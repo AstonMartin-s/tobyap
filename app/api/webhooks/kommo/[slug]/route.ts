@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
-import { leads, kommoWebhookLog } from '@/db/schema';
+import { leads, kommoWebhookLog, metaEvents } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { sendCapiEvent } from '@/lib/meta';
 import { fetchKommoLead, readLeadField, readPhone, contactId, type KommoLead } from '@/lib/kommo';
@@ -96,36 +96,51 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   for (const ev of events) {
     try {
       const lead = await fetchKommoLead(tenant, ev.leadId);
+
+      // FILTRO: solo trackeamos el pipeline configurado del tenant (ETAPAS-SA).
+      if (tenant.kommoPipelineId && lead.pipeline_id !== tenant.kommoPipelineId) {
+        results.push({ leadId: ev.leadId, skipped: 'fuera del pipeline trackeado' });
+        continue;
+      }
+
       const row = await upsertLead(tenant, lead, null);
       const ud = buildUserData(tenant, lead);
 
-      if (ev.type === 'add') {
-        const r = await sendCapiEvent(tenant, {
-          eventName: 'Conversacion',
-          eventId: `conv-${ev.leadId}`,
-          userData: ud,
-          customData: {
-            campaign_id: readLeadField(lead, tenant.fieldUtmCampaign) ?? undefined,
-            internal_event: 'ConversacionCRM',
-          },
-          leadId: row?.id ?? null,
-        });
-        results.push(r);
-      } else if (ev.type === 'status' && ev.statusId === tenant.statusCargoId) {
-        const r = await sendCapiEvent(tenant, {
-          eventName: 'Cargo',
-          eventId: `cargo-${ev.leadId}`,
-          userData: ud,
-          customData: { internal_event: 'CargoCRM' },
-          leadId: row?.id ?? null,
-        });
-        // marcar convertido
-        if (row) {
-          await db.update(leads).set({ converted: true }).where(eq(leads.id, row.id));
-        }
-        results.push(r);
+      // CONVERSACIÓN: una sola vez por lead (al ENTRAR al embudo, por alta o por
+      // movimiento). El event_id determinístico + dedup hacen que sea idempotente.
+      const convId = `conv-${ev.leadId}`;
+      if (!(await eventExists(tenant.id, convId))) {
+        results.push(
+          await sendCapiEvent(tenant, {
+            eventName: 'Conversacion',
+            eventId: convId,
+            userData: ud,
+            customData: {
+              campaign_id: readLeadField(lead, tenant.fieldUtmCampaign) ?? undefined,
+              internal_event: 'ConversacionCRM',
+            },
+            leadId: row?.id ?? null,
+          }),
+        );
       }
-      // otros cambios de etapa: solo actualizamos status (ya hecho en upsert)
+
+      // CARGA: cuando el lead está en el estado P4-CARGO (status_cargo). Idempotente.
+      const cargoId = `cargo-${ev.leadId}`;
+      if (lead.status_id === tenant.statusCargoId && !(await eventExists(tenant.id, cargoId))) {
+        results.push(
+          await sendCapiEvent(tenant, {
+            eventName: 'Cargo',
+            eventId: cargoId,
+            userData: ud,
+            customData: {
+              campaign_id: readLeadField(lead, tenant.fieldUtmCampaign) ?? undefined,
+              internal_event: 'CargoCRM',
+            },
+            leadId: row?.id ?? null,
+          }),
+        );
+        if (row) await db.update(leads).set({ converted: true }).where(eq(leads.id, row.id));
+      }
     } catch (e) {
       console.error(`[kommo-webhook ${tenant.slug}] lead ${ev.leadId}:`, e);
       results.push({ leadId: ev.leadId, error: String(e) });
@@ -133,4 +148,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
 
   return NextResponse.json({ ok: true, processed: results.length, results });
+}
+
+// ¿Ya enviamos este evento para este lead? (idempotencia a nivel app, antes de
+// llamar a Meta, para no repetir envíos en cada webhook).
+async function eventExists(tenantId: string, eventId: string): Promise<boolean> {
+  const r = await db.query.metaEvents.findFirst({
+    where: and(eq(metaEvents.tenantId, tenantId), eq(metaEvents.eventId, eventId)),
+  });
+  return !!r;
 }
