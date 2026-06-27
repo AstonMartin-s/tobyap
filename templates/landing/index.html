@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <title>Redirigiendo…</title>
+  <style>
+    :root { --brand:#fbc604; --bg:#0d0f12; --fg:#e7e9ec; }
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,sans-serif}
+    .wrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:1rem;text-align:center}
+    .spinner{width:42px;height:42px;border:4px solid #2a2f36;border-top-color:var(--brand);border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .muted{color:#8a93a0;font-size:.9rem}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="spinner"></div>
+    <p>Verificando tu acceso…</p>
+    <p class="muted">Te redirigimos a WhatsApp en un instante.</p>
+  </div>
+
+  <!-- ====================== CONFIG (por cliente) ====================== -->
+  <!-- En el deploy real estos valores vienen de NEXT_PUBLIC_* / build.   -->
+  <script>
+    window.LANDING_CONFIG = {
+      slug:            "mooneyatkinson",                       // tenant en TOBYAP
+      trackApi:        "https://TU-APP.up.railway.app",        // base de TOBYAP (Railway)
+      pixelId:         "PEGAR_PIXEL_ID",                       // Meta Pixel
+      waNumber:        "5491150120516",                        // WhatsApp destino
+      defaultMessage:  "Hola vi el anuncio y quiero mi beneficio",
+      redirectDelayMs: 1500
+    };
+  </script>
+
+  <!-- ====================== Meta Pixel ====================== -->
+  <script>
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+    n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+    document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    if (window.LANDING_CONFIG.pixelId && window.LANDING_CONFIG.pixelId.indexOf('PEGAR') === -1) {
+      fbq('init', window.LANDING_CONFIG.pixelId);
+      fbq('track', 'PageView');
+    }
+  </script>
+
+  <!-- ====================== Lógica de atribución + redirect ====================== -->
+  <script>
+    (function () {
+      var C = window.LANDING_CONFIG;
+
+      function getParam(n){ return new URLSearchParams(location.search).get(n); }
+      function getCookie(n){ var m = document.cookie.match('(^|;)\\s*' + n + '\\s*=\\s*([^;]+)'); return m ? m.pop() : null; }
+
+      var fbclid = getParam('fbclid');
+      var campaignId = getParam('campaign') || getParam('campaignId') || getParam('utm_campaign') || null;
+      var fbp = getCookie('_fbp');
+      var fbc = getCookie('_fbc') || (fbclid ? ('fb.1.' + Date.now() + '.' + fbclid) : null);
+
+      // 1) Registrar el redirect en TOBYAP (no bloquea el redirect).
+      try {
+        fetch(C.trackApi.replace(/\/$/, '') + '/api/track/redirect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          keepalive: true,
+          body: JSON.stringify({
+            slug: C.slug,
+            campaignId: campaignId,
+            fbp: fbp, fbc: fbc, fbclid: fbclid,
+            eventSourceUrl: location.href
+          })
+        }).catch(function(){});
+      } catch (e) {}
+
+      // 2) Redirigir a WhatsApp con el mensaje por defecto.
+      var msg = encodeURIComponent(C.defaultMessage || '');
+      var wa = 'https://wa.me/' + (C.waNumber || '').replace(/\D/g, '') + '?text=' + msg;
+      setTimeout(function () { window.location.href = wa; }, C.redirectDelayMs || 1500);
+    })();
+  </script>
+</body>
+</html>

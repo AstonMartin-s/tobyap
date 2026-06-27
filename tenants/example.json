@@ -1,0 +1,59 @@
+{
+  "slug": "example",
+  "name": "Cliente de ejemplo",
+
+  "kommoSubdomain": "ejemplo",
+  "kommoToken": "PEGAR_TOKEN_KOMMO_AQUI_SOLO_LOCAL",
+  "kommoEmail": "ejemplo@correo.com",
+  "kommoPassword": "PEGAR_PASS_KOMMO",
+  "kommoPipelineId": 1234567,
+
+  "panelUser": "operador",
+  "panelPassword": "cambiar-esto",
+
+  "openaiApiKey": "sk-...",
+  "metaPixelId": "000000000000000",
+  "metaCapiToken": "PEGAR_TOKEN_META_CAPI",
+  "eventSuffix": "0",
+
+  "customFields": {
+    "fbclid": 111111,
+    "utm_campaign": 222222,
+    "utm_source": 333333,
+    "utm_content": 444444,
+    "fbc": 555555,
+    "fbp": 666666,
+    "status_cargo": 777777,
+    "status_revisar_imagen": 888888
+  },
+
+  "role": "client",
+  "platform": "meta",
+  "apiUrl": "https://ejemplo.paybot.app",
+  "kommoDb": "kommo-ejemplo",
+  "projectId": "prj_xxxxxxxx",
+  "pspActive": false,
+  "pspKey": "",
+  "externalApiKey": "pbx_ext_live_PEGAR_SOLO_LOCAL",
+
+  "settings": {
+    "accountName": "Administración Ejemplo SA",
+    "accountCbu": "0000000000000000000000",
+    "context": "Eres un asistente de IA especializado en clasificar mensajes... (prompt §6.5)",
+    "message": "Hola vi el anuncio y quiero mi beneficio",
+    "regularMessage": ".",
+    "walink": "1150120516"
+  },
+
+  "numbers": [
+    { "name": "Agro Norte", "phone": "5491164330069", "status": true, "type": "publi" },
+    { "name": "Ganadera Agro", "phone": "5491124024628", "status": true, "type": "spam" },
+    { "name": "Soporte 1", "phone": "5491150120516", "status": true, "type": "soporte" }
+  ],
+
+  "rules": [
+    { "rule": "text vacío + attachment", "text": "Revisar Imagen", "priority": 1, "status": "active" },
+    { "rule": "Quiero mi B0NUS", "text": "Pidio Usuario", "priority": 1, "status": "active" },
+    { "rule": "NUNCA cambiar a status Cargo", "text": "-", "priority": 1, "status": "active" }
+  ]
+}
