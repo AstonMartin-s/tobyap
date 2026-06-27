@@ -4,7 +4,7 @@ import { db } from '@/db';
 import { leads, kommoWebhookLog, metaEvents } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { sendCapiEvent } from '@/lib/meta';
-import { fetchKommoLead, readLeadField, readPhone, contactId, type KommoLead } from '@/lib/kommo';
+import { fetchKommoLead, fetchContactPhone, readLeadField, readPhone, contactId, type KommoLead } from '@/lib/kommo';
 import type { ResolvedTenant } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
@@ -105,6 +105,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
       const row = await upsertLead(tenant, lead, null);
       const ud = buildUserData(tenant, lead);
+      // El teléfono no viene en el contacto embebido: lo pedimos aparte si falta.
+      if (!ud.phone) {
+        const cId = contactId(lead);
+        if (cId) ud.phone = await fetchContactPhone(tenant, cId);
+      }
 
       // CONVERSACIÓN: una sola vez por lead (al ENTRAR al embudo, por alta o por
       // movimiento). El event_id determinístico + dedup hacen que sea idempotente.
@@ -154,7 +159,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 // llamar a Meta, para no repetir envíos en cada webhook).
 async function eventExists(tenantId: string, eventId: string): Promise<boolean> {
   const r = await db.query.metaEvents.findFirst({
-    where: and(eq(metaEvents.tenantId, tenantId), eq(metaEvents.eventId, eventId)),
+    where: and(
+      eq(metaEvents.tenantId, tenantId),
+      eq(metaEvents.eventId, eventId),
+      eq(metaEvents.status, 'sent'), // solo enviados; los 'failed' se reintentan
+    ),
   });
   return !!r;
 }

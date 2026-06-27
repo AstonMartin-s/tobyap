@@ -95,11 +95,16 @@ export async function sendCapiEvent(
     throw new Error(`Tenant ${tenant.slug} sin pixel/token de Meta configurado`);
   }
 
+  // PAYBOT usa action_source 'website'. Si se usa 'business_messaging', Meta exige
+  // además messaging_channel (whatsapp/messenger/instagram).
+  const actionSource = input.actionSource ?? 'website';
+
   const event = {
     event_name: eventName,
     event_time: Math.floor(Date.now() / 1000),
     event_id: input.eventId,
-    action_source: input.actionSource ?? 'business_messaging',
+    action_source: actionSource,
+    ...(actionSource === 'business_messaging' ? { messaging_channel: 'whatsapp' } : {}),
     ...(input.eventSourceUrl ? { event_source_url: input.eventSourceUrl } : {}),
     user_data: buildUserData(input.userData),
     custom_data: input.customData ?? {},
@@ -147,6 +152,9 @@ async function persistEvent(
   status: 'sent' | 'failed' | 'pending',
 ) {
   try {
+    const eventType = input.eventName === 'Conversacion' ? 'conversacion' : 'cargo';
+    const campaignId = (input.customData?.campaign_id as string) ?? null;
+    const sentAt = status === 'sent' ? new Date() : null;
     await db
       .insert(metaEvents)
       .values({
@@ -155,15 +163,20 @@ async function persistEvent(
         eventName,
         eventId: input.eventId,
         // eventType alimenta los reportes admin (conversacion / cargo / redirect).
-        eventType: input.eventName === 'Conversacion' ? 'conversacion' : 'cargo',
-        campaignId: (input.customData?.campaign_id as string) ?? null,
+        eventType,
+        campaignId,
         payload: payload as object,
         response: response as object,
         status,
         success: status === 'sent',
-        sentAt: status === 'sent' ? new Date() : null,
+        sentAt,
       })
-      .onConflictDoNothing({ target: [metaEvents.tenantId, metaEvents.eventId] });
+      // Si ya existía (p. ej. un intento fallido), lo actualizamos: así un reintento
+      // exitoso queda reflejado como 'sent' en vez de quedar pegado en 'failed'.
+      .onConflictDoUpdate({
+        target: [metaEvents.tenantId, metaEvents.eventId],
+        set: { payload: payload as object, response: response as object, status, success: status === 'sent', sentAt },
+      });
   } catch (e) {
     console.error('[meta] no se pudo persistir el evento:', e);
   }

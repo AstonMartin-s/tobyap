@@ -63,6 +63,25 @@ export function contactId(lead: KommoLead): number | null {
   return lead._embedded?.contacts?.[0]?.id ?? null;
 }
 
+// El contacto embebido en el lead NO trae custom_fields_values; hay que pedir el
+// contacto aparte para sacar el teléfono (field_code PHONE).
+export async function fetchContactPhone(
+  tenant: ResolvedTenant,
+  cId: number,
+): Promise<string | null> {
+  if (!tenant.kommoSubdomain || !tenant.kommoToken) return null;
+  const url = `https://${tenant.kommoSubdomain}.kommo.com/api/v4/contacts/${cId}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${tenant.kommoToken}` } });
+  if (!res.ok) return null;
+  const c = (await res.json()) as {
+    custom_fields_values?: Array<{ field_code?: string; field_name?: string; values: Array<{ value: string }> }>;
+  };
+  const phone = c.custom_fields_values?.find(
+    (f) => f.field_code === 'PHONE' || (f.field_name ?? '').toLowerCase().includes('tel'),
+  );
+  return phone?.values?.[0]?.value ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // Pipelines / estados (proxy de solo lectura hacia Kommo v4).
 // ---------------------------------------------------------------------------
