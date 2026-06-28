@@ -8,3 +8,5 @@ out
 drizzle/.snapshot
 tenants/*.json
 !tenants/example.json
+
+bots-adapted/
