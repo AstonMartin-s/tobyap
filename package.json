@@ -11,7 +11,8 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "seed:tenant": "tsx --env-file=.env scripts/seed-tenant.ts",
-    "import:paybot": "tsx --env-file=.env scripts/import-paybot-events.ts"
+    "import:paybot": "tsx --env-file=.env scripts/import-paybot-events.ts",
+    "onboard": "tsx --env-file=.env scripts/onboard-client.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

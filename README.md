@@ -37,7 +37,41 @@ npm run dev                 # http://localhost:3000
 
 ---
 
-## Alta de un cliente (tenant)
+## Alta de un cliente NUEVO (onboarding automático)
+
+Para clientes con el embudo estándar, el alta descubre **solo** el pipeline, los
+estados (`Cargo$`, `Revisar imagen`) y los custom fields (`fbclid`, `utm_*`) **por
+nombre** desde Kommo. Solo aportás lo esencial:
+
+```bash
+npm run onboard -- tenants/<slug>.json
+```
+
+JSON mínimo (sin IDs):
+```json
+{
+  "slug": "nuevocliente",
+  "name": "Nuevo Cliente",
+  "role": "client",
+  "kommoSubdomain": "nuevocliente",
+  "kommoToken": "<token largo kommo>",
+  "panelUser": "nuevocliente@gmail.com",
+  "panelPassword": "<pass panel>",
+  "metaPixelId": "<pixel>",
+  "metaCapiToken": "<token capi>",
+  "eventSuffix": "3"
+}
+```
+Opcionales: `pipelineName` o `pipelineId` (si no usa el principal), `customFields`
+(para pisar lo descubierto, p. ej. clientes multi-embudo), `apiUrl`, `externalApiKey`.
+
+El script imprime lo descubierto y la URL de webhook a configurar en Kommo.
+Equivalente vía API: `POST /api/admin/onboard` (con sesión admin o `x-admin-token`);
+agregá `?preview=true` para solo ver lo que detectaría sin crear nada.
+
+---
+
+## Alta de un cliente (manual, con IDs explícitos)
 
 **Opción A — endpoint admin (recomendada, usa el server con env cargada):**
 ```bash
