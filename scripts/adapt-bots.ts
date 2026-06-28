@@ -14,6 +14,42 @@ const agg = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 interface Pipe { id: number; name: string; statuses: Array<{ id: number; name: string }> }
 
+// Fuentes ESTÁTICAS (sin token): usar con `npm run adapt-bots -- <slug> static <sourceKey>`.
+// Datos del CRM modelo, para mapear estados/custom-fields por nombre.
+const STATIC_SOURCES: Record<string, { pipelines: Pipe[]; customFields: Record<number, string> }> = {
+  publigreenbetmia: {
+    pipelines: [
+      {
+        id: 12293031,
+        name: 'Embudo de ventas',
+        statuses: [
+          { id: 95010507, name: 'Incoming leads' },
+          { id: 95010515, name: 'Revisar' },
+          { id: 95010511, name: 'Pidio Usuario' },
+          { id: 95015083, name: 'Pidio CbuAlias' },
+          { id: 95160651, name: 'Revisar imagen' },
+          { id: 95015087, name: 'Cargo$' },
+          { id: 95010523, name: 'No Atender' },
+          { id: 95015091, name: 'No Cargo' },
+          { id: 95010519, name: 'Seguimiento' },
+        ],
+      },
+      {
+        id: 12293739,
+        name: 'Clientes Regulares',
+        statuses: [
+          { id: 95015095, name: 'Leads Entrantes' },
+          { id: 95015099, name: 'Pidio Cbu Alias' },
+          { id: 95015103, name: 'Atencion Manual' },
+          { id: 95015107, name: 'Tomar decisión' },
+          { id: 95015183, name: 'Solicita Retiro' },
+        ],
+      },
+    ],
+    customFields: { 752838: 'CBU', 752840: 'TITULAR' },
+  },
+};
+
 async function pipelines(subdomain: string, token: string): Promise<Pipe[]> {
   const res = await fetch(`https://${subdomain}.kommo.com/api/v4/leads/pipelines`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -47,11 +83,19 @@ async function main() {
     process.exit(1);
   }
 
-  const srcPipes = await pipelines(sourceSub, sourceToken);
+  // Origen: por token (live) o estático (sin token) si sourceToken === 'static'.
+  const staticSrc = sourceToken === 'static' ? STATIC_SOURCES[sourceSub] : undefined;
+  if (sourceToken === 'static' && !staticSrc) {
+    console.error(`No hay fuente estática para "${sourceSub}". Disponibles: ${Object.keys(STATIC_SOURCES).join(', ')}`);
+    process.exit(1);
+  }
+  const srcPipes = staticSrc ? staticSrc.pipelines : await pipelines(sourceSub, sourceToken);
   const dstPipes = await pipelines(t.kommoSubdomain, t.kommoToken);
 
   // Custom fields: origen id->nombre, destino nombre(agg)->id.
-  const srcCf = await customFields(sourceSub, sourceToken);
+  const srcCf = staticSrc
+    ? new Map<number, string>(Object.entries(staticSrc.customFields).map(([id, n]) => [Number(id), n]))
+    : await customFields(sourceSub, sourceToken);
   const dstCf = await customFields(t.kommoSubdomain, t.kommoToken);
   const dstCfByName = new Map<string, number>();
   for (const [id, name] of dstCf) dstCfByName.set(agg(name), id);
