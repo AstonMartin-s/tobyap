@@ -67,8 +67,14 @@ Esto, contra el Kommo del cliente:
 | REVISAR_IMAGEN | mueve a "Revisar imagen" |
 | CREO_USUARIO / SEGUIMIENTO | mensajes/estados |
 
-> Los bots no se crean por API; se importan a mano en el diseñador y se les apunta el
-> `send_hook` a nuestros endpoints. (Automatizar esto es una fase futura aparte.)
+> **Los bots NO se editan por API** (GET devuelve solo metadata; el flujo vive en el
+> diseñador). Flujo: (1) importás los bots de ejemplo de `bots-template/` en el diseñador
+> de Salesbot del cliente; (2) ajustás a mano las variables. Para no adivinar, corré:
+> ```bash
+> npm run bot-spec -- <slug>
+> ```
+> que imprime EXACTO qué poner: URLs de `send_hook`, IDs de estado para cada `change_status`
+> y los `{{lead.cf.<id>}}` del CBU/Titular de ese cliente.
 
 ## 5. Landing del cliente
 

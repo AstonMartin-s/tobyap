@@ -13,7 +13,8 @@
     "seed:tenant": "tsx --env-file=.env scripts/seed-tenant.ts",
     "import:paybot": "tsx --env-file=.env scripts/import-paybot-events.ts",
     "onboard": "tsx --env-file=.env scripts/onboard-client.ts",
-    "provision": "tsx --env-file=.env scripts/provision-client.ts"
+    "provision": "tsx --env-file=.env scripts/provision-client.ts",
+    "bot-spec": "tsx --env-file=.env scripts/bot-spec.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
