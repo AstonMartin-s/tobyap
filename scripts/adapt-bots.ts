@@ -1,29 +1,26 @@
 // Reescribe los bots de bots-template/ dejándolos LISTOS para importar al Kommo del
-// cliente: cambia las URLs de send_hook a nuestros endpoints (+slug) y remapea los
-// change_status (IDs de estado del CRM origen -> IDs del embudo del cliente, por NOMBRE).
+// cliente: URLs de send_hook -> nuestros endpoints (+slug) y change_status remapeado
+// (estado + pipeline) del CRM origen al del cliente, por NOMBRE (tolerante).
 //
 //   npm run adapt-bots -- <slug> <sourceToken> <sourceSubdomain>
 //
-// <sourceToken>/<sourceSubdomain>: del CRM modelo de donde salieron los bots
-// (ej. paybotcrm13). Se usa solo para leer sus nombres de estado y mapear.
 // Salida: bots-adapted/<slug>/*.json
 import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
 import { getTenantBySlug } from '@/lib/tenants';
-import { fetchPipelineStatuses } from '@/lib/kommo';
 
 const APP = 'https://tobyap-production.up.railway.app';
-const norm = (s: string) => s.trim().toLowerCase();
+// Normalización tolerante: minúsculas + solo alfanumérico ("Pidio cbu/alias" == "Pidio CbuAlias").
+const agg = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-async function fetchAllStatuses(subdomain: string, token: string) {
+interface Pipe { id: number; name: string; statuses: Array<{ id: number; name: string }> }
+
+async function pipelines(subdomain: string, token: string): Promise<Pipe[]> {
   const res = await fetch(`https://${subdomain}.kommo.com/api/v4/leads/pipelines`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error(`Origen pipelines: HTTP ${res.status}`);
-  const d = (await res.json()) as { _embedded?: { pipelines?: Array<{ _embedded?: { statuses?: Array<{ id: number; name: string }> } }> } };
-  const byId = new Map<number, string>();
-  for (const p of d._embedded?.pipelines ?? [])
-    for (const s of p._embedded?.statuses ?? []) byId.set(s.id, s.name);
-  return byId;
+  if (!res.ok) throw new Error(`${subdomain} pipelines: HTTP ${res.status}`);
+  const d = (await res.json()) as { _embedded?: { pipelines?: Array<{ id: number; name: string; _embedded?: { statuses?: Array<{ id: number; name: string }> } }> } };
+  return (d._embedded?.pipelines ?? []).map((p) => ({ id: p.id, name: p.name, statuses: p._embedded?.statuses ?? [] }));
 }
 
 async function main() {
@@ -33,84 +30,83 @@ async function main() {
     process.exit(1);
   }
   const t = await getTenantBySlug(slug);
-  if (!t || !t.kommoPipelineId) {
-    console.error(`Tenant "${slug}" no encontrado o sin pipeline.`);
+  if (!t || !t.kommoSubdomain || !t.kommoToken) {
+    console.error(`Tenant "${slug}" no encontrado o sin credenciales.`);
     process.exit(1);
   }
 
-  // Origen: id -> nombre.  Destino: nombre -> id.
-  const srcById = await fetchAllStatuses(sourceSub, sourceToken);
-  const pipelineId = t.kommoPipelineId;
-  const dstStatuses = await fetchPipelineStatuses(t, pipelineId);
-  const nameToId = new Map<string, number>();
-  for (const s of dstStatuses) nameToId.set(norm(s.name), s.id);
+  const srcPipes = await pipelines(sourceSub, sourceToken);
+  const dstPipes = await pipelines(t.kommoSubdomain, t.kommoToken);
 
-  // old status id -> new status id (por nombre). 142/143 (won/lost) se mantienen.
-  function remapStatus(oldId: number): number {
-    if (oldId === 142 || oldId === 143) return oldId;
-    const name = srcById.get(oldId);
-    const newId = name ? nameToId.get(norm(name)) : undefined;
-    return newId ?? oldId; // si no matchea, deja el viejo (y avisamos)
+  // Origen: statusId -> { name, pipeName }
+  const srcById = new Map<number, { name: string; pipeName: string }>();
+  for (const p of srcPipes) for (const s of p.statuses) srcById.set(s.id, { name: s.name, pipeName: p.name });
+
+  // Destino: pipeName(agg) -> { id, statusByName(agg) -> id }
+  const dstByPipe = new Map<string, { id: number; byName: Map<string, number> }>();
+  for (const p of dstPipes) {
+    const byName = new Map<string, number>();
+    for (const s of p.statuses) byName.set(agg(s.name), s.id);
+    dstByPipe.set(agg(p.name), { id: p.id, byName });
+  }
+  const mainPipe = dstByPipe.get(agg('Embudo de ventas')) ?? [...dstByPipe.values()][0];
+
+  const warnings: string[] = [];
+  function remap(oldId: number): { value: number; pipeline_id: number } {
+    const src = srcById.get(oldId);
+    const targetPipe = (src && dstByPipe.get(agg(src.pipeName))) || mainPipe;
+    if (oldId === 142 || oldId === 143) return { value: oldId, pipeline_id: targetPipe.id };
+    const newId = src ? targetPipe.byName.get(agg(src.name)) : undefined;
+    if (newId == null) {
+      warnings.push(`estado ${oldId} (${src?.name ?? 'desconocido'} / ${src?.pipeName ?? '?'}) no se pudo mapear`);
+      return { value: oldId, pipeline_id: targetPipe.id };
+    }
+    return { value: newId, pipeline_id: targetPipe.id };
   }
 
   const convUrl = `${APP}/api/conversion-event/${slug}`;
   const cbuUrl = `${APP}/api/cbu/${slug}`;
-  const outDir = `bots-adapted/${slug}`;
-  mkdirSync(outDir, { recursive: true });
-  const warnings: string[] = [];
 
-  // Transforma recursivamente el árbol del flujo: URLs + change_status.
-  function walk(node: unknown, file: string): void {
-    if (Array.isArray(node)) {
-      node.forEach((n) => walk(n, file));
-      return;
-    }
+  function walk(node: unknown): void {
+    if (Array.isArray(node)) return node.forEach(walk);
     if (!node || typeof node !== 'object') return;
     const obj = node as Record<string, unknown>;
-
     for (const [k, v] of Object.entries(obj)) {
       if (typeof v === 'string') {
         if (v.includes('/api/conversion-event')) obj[k] = convUrl;
         else if (v.includes('/api/cbu')) obj[k] = cbuUrl;
-      } else {
-        walk(v, file);
-      }
+      } else walk(v);
     }
-
     if (obj.name === 'change_status' && obj.params && typeof obj.params === 'object') {
       const p = obj.params as Record<string, unknown>;
       if (typeof p.value === 'number') {
-        const oldId = p.value;
-        const newId = remapStatus(oldId);
-        if (newId === oldId && oldId !== 142 && oldId !== 143)
-          warnings.push(`${file}: estado ${oldId} (${srcById.get(oldId) ?? 'desconocido'}) no se pudo remapear`);
-        p.value = newId;
-        p.pipeline_id = pipelineId;
+        const r = remap(p.value);
+        p.value = r.value;
+        p.pipeline_id = r.pipeline_id;
       }
     }
   }
-
-  // model.text y model.positions son STRINGS con JSON adentro: parse -> walk -> stringify.
-  function transformJsonString(s: string, file: string): string {
+  const transform = (s: string) => {
     try {
-      const parsed = JSON.parse(s);
-      walk(parsed, file);
-      return JSON.stringify(parsed);
+      const o = JSON.parse(s);
+      walk(o);
+      return JSON.stringify(o);
     } catch {
       return s;
     }
-  }
+  };
 
+  const outDir = `bots-adapted/${slug}`;
+  mkdirSync(outDir, { recursive: true });
   for (const file of readdirSync('bots-template').filter((f) => f.endsWith('.json'))) {
-    if (file === 'CREATE_USER.json') continue; // lo dejamos afuera
+    if (file === 'CREATE_USER.json') continue;
     const bot = JSON.parse(readFileSync(`bots-template/${file}`, 'utf8'));
-    const model = bot.model ?? {};
-    if (typeof model.text === 'string') model.text = transformJsonString(model.text, file);
-    if (typeof model.positions === 'string') model.positions = transformJsonString(model.positions, file);
-    writeFileSync(`${outDir}/${file}`, JSON.stringify(bot, null, 0));
+    const m = bot.model ?? {};
+    if (typeof m.text === 'string') m.text = transform(m.text);
+    if (typeof m.positions === 'string') m.positions = transform(m.positions);
+    writeFileSync(`${outDir}/${file}`, JSON.stringify(bot));
     console.log(`✓ ${file}`);
   }
-
   if (warnings.length) {
     console.log('\n⚠️  Revisar:');
     [...new Set(warnings)].forEach((w) => console.log('   ' + w));

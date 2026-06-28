@@ -33,6 +33,7 @@ async function main() {
     pipelineName: input.pipelineName,
   });
   console.log(`   Pipeline: ${prov.pipelineName} (${prov.pipelineId}) · estados creados: ${prov.created.statuses}`);
+  console.log(`   Clientes Regulares: ${prov.regularesPipelineId} ${prov.created.regulares ? '(creado)' : '(ya existía)'}`);
   console.log(`   Custom fields creados: ${prov.created.fields.join(', ') || '(ninguno, ya existían)'}`);
 
   console.log('2) Descubriendo config (mapeo por nombre) ...');

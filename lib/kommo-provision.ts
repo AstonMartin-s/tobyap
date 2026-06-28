@@ -21,15 +21,24 @@ export const STANDARD_STATUSES: Array<{ name: string; sort: number; color: strin
   { name: 'Seguimiento', sort: 90, color: '#ffce5a' },
 ];
 
+// Segundo pipeline: clientes que ya convirtieron al menos una vez. El bot CARGO
+// mueve acá tras la carga.
+export const REGULARES_NAME = 'Clientes Regulares';
+export const REGULARES_STATUSES: Array<{ name: string; sort: number; color: string }> = [
+  { name: 'Atencion Manual', sort: 20, color: '#fffd7f' },
+  { name: 'Solicita Retiro', sort: 30, color: '#f9deff' },
+];
+
 // Custom fields base (todos type "text" para poder leerlos y escribirlos).
 export const STANDARD_FIELDS = ['fbclid', 'utm_campaign', 'utm_source', 'utm_content', 'CBU', 'TITULAR'];
 
 interface ProvisionResult {
   pipelineId: number;
   pipelineName: string;
+  regularesPipelineId: number;
   statuses: { id: number; name: string }[];
   fields: Record<string, number>;
-  created: { statuses: number; fields: string[] };
+  created: { statuses: number; fields: string[]; regulares: boolean };
 }
 
 async function kommo<T>(subdomain: string, token: string, path: string, init?: RequestInit): Promise<T> {
@@ -129,6 +138,24 @@ async function ensureFields(subdomain: string, token: string) {
   return { fields, created };
 }
 
+// Crea el pipeline "Clientes Regulares" si no existe. Devuelve su id.
+async function ensureRegulares(subdomain: string, token: string) {
+  const list = await kommo<{ _embedded?: { pipelines?: Array<{ id: number; name: string }> } }>(
+    subdomain,
+    token,
+    '/leads/pipelines',
+  );
+  const found = list._embedded?.pipelines?.find((p) => norm(p.name) === norm(REGULARES_NAME));
+  if (found) return { id: found.id, created: false };
+  const res = await kommo<{ _embedded: { pipelines: Array<{ id: number }> } }>(
+    subdomain,
+    token,
+    '/leads/pipelines',
+    { method: 'POST', body: JSON.stringify([{ name: REGULARES_NAME, is_main: false, is_unsorted_on: true, sort: 20, _embedded: { statuses: REGULARES_STATUSES } }]) },
+  );
+  return { id: res._embedded.pipelines[0].id, created: true };
+}
+
 export async function provisionClient(
   subdomain: string,
   token: string,
@@ -137,11 +164,13 @@ export async function provisionClient(
   const name = opts.pipelineName ?? 'Embudo de ventas';
   const pipe = await ensurePipeline(subdomain, token, name);
   const f = await ensureFields(subdomain, token);
+  const reg = await ensureRegulares(subdomain, token);
   return {
     pipelineId: pipe.id,
     pipelineName: pipe.name,
+    regularesPipelineId: reg.id,
     statuses: pipe.statuses,
     fields: f.fields,
-    created: { statuses: pipe.createdStatuses, fields: f.created },
+    created: { statuses: pipe.createdStatuses, fields: f.created, regulares: reg.created },
   };
 }
