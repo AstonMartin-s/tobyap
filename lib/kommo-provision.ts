@@ -9,15 +9,16 @@
 
 // Embudo estándar (matriz publigreenbetmia). "Incoming leads" y ganados/perdidos
 // los crea Kommo solo; nosotros agregamos los intermedios.
+// Colores de la paleta válida de Kommo (no acepta hex arbitrarios).
 export const STANDARD_STATUSES: Array<{ name: string; sort: number; color: string }> = [
-  { name: 'Revisar', sort: 20, color: '#ffff99' },
-  { name: 'Pidio Usuario', sort: 30, color: '#99ccff' },
+  { name: 'Revisar', sort: 20, color: '#fffd7f' },
+  { name: 'Pidio Usuario', sort: 30, color: '#98cbff' },
   { name: 'Pidio CbuAlias', sort: 40, color: '#f9deff' },
   { name: 'Revisar imagen', sort: 50, color: '#ffdc7f' },
   { name: 'Cargo$', sort: 60, color: '#87f2c0' },
-  { name: 'No Atender', sort: 70, color: '#ffcccc' },
+  { name: 'No Atender', sort: 70, color: '#ffc8c8' },
   { name: 'No Cargo', sort: 80, color: '#f2f3f4' },
-  { name: 'Seguimiento', sort: 90, color: '#ffcc66' },
+  { name: 'Seguimiento', sort: 90, color: '#ffce5a' },
 ];
 
 // Custom fields base (todos type "text" para poder leerlos y escribirlos).
@@ -46,30 +47,53 @@ async function kommo<T>(subdomain: string, token: string, path: string, init?: R
 
 const norm = (s: string) => s.trim().toLowerCase();
 
-// Crea el pipeline estándar (o lo reutiliza si ya existe por nombre).
+interface StatusRaw { id: number; name: string; is_editable?: boolean; type?: number; sort?: number }
+
+// Deja el pipeline elegido (por nombre o el principal) con los estados estándar:
+// agrega los que faltan (por nombre) y borra los default no estándar (cuenta nueva).
 async function ensurePipeline(subdomain: string, token: string, name: string) {
-  const existing = await kommo<{ _embedded?: { pipelines?: Array<{ id: number; name: string; _embedded?: { statuses?: Array<{ id: number; name: string }> } }> } }>(
+  const list = await kommo<{ _embedded?: { pipelines?: Array<{ id: number; name: string; is_main?: boolean; _embedded?: { statuses?: StatusRaw[] } }> } }>(
     subdomain,
     token,
     '/leads/pipelines',
   );
-  const found = existing._embedded?.pipelines?.find((p) => norm(p.name) === norm(name));
-  if (found) {
-    return { id: found.id, name: found.name, statuses: found._embedded?.statuses ?? [], createdStatuses: 0 };
-  }
-  const res = await kommo<{ _embedded: { pipelines: Array<{ id: number; name: string; _embedded?: { statuses?: Array<{ id: number; name: string }> } }> } }>(
-    subdomain,
-    token,
-    '/leads/pipelines',
-    {
+  const pipelines = list._embedded?.pipelines ?? [];
+  const p =
+    pipelines.find((x) => norm(x.name) === norm(name)) ??
+    pipelines.find((x) => x.is_main) ??
+    pipelines[0];
+  if (!p) throw new Error('No hay pipeline para provisionar');
+
+  let statuses = p._embedded?.statuses ?? [];
+  const have = new Set(statuses.map((s) => norm(s.name)));
+
+  // 1) Agregar los estándar que falten.
+  const toAdd = STANDARD_STATUSES.filter((s) => !have.has(norm(s.name)));
+  if (toAdd.length) {
+    await kommo(subdomain, token, `/leads/pipelines/${p.id}/statuses`, {
       method: 'POST',
-      body: JSON.stringify([
-        { name, is_main: false, _embedded: { statuses: STANDARD_STATUSES } },
-      ]),
-    },
+      body: JSON.stringify(toAdd),
+    });
+  }
+
+  // 2) Borrar estados default no estándar (editables, no de sistema). Cuenta nueva
+  //    => sin leads, es seguro. Conservamos "Incoming leads" y los nuestros.
+  const keep = new Set<string>(STANDARD_STATUSES.map((s) => norm(s.name)));
+  keep.add('incoming leads');
+  for (const s of statuses) {
+    if (s.is_editable && s.type !== 1 && s.id !== 142 && s.id !== 143 && !keep.has(norm(s.name))) {
+      await kommo(subdomain, token, `/leads/pipelines/${p.id}/statuses/${s.id}`, { method: 'DELETE' }).catch(() => {});
+    }
+  }
+
+  // 3) Re-leer estados finales.
+  const fresh = await kommo<{ _embedded?: { statuses?: StatusRaw[] } }>(
+    subdomain,
+    token,
+    `/leads/pipelines/${p.id}`,
   );
-  const p = res._embedded.pipelines[0];
-  return { id: p.id, name: p.name, statuses: p._embedded?.statuses ?? [], createdStatuses: STANDARD_STATUSES.length };
+  statuses = fresh._embedded?.statuses ?? statuses;
+  return { id: p.id, name: p.name, statuses, createdStatuses: toAdd.length };
 }
 
 // Crea los custom fields que falten (por nombre). Devuelve nombre->id de todos.

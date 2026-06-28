@@ -148,9 +148,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         );
       }
 
-      // CARGA: estado P4-CARGO (fallback; la fuente autoritativa es /api/conversion-event).
+      // CARGA: cuando entra al estado Cargo$. Miramos el estado del EVENTO (por si un
+      // bot lo mueve enseguida) y también el actual. La fuente más confiable sigue
+      // siendo /api/conversion-event (bot CARGO), esto es el fallback por estado.
       const cargoId = `cargo-${sig.leadId}`;
-      if (lead.status_id === tenant.statusCargoId && !(await eventExists(tenant.id, cargoId))) {
+      const isCargo = sig.statusId === tenant.statusCargoId || lead.status_id === tenant.statusCargoId;
+      if (isCargo && !(await eventExists(tenant.id, cargoId))) {
         results.push(
           await sendCapiEvent(tenant, {
             eventName: 'Cargo',
