@@ -63,6 +63,40 @@ export function contactId(lead: KommoLead): number | null {
   return lead._embedded?.contacts?.[0]?.id ?? null;
 }
 
+// Escribe custom fields en un lead (PATCH). Usado por el CBU variable.
+export async function updateLeadFields(
+  tenant: ResolvedTenant,
+  leadId: number,
+  fields: Array<{ fieldId: number; value: string }>,
+): Promise<boolean> {
+  if (!tenant.kommoSubdomain || !tenant.kommoToken || !fields.length) return false;
+  const url = `https://${tenant.kommoSubdomain}.kommo.com/api/v4/leads/${leadId}`;
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${tenant.kommoToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      custom_fields_values: fields.map((f) => ({ field_id: f.fieldId, values: [{ value: f.value }] })),
+    }),
+  });
+  return res.ok;
+}
+
+// Extrae lead ids de un payload de send_hook de Kommo (form), JSON o query.
+export function parseLeadIds(raw: string, params: URLSearchParams): number[] {
+  const ids = new Set<number>();
+  const q = params.get('lead_id') || params.get('id');
+  if (q && /^\d+$/.test(q)) ids.add(Number(q));
+  for (const m of raw.matchAll(/\[id\]=(\d+)/g)) ids.add(Number(m[1]));
+  try {
+    const j = JSON.parse(raw);
+    if (j.lead_id) ids.add(Number(j.lead_id));
+    if (Array.isArray(j.leads)) for (const l of j.leads) if (l?.id) ids.add(Number(l.id));
+  } catch {
+    /* no era JSON */
+  }
+  return [...ids];
+}
+
 // El contacto embebido en el lead NO trae custom_fields_values; hay que pedir el
 // contacto aparte para sacar el teléfono (field_code PHONE).
 export async function fetchContactPhone(

@@ -92,6 +92,12 @@ export async function discoverKommoConfig(
     const id = byName(key);
     if (id) customFields[key] = id;
   }
+  // CBU variable: campos donde el bot CBU escribe el CBU/CVU y el Titular/Alias.
+  const cbuField = fields.find((f) => /cbu|cvu/i.test(f.name))?.id;
+  const titularField = fields.find((f) => /titular|alias/i.test(f.name))?.id;
+  if (cbuField) customFields.cbu_field = cbuField;
+  if (titularField) customFields.titular_field = titularField;
+
   if (statusCargo) customFields.status_cargo = statusCargo;
   if (statusRevisarImagen) customFields.status_revisar_imagen = statusRevisarImagen;
   if (!customFields.fbclid) warnings.push('No se encontró custom field "fbclid"');
