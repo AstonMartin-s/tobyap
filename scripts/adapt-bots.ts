@@ -23,6 +23,18 @@ async function pipelines(subdomain: string, token: string): Promise<Pipe[]> {
   return (d._embedded?.pipelines ?? []).map((p) => ({ id: p.id, name: p.name, statuses: p._embedded?.statuses ?? [] }));
 }
 
+// Custom fields de leads: id -> nombre.
+async function customFields(subdomain: string, token: string): Promise<Map<number, string>> {
+  const res = await fetch(`https://${subdomain}.kommo.com/api/v4/leads/custom_fields?limit=250`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const m = new Map<number, string>();
+  if (!res.ok) return m;
+  const d = (await res.json()) as { _embedded?: { custom_fields?: Array<{ id: number; name: string }> } };
+  for (const f of d._embedded?.custom_fields ?? []) m.set(f.id, f.name);
+  return m;
+}
+
 async function main() {
   const [slug, sourceToken, sourceSub] = process.argv.slice(2);
   if (!slug || !sourceToken || !sourceSub) {
@@ -37,6 +49,16 @@ async function main() {
 
   const srcPipes = await pipelines(sourceSub, sourceToken);
   const dstPipes = await pipelines(t.kommoSubdomain, t.kommoToken);
+
+  // Custom fields: origen id->nombre, destino nombre(agg)->id.
+  const srcCf = await customFields(sourceSub, sourceToken);
+  const dstCf = await customFields(t.kommoSubdomain, t.kommoToken);
+  const dstCfByName = new Map<string, number>();
+  for (const [id, name] of dstCf) dstCfByName.set(agg(name), id);
+  function remapCf(oldId: number): number | null {
+    const name = srcCf.get(oldId);
+    return name ? dstCfByName.get(agg(name)) ?? null : null;
+  }
 
   // Origen: statusId -> { name, pipeName }
   const srcById = new Map<number, { name: string; pipeName: string }>();
@@ -66,6 +88,8 @@ async function main() {
 
   const convUrl = `${APP}/api/conversion-event/${slug}`;
   const cbuUrl = `${APP}/api/cbu/${slug}`;
+  const retiroUrl = `${APP}/api/retiro/${slug}`;
+  const cfWarn: string[] = [];
 
   function walk(node: unknown): void {
     if (Array.isArray(node)) return node.forEach(walk);
@@ -73,8 +97,20 @@ async function main() {
     const obj = node as Record<string, unknown>;
     for (const [k, v] of Object.entries(obj)) {
       if (typeof v === 'string') {
-        if (v.includes('/api/conversion-event')) obj[k] = convUrl;
-        else if (v.includes('/api/cbu')) obj[k] = cbuUrl;
+        let s = v;
+        if (s.includes('/api/conversion-event')) s = convUrl;
+        else if (s.includes('/api/cbu')) s = cbuUrl;
+        else if (s.includes('/api/retiro')) s = retiroUrl;
+        // Remapea {{lead.cf.<id>}} (CBU/Titular u otros) al id del cliente.
+        s = s.replace(/\{\{lead\.cf\.(\d+)\}\}/g, (m, id: string) => {
+          const n = remapCf(Number(id));
+          if (n == null) {
+            cfWarn.push(`cf ${id} (${srcCf.get(Number(id)) ?? '?'}) no se pudo mapear`);
+            return m;
+          }
+          return `{{lead.cf.${n}}}`;
+        });
+        obj[k] = s;
       } else walk(v);
     }
     if (obj.name === 'change_status' && obj.params && typeof obj.params === 'object') {
@@ -107,9 +143,10 @@ async function main() {
     writeFileSync(`${outDir}/${file}`, JSON.stringify(bot));
     console.log(`✓ ${file}`);
   }
-  if (warnings.length) {
+  const allWarn = [...new Set([...warnings, ...cfWarn])];
+  if (allWarn.length) {
     console.log('\n⚠️  Revisar:');
-    [...new Set(warnings)].forEach((w) => console.log('   ' + w));
+    allWarn.forEach((w) => console.log('   ' + w));
   }
   console.log(`\nListos en ${outDir}/ — importalos en el diseñador de Salesbot del cliente.`);
   process.exit(0);

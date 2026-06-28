@@ -25,8 +25,10 @@ export const STANDARD_STATUSES: Array<{ name: string; sort: number; color: strin
 // mueve acá tras la carga.
 export const REGULARES_NAME = 'Clientes Regulares';
 export const REGULARES_STATUSES: Array<{ name: string; sort: number; color: string }> = [
-  { name: 'Atencion Manual', sort: 20, color: '#fffd7f' },
-  { name: 'Solicita Retiro', sort: 30, color: '#f9deff' },
+  { name: 'Pidio Cbu Alias', sort: 20, color: '#98cbff' },
+  { name: 'Atencion Manual', sort: 30, color: '#fffd7f' },
+  { name: 'Tomar decisión', sort: 40, color: '#ffce5a' },
+  { name: 'Solicita Retiro', sort: 50, color: '#f9deff' },
 ];
 
 // Custom fields base (todos type "text" para poder leerlos y escribirlos).
@@ -138,22 +140,33 @@ async function ensureFields(subdomain: string, token: string) {
   return { fields, created };
 }
 
-// Crea el pipeline "Clientes Regulares" si no existe. Devuelve su id.
+// Crea (o completa) el pipeline "Clientes Regulares". Agrega los estados que falten.
 async function ensureRegulares(subdomain: string, token: string) {
-  const list = await kommo<{ _embedded?: { pipelines?: Array<{ id: number; name: string }> } }>(
+  const list = await kommo<{ _embedded?: { pipelines?: Array<{ id: number; name: string; _embedded?: { statuses?: StatusRaw[] } }> } }>(
     subdomain,
     token,
     '/leads/pipelines',
   );
   const found = list._embedded?.pipelines?.find((p) => norm(p.name) === norm(REGULARES_NAME));
-  if (found) return { id: found.id, created: false };
-  const res = await kommo<{ _embedded: { pipelines: Array<{ id: number }> } }>(
-    subdomain,
-    token,
-    '/leads/pipelines',
-    { method: 'POST', body: JSON.stringify([{ name: REGULARES_NAME, is_main: false, is_unsorted_on: true, sort: 20, _embedded: { statuses: REGULARES_STATUSES } }]) },
-  );
-  return { id: res._embedded.pipelines[0].id, created: true };
+  if (!found) {
+    const res = await kommo<{ _embedded: { pipelines: Array<{ id: number }> } }>(
+      subdomain,
+      token,
+      '/leads/pipelines',
+      { method: 'POST', body: JSON.stringify([{ name: REGULARES_NAME, is_main: false, is_unsorted_on: true, sort: 20, _embedded: { statuses: REGULARES_STATUSES } }]) },
+    );
+    return { id: res._embedded.pipelines[0].id, created: true };
+  }
+  // Ya existe: agregar estados faltantes por nombre.
+  const have = new Set((found._embedded?.statuses ?? []).map((s) => norm(s.name)));
+  const toAdd = REGULARES_STATUSES.filter((s) => !have.has(norm(s.name)));
+  if (toAdd.length) {
+    await kommo(subdomain, token, `/leads/pipelines/${found.id}/statuses`, {
+      method: 'POST',
+      body: JSON.stringify(toAdd),
+    });
+  }
+  return { id: found.id, created: false };
 }
 
 export async function provisionClient(
