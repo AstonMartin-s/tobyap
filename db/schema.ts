@@ -50,6 +50,10 @@ export const tenants = pgTable('tenants', {
   pspKey: text('psp_key'), // cifrado — clave del PSP
   externalApiKey: text('external_api_key'), // cifrado — pbx_ext_live_... (API externa §8)
 
+  // Override por cliente del mapa CCPP -> bono (ej. { "A1": "Bono10%" }).
+  // Si falta una clave, se usa el mapa global por defecto (lib/attribution).
+  bonoMap: jsonb('bono_map').$type<Record<string, string>>().default({}),
+
   active: boolean('active').default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
@@ -248,6 +252,42 @@ export const metaEvents = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// attributions — atribución de una visita, indexada por un TOKEN único que viaja
+// en el mensaje de WhatsApp. Al llegar el lead se matchea por el token y se
+// asignan etiquetas (campaña + bono) + se escriben fbclid/utm en el lead.
+// ---------------------------------------------------------------------------
+export const attributions = pgTable(
+  'attributions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    code: text('code').notNull(), // token único en el mensaje
+
+    campaignId: text('campaign_id'), // CC1 (== nombre de campaña en Meta)
+    ccpp: text('ccpp'), // A1 (código promocional)
+    bono: text('bono'), // Bono10% (resuelto desde ccpp)
+
+    fbclid: text('fbclid'),
+    fbp: text('fbp'),
+    fbc: text('fbc'),
+    utmSource: text('utm_source'),
+    utmCampaign: text('utm_campaign'),
+    utmContent: text('utm_content'),
+    namead: text('namead'),
+    eventSourceUrl: text('event_source_url'),
+
+    matchedLeadId: bigint('matched_lead_id', { mode: 'number' }),
+    matchedAt: timestamp('matched_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    uniqCode: unique('attributions_tenant_code').on(t.tenantId, t.code),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // kommo_webhook_log — log crudo para debug / reprocesar.
 // ---------------------------------------------------------------------------
 export const kommoWebhookLog = pgTable('kommo_webhook_log', {
@@ -269,3 +309,4 @@ export type LandingRow = typeof landings.$inferSelect;
 export type AdAccountRow = typeof adAccounts.$inferSelect;
 export type CampaignRow = typeof campaigns.$inferSelect;
 export type MetaEventRow = typeof metaEvents.$inferSelect;
+export type AttributionRow = typeof attributions.$inferSelect;

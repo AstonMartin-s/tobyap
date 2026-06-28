@@ -49,15 +49,31 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
   function p(n){return new URLSearchParams(location.search).get(n);}
   function c(n){var m=document.cookie.match('(^|;)\\\\s*'+n+'\\\\s*=\\\\s*([^;]+)');return m?m.pop():null;}
   var fbclid=p('fbclid');
-  var campaignId=p('campaign')||p('campaignId')||p('utm_campaign')||null;
   var fbp=c('_fbp');
   var fbc=c('_fbc')||(fbclid?('fb.1.'+Date.now()+'.'+fbclid):null);
-  try{
-    fetch('/api/track/redirect',{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,
-      body:JSON.stringify({slug:C.slug,campaignId:campaignId,fbp:fbp,fbc:fbc,fbclid:fbclid,eventSourceUrl:location.href})}).catch(function(){});
-  }catch(e){}
-  var wa='https://wa.me/'+C.waNumber+'?text='+encodeURIComponent(C.defaultMessage);
-  setTimeout(function(){window.location.href=wa;},C.redirectDelayMs);
+  var payload={
+    slug:C.slug,
+    campaign:p('campaign'),
+    ccpp:p('CCPP')||p('ccpp'),
+    utmSource:p('utm_source'),
+    utmCampaign:p('utm_campaign'),
+    utmContent:p('utm_content'),
+    namead:p('namead'),
+    fbp:fbp, fbc:fbc, fbclid:fbclid,
+    eventSourceUrl:location.href
+  };
+  function go(code){
+    var msg = (code ? ('Codigo Promocion: '+code+'.') : '') + C.defaultMessage;
+    var wa='https://wa.me/'+C.waNumber+'?text='+encodeURIComponent(msg);
+    window.location.href=wa;
+  }
+  var done=false;
+  // Si la API tarda, igual redirigimos (sin code) al cumplirse el delay.
+  var fallback=setTimeout(function(){ if(!done){done=true; go(null);} }, C.redirectDelayMs+2000);
+  fetch('/api/track/redirect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    .then(function(r){return r.json();})
+    .then(function(d){ if(!done){done=true; clearTimeout(fallback); setTimeout(function(){go(d&&d.code);}, C.redirectDelayMs);} })
+    .catch(function(){ if(!done){done=true; clearTimeout(fallback); go(null);} });
 })();`;
 
   return (

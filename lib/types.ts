@@ -21,6 +21,8 @@ export interface ResolvedTenant {
 
   // Mapa de custom fields de Kommo
   customFields: Record<string, number>;
+  // Override CCPP -> bono (se combina con el mapa global por defecto)
+  bonoMap: Record<string, string>;
 
   // Derivados de customFields (atajos):
   statusCargoId: number | null; // customFields.status_cargo
@@ -84,6 +86,8 @@ export interface CreateTenantInput {
 
   // Mapa de custom fields + status ids de Kommo
   customFields?: Record<string, number>;
+  // Override CCPP -> bono
+  bonoMap?: Record<string, string>;
 
   // Documento de cliente (estructura PAYBOT §4)
   role?: 'client' | 'admin' | string;

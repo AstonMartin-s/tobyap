@@ -81,6 +81,32 @@ export async function updateLeadFields(
   return res.ok;
 }
 
+// Agrega etiquetas a un lead SIN pisar las existentes (Kommo PATCH reemplaza la
+// lista, así que primero leemos las actuales y mergeamos por nombre).
+export async function addLeadTags(
+  tenant: ResolvedTenant,
+  leadId: number,
+  names: string[],
+): Promise<boolean> {
+  if (!tenant.kommoSubdomain || !tenant.kommoToken || !names.length) return false;
+  const base = `https://${tenant.kommoSubdomain}.kommo.com/api/v4/leads/${leadId}`;
+  const headers = { Authorization: `Bearer ${tenant.kommoToken}`, 'Content-Type': 'application/json' };
+
+  const cur = await fetch(`${base}?with=tags`, { headers });
+  const existing: Array<{ name: string }> =
+    cur.ok ? ((await cur.json())?._embedded?.tags ?? []) : [];
+  const merged = new Map<string, { name: string }>();
+  for (const t of existing) merged.set(t.name, { name: t.name });
+  for (const n of names) if (n) merged.set(n, { name: n });
+
+  const res = await fetch(base, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ _embedded: { tags: [...merged.values()] } }),
+  });
+  return res.ok;
+}
+
 // Extrae lead ids de un payload de send_hook de Kommo (form), JSON o query.
 export function parseLeadIds(raw: string, params: URLSearchParams): number[] {
   const ids = new Set<number>();
