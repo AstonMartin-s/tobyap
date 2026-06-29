@@ -121,10 +121,19 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
       let campaign = readLeadField(lead, tenant.fieldUtmCampaign) ?? undefined;
 
+      // TOKEN: del mensaje (si vino por webhook) o del campo ad_code que el bot WELCOME
+      // graba con el primer mensaje. Extraemos el código PBxxxxxx y aplicamos atribución.
+      let code = sig.code;
+      if (!code && tenant.customFields['ad_code']) {
+        const adVal = readLeadField(lead, tenant.customFields['ad_code']);
+        const m = adVal?.match(CODE_REGEX);
+        if (m) code = m[0];
+      }
+
       // TOKEN: matchea atribución -> etiquetas (campaña+bono) + fbclid/utm en el lead,
       // y enriquece el evento con los datos guardados desde la landing.
-      if (sig.code) {
-        const attr = await applyAttributionByCode(tenant, sig.leadId, sig.code);
+      if (code) {
+        const attr = await applyAttributionByCode(tenant, sig.leadId, code);
         if (attr) {
           ud.fbclid = ud.fbclid ?? attr.fbclid;
           ud.fbc = ud.fbc ?? attr.fbc;
