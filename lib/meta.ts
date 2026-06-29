@@ -1,6 +1,8 @@
 import crypto from 'crypto';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { metaEvents } from '@/db/schema';
+import { metaEvents, tenants } from '@/db/schema';
+import { decryptOptional } from '@/lib/crypto';
 import type { ResolvedTenant } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
@@ -139,6 +141,57 @@ export async function sendCapiEvent(
   await persistEvent(tenant, input, eventName, event, body, status);
 
   return { ok: res.ok, status: res.status, eventId: input.eventId, eventName, body };
+}
+
+// ---------------------------------------------------------------------------
+// Reintento de eventos fallidos.
+// Un fallo de red/transitorio de Meta deja el evento en status 'failed' con su
+// payload guardado. Esto los re-envía (mismo event_id => Meta deduplica). Lo
+// dispara un cron: sin esto, una conversión perdida por un hipo de red no se
+// recupera nunca.
+// ---------------------------------------------------------------------------
+export async function retryFailedEvents(opts?: { maxAgeHours?: number; limit?: number }) {
+  const maxAgeHours = opts?.maxAgeHours ?? 48; // no reintentar indefinidamente
+  const limit = opts?.limit ?? 100;
+  const cutoff = new Date(Date.now() - maxAgeHours * 3600_000);
+
+  const rows = await db
+    .select({
+      id: metaEvents.id,
+      tenantId: metaEvents.tenantId,
+      eventId: metaEvents.eventId,
+      payload: metaEvents.payload,
+      pixelId: tenants.metaPixelId,
+      token: tenants.metaCapiToken,
+    })
+    .from(metaEvents)
+    .innerJoin(tenants, eq(tenants.id, metaEvents.tenantId))
+    .where(and(eq(metaEvents.status, 'failed'), sql`${metaEvents.createdAt} > ${cutoff}`))
+    .limit(limit);
+
+  let sent = 0;
+  let stillFailed = 0;
+  for (const r of rows) {
+    const token = decryptOptional(r.token);
+    if (!r.payload || !r.pixelId || !token) continue;
+    try {
+      const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${r.pixelId}/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: [r.payload], access_token: token }),
+      });
+      const body = await res.json().catch(() => ({}));
+      const ok = res.ok;
+      await db
+        .update(metaEvents)
+        .set({ status: ok ? 'sent' : 'failed', success: ok, response: body, sentAt: ok ? new Date() : null })
+        .where(eq(metaEvents.id, r.id));
+      ok ? sent++ : stillFailed++;
+    } catch {
+      stillFailed++;
+    }
+  }
+  return { scanned: rows.length, sent, stillFailed };
 }
 
 // Auditoría + idempotencia. El unique(tenant_id, event_id) evita duplicados:
