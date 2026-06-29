@@ -35,7 +35,6 @@ export function Nav({ slug, role = 'client' }: { slug: string; role?: string }) 
       ) : (
         <>
           {Link_('/reportes', 'Reportes')}
-          {Link_('/convertidos', 'Convertidos')}
           {Link_('/config', 'Configuración')}
         </>
       )}
