@@ -15,9 +15,10 @@ function injectAdCode(bot: { model: { text: string; positions: string } }, adFie
   const text = JSON.parse(bot.model.text) as Record<string, unknown>;
   const pos = JSON.parse(bot.model.positions) as Array<Record<string, unknown>>;
 
+  // Formato real de Kommo para "Establecer campo" del lead con el mensaje entrante.
   const action = {
     name: 'set_custom_fields',
-    params: { value: '{{message.text}}', value_type: 'custom_value', custom_field: `{{lead.cf.${adFieldId}}}` },
+    params: { type: 'lead', value: '{{message_text}}', value_type: 'value', custom_field: `{{lead.cf.${adFieldId}}}` },
   };
   // Ya inyectado?
   const exists = pos.some((b) =>
