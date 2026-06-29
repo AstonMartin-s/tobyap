@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { desc } from 'drizzle-orm';
 import { db } from '@/db';
@@ -25,7 +26,7 @@ export default async function ClientesPage() {
             <tbody>
               {rows.map((t) => (
                 <tr key={t.id}>
-                  <td>{t.slug}</td>
+                  <td><Link href={`/admin/clientes/${t.slug}`} style={{ color: 'var(--accent)', fontWeight: 600 }}>{t.slug}</Link></td>
                   <td>{t.name}</td>
                   <td style={{ color: 'var(--muted)' }}>{t.panelUser ?? '—'}</td>
                   <td>{t.role === 'admin' ? <span className="badge" style={{ background: 'rgba(255,184,77,0.12)', color: 'var(--warn)' }}>admin</span> : <span className="badge badge--muted">client</span>}</td>

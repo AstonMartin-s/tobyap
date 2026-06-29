@@ -129,6 +129,38 @@ export async function upsertTenant(input: CreateTenantInput): Promise<TenantRow>
 }
 
 // ---------------------------------------------------------------------------
+// Edición parcial desde el admin: solo toca los campos provistos. Los secretos
+// se re-cifran únicamente si vienen en el patch (no se pisan con vacío).
+// ---------------------------------------------------------------------------
+export interface UpdateTenantPatch {
+  name?: string;
+  eventSuffix?: string;
+  readonly?: boolean;
+  active?: boolean;
+  panelPassword?: string; // reset
+  metaPixelId?: string;
+  metaCapiToken?: string;
+  kommoToken?: string;
+  customFields?: Record<string, number>;
+}
+
+export async function updateTenantFields(slug: string, patch: UpdateTenantPatch): Promise<void> {
+  const set: Record<string, unknown> = { updatedAt: new Date() };
+  if (patch.name !== undefined) set.name = patch.name;
+  if (patch.eventSuffix !== undefined) set.eventSuffix = patch.eventSuffix;
+  if (patch.readonly !== undefined) set.readonly = patch.readonly;
+  if (patch.active !== undefined) set.active = patch.active;
+  if (patch.metaPixelId !== undefined) set.metaPixelId = patch.metaPixelId;
+  if (patch.metaCapiToken) set.metaCapiToken = encrypt(patch.metaCapiToken);
+  if (patch.kommoToken) set.kommoToken = encrypt(patch.kommoToken);
+  if (patch.customFields !== undefined) set.customFields = patch.customFields;
+  if (patch.panelPassword) set.panelPasswordHash = await bcrypt.hash(patch.panelPassword, 10);
+
+  await db.update(tenants).set(set).where(eq(tenants.slug, slug));
+  invalidateTenant(slug);
+}
+
+// ---------------------------------------------------------------------------
 // Resolución de tenant: descifra secretos en memoria + deriva atajos.
 // Cache corto para no golpear DB + descifrar en cada webhook, pero permitiendo
 // rotar secretos sin reiniciar el proceso.

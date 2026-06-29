@@ -134,20 +134,33 @@ export const rules = pgTable('rules', {
 // ---------------------------------------------------------------------------
 // landings — páginas de redirect por cliente (§7). Deploy en Vercel.
 // ---------------------------------------------------------------------------
-export const landings = pgTable('landings', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  tenantId: uuid('tenant_id')
-    .notNull()
-    .references(() => tenants.id, { onDelete: 'cascade' }),
-  url: text('url'),
-  type: text('type'), // publi | regular
-  active: boolean('active').default(true),
-  environments: jsonb('environments').$type<string[]>().default(['production']),
-  db: text('db'),
-  vercel: jsonb('vercel'), // { project, name, target, gitSource:{ref,repoId,type} }
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
-});
+export const landings = pgTable(
+  'landings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    // landingSlug: identifica la landing dentro del cliente => /l/<tenant>/<landingSlug>
+    landingSlug: text('landing_slug'),
+    name: text('name'),
+    type: text('type'), // publi | regular | spam | remarketing | soporte
+    active: boolean('active').default(true),
+    // Presentación + comportamiento de NUESTRA landing (servida en Railway):
+    // { brandName, primaryColor, logoUrl, headline, subtext, message, waNumber,
+    //   pixelId, ccpp, campaign, redirectDelayMs }
+    config: jsonb('config').$type<Record<string, string | number | null>>().default({}),
+    url: text('url'), // URL final (dominio propio cuando se mapee)
+    environments: jsonb('environments').$type<string[]>().default(['production']),
+    db: text('db'),
+    vercel: jsonb('vercel'), // legado del sistema original
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    uniqLanding: unique('landings_tenant_slug').on(t.tenantId, t.landingSlug),
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // ad_accounts — cuentas publicitarias de Meta (§5.1). Globales.
