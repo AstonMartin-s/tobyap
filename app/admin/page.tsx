@@ -26,8 +26,10 @@ export default async function AdminPage({
       <Nav slug={session.slug} role="admin" />
       <main className="shell">
         <div className="page-head">
-          <h1>Reportes · todos los clientes</h1>
-          <p>Resultados agregados desde la base propia.</p>
+          <div className="page-head__text">
+            <h1>Reportes · todos los clientes</h1>
+            <p>Resultados agregados desde la base propia.</p>
+          </div>
         </div>
 
         <form method="get" className="card" style={{ paddingBottom: '1.1rem' }}>

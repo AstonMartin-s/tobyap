@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'TOBYAP — Panel',
+  title: 'TrackerIO — Panel',
   description: 'Tracking de conversiones · Kommo → Meta',
 };
 

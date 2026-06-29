@@ -27,8 +27,10 @@ export default async function ReportesPage({
       <Nav slug={session.slug} role={session.role} />
       <main className="shell">
         <div className="page-head">
-          <h1>Reportes</h1>
-          <p>Estadísticas y análisis de eventos de tu cuenta.</p>
+          <div className="page-head__text">
+            <h1>Reportes</h1>
+            <p>Estadísticas y análisis de eventos de tu cuenta.</p>
+          </div>
         </div>
 
         <form method="get" className="card" style={{ paddingBottom: '1.1rem' }}>

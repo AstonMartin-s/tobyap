@@ -28,9 +28,15 @@ export default function LoginPage() {
   return (
     <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '1rem' }}>
       <div className="card" style={{ width: '100%', maxWidth: 380, margin: 0, padding: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginBottom: '0.4rem' }}>
-          <span className="nav__dot" />
-          <span style={{ fontWeight: 800, fontSize: '1.25rem', letterSpacing: '-0.02em' }}>TOBYAP</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', marginBottom: '0.5rem' }}>
+          <span className="sidebar__mark">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12h4l3 8 4-16 3 8h4" />
+            </svg>
+          </span>
+          <span style={{ fontWeight: 800, fontSize: '1.3rem', letterSpacing: '-0.02em' }}>
+            Tracker<span style={{ color: 'var(--accent)' }}>IO</span>
+          </span>
         </div>
         <p style={{ color: 'var(--muted)', margin: '0 0 1.5rem', fontSize: '0.88rem' }}>Ingresá a tu panel.</p>
         <form onSubmit={submit}>

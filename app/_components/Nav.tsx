@@ -1,7 +1,32 @@
 'use client';
 
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+
+// Iconos inline (stroke currentColor) — sin dependencias.
+const I = {
+  report: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 3v18h18" /><rect x="7" y="11" width="3" height="6" /><rect x="13" y="7" width="3" height="10" />
+    </svg>
+  ),
+  config: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.78 1 1.42 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  ),
+  clients: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
+  logout: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  ),
+};
 
 export function Nav({ slug, role = 'client' }: { slug: string; role?: string }) {
   const pathname = usePathname();
@@ -13,34 +38,48 @@ export function Nav({ slug, role = 'client' }: { slug: string; role?: string }) 
     router.push('/login');
   }
 
-  const Link_ = (href: string, label: string) => (
-    <Link href={href} className={`nav__link${pathname === href ? ' active' : ''}`}>
-      {label}
+  const NavLink = (href: string, label: string, icon: ReactNode) => (
+    <Link href={href} className={`sidebar__link${pathname === href ? ' active' : ''}`}>
+      {icon}
+      <span>{label}</span>
     </Link>
   );
 
   return (
-    <nav className="nav">
-      <span className="nav__brand">
-        <span className="nav__dot" /> TOBYAP
-        <span style={{ color: isAdmin ? 'var(--warn)' : 'var(--accent)', fontWeight: 600, fontSize: '0.85rem' }}>
-          · {isAdmin ? 'admin' : slug}
+    <nav className="sidebar">
+      <div className="sidebar__brand">
+        <span className="sidebar__mark">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12h4l3 8 4-16 3 8h4" />
+          </svg>
         </span>
-      </span>
-      {isAdmin ? (
-        <>
-          {Link_('/admin', 'Reportes')}
-          {Link_('/admin/clientes', 'Clientes')}
-        </>
-      ) : (
-        <>
-          {Link_('/reportes', 'Reportes')}
-          {Link_('/config', 'Configuración')}
-        </>
-      )}
-      <span className="nav__spacer" />
-      <button className="nav__logout" onClick={logout}>
-        Cerrar sesión
+        <span>
+          <span className="sidebar__name">Tracker<b>IO</b></span>
+          <div className="sidebar__tag">{isAdmin ? 'Panel administrador' : `Cuenta · ${slug}`}</div>
+        </span>
+      </div>
+
+      <div className="sidebar__nav">
+        {isAdmin ? (
+          <>
+            {NavLink('/admin', 'Reportes', I.report)}
+            {NavLink('/admin/clientes', 'Clientes', I.clients)}
+          </>
+        ) : (
+          <>
+            {NavLink('/reportes', 'Reportes', I.report)}
+            {NavLink('/config', 'Configuración', I.config)}
+          </>
+        )}
+      </div>
+
+      <div className="sidebar__spacer" />
+      <div className="sidebar__status">
+        <span className="nav__dot" /> Sistema conectado
+      </div>
+      <button className="sidebar__logout" onClick={logout}>
+        {I.logout}
+        <span>Cerrar sesión</span>
       </button>
     </nav>
   );

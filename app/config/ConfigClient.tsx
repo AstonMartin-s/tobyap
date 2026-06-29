@@ -20,8 +20,10 @@ export function ConfigClient() {
   return (
     <>
       <div className="page-head">
-        <h1>Configuración</h1>
-        <p>Gestioná los datos de tu cuenta, números y reglas del CRM.</p>
+        <div className="page-head__text">
+          <h1>Configuración</h1>
+          <p>Gestioná los datos de tu cuenta, números y reglas del CRM.</p>
+        </div>
       </div>
       <SettingsSection />
       <NumbersSection />

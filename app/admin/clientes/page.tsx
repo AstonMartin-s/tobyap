@@ -18,7 +18,7 @@ export default async function ClientesPage() {
     <>
       <Nav slug={session.slug} role="admin" />
       <main className="shell">
-        <div className="page-head"><h1>Clientes</h1><p>Cuentas dadas de alta en el sistema.</p></div>
+        <div className="page-head"><div className="page-head__text"><h1>Clientes</h1><p>Cuentas dadas de alta en el sistema.</p></div></div>
         <div className="card">
           <table className="table">
             <thead><tr><th>Slug</th><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Suffix</th><th>Activo</th></tr></thead>
