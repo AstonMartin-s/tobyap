@@ -1,12 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
-import { leads, kommoWebhookLog, metaEvents } from '@/db/schema';
+import { leads, kommoWebhookLog, metaEvents, clientSettings } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { sendCapiEvent } from '@/lib/meta';
 import { applyAttributionByCode, CODE_REGEX } from '@/lib/attribution';
-import { fetchKommoLead, fetchContactPhone, readLeadField, readPhone, contactId, type KommoLead } from '@/lib/kommo';
+import { fetchKommoLead, fetchContactPhone, readLeadField, readPhone, contactId, updateLeadFields, type KommoLead } from '@/lib/kommo';
 import type { ResolvedTenant } from '@/lib/types';
+
+// CBU robusto: escribe el CBU/Titular del panel en el lead (sin depender del bot).
+// Idempotente; solo escribe si el tenant tiene los campos mapeados.
+async function writeCbu(tenant: ResolvedTenant, leadId: number) {
+  const cbuField = tenant.customFields['cbu_field'];
+  const titularField = tenant.customFields['titular_field'];
+  if (!cbuField && !titularField) return;
+  const [s] = await db.select().from(clientSettings).where(eq(clientSettings.tenantId, tenant.id));
+  const fields: Array<{ fieldId: number; value: string }> = [];
+  if (cbuField && s?.accountCbu) fields.push({ fieldId: cbuField, value: s.accountCbu });
+  if (titularField && s?.accountName) fields.push({ fieldId: titularField, value: s.accountName });
+  if (fields.length) await updateLeadFields(tenant, leadId, fields).catch(() => false);
+}
 
 // ---------------------------------------------------------------------------
 // POST /api/webhooks/kommo/[slug]
@@ -106,6 +119,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       }
 
       const row = await upsertLead(tenant, lead);
+
+      // CBU robusto: aseguramos CBU/Titular del panel escritos en el lead (no
+      // dependemos del send_hook del bot CBU, que es poco confiable).
+      await writeCbu(tenant, sig.leadId);
 
       // user_data base (teléfono del contacto si falta) + atribución del lead.
       const ud: { fbc: string | null; fbp: string | null; fbclid: string | null; phone: string | null } = {
