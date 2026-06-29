@@ -47,18 +47,22 @@ export async function applyAttributionByCode(
   });
   if (!attr) return null;
 
-  // Etiquetas
-  const tags = [attr.campaignId, attr.bono].filter((x): x is string => !!x);
-  if (tags.length) await addLeadTags(tenant, kommoLeadId, tags).catch(() => false);
+  // En modo readonly NO escribimos nada en el lead del CRM: solo matcheamos y
+  // devolvemos la atribución para enriquecer el evento a Meta (tracking).
+  if (!tenant.readonly) {
+    // Etiquetas
+    const tags = [attr.campaignId, attr.bono].filter((x): x is string => !!x);
+    if (tags.length) await addLeadTags(tenant, kommoLeadId, tags).catch(() => false);
 
-  // Custom fields (fbclid / utm) si el tenant los tiene mapeados
-  const fields: Array<{ fieldId: number; value: string }> = [];
-  const cf = tenant.customFields;
-  if (cf.fbclid && attr.fbclid) fields.push({ fieldId: cf.fbclid, value: attr.fbclid });
-  if (cf.utm_campaign && attr.campaignId) fields.push({ fieldId: cf.utm_campaign, value: attr.campaignId });
-  if (cf.utm_source && attr.utmSource) fields.push({ fieldId: cf.utm_source, value: attr.utmSource });
-  if (cf.utm_content && attr.utmContent) fields.push({ fieldId: cf.utm_content, value: attr.utmContent });
-  if (fields.length) await updateLeadFields(tenant, kommoLeadId, fields).catch(() => false);
+    // Custom fields (fbclid / utm) si el tenant los tiene mapeados
+    const fields: Array<{ fieldId: number; value: string }> = [];
+    const cf = tenant.customFields;
+    if (cf.fbclid && attr.fbclid) fields.push({ fieldId: cf.fbclid, value: attr.fbclid });
+    if (cf.utm_campaign && attr.campaignId) fields.push({ fieldId: cf.utm_campaign, value: attr.campaignId });
+    if (cf.utm_source && attr.utmSource) fields.push({ fieldId: cf.utm_source, value: attr.utmSource });
+    if (cf.utm_content && attr.utmContent) fields.push({ fieldId: cf.utm_content, value: attr.utmContent });
+    if (fields.length) await updateLeadFields(tenant, kommoLeadId, fields).catch(() => false);
+  }
 
   // Marca matcheada (idempotente)
   if (!attr.matchedLeadId) {

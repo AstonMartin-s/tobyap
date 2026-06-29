@@ -30,6 +30,7 @@ function tenantValues(input: CreateTenantInput) {
     eventSuffix: input.eventSuffix ?? null,
     customFields: input.customFields ?? {},
     bonoMap: input.bonoMap ?? {},
+    readonly: input.readonly ?? false,
     // Documento de cliente (§4)
     role: input.role ?? 'client',
     platform: input.platform ?? 'meta',
@@ -153,6 +154,7 @@ function resolve(row: TenantRow): ResolvedTenant {
     externalApiKey: decryptOptional(row.externalApiKey),
     customFields: cf,
     bonoMap: (row.bonoMap ?? {}) as Record<string, string>,
+    readonly: row.readonly ?? false,
     statusCargoId: num('status_cargo'),
     statusRevisarImagenId: num('status_revisar_imagen'),
     fieldFbclid: num('fbclid'),

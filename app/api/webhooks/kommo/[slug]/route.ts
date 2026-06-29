@@ -11,6 +11,7 @@ import type { ResolvedTenant } from '@/lib/types';
 // CBU robusto: escribe el CBU/Titular del panel en el lead (sin depender del bot).
 // Idempotente; solo escribe si el tenant tiene los campos mapeados.
 async function writeCbu(tenant: ResolvedTenant, leadId: number) {
+  if (tenant.readonly) return; // info-only: nunca escribimos en el lead
   const cbuField = tenant.customFields['cbu_field'];
   const titularField = tenant.customFields['titular_field'];
   if (!cbuField && !titularField) return;

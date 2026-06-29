@@ -23,6 +23,8 @@ export interface ResolvedTenant {
   customFields: Record<string, number>;
   // Override CCPP -> bono (se combina con el mapa global por defecto)
   bonoMap: Record<string, string>;
+  // Solo-lectura: no escribir en los leads del CRM del cliente.
+  readonly: boolean;
 
   // Derivados de customFields (atajos):
   statusCargoId: number | null; // customFields.status_cargo
@@ -88,6 +90,7 @@ export interface CreateTenantInput {
   customFields?: Record<string, number>;
   // Override CCPP -> bono
   bonoMap?: Record<string, string>;
+  readonly?: boolean;
 
   // Documento de cliente (estructura PAYBOT §4)
   role?: 'client' | 'admin' | string;

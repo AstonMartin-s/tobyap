@@ -54,6 +54,10 @@ export const tenants = pgTable('tenants', {
   // Si falta una clave, se usa el mapa global por defecto (lib/attribution).
   bonoMap: jsonb('bono_map').$type<Record<string, string>>().default({}),
 
+  // Modo solo-lectura: trackeamos (leemos + DB propia + Meta) pero NUNCA escribimos
+  // en los leads del CRM del cliente (sin etiquetas, sin CBU, sin custom fields).
+  readonly: boolean('readonly').default(false),
+
   active: boolean('active').default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
