@@ -7,41 +7,35 @@ import { Nav } from '../../_components/Nav';
 
 export const dynamic = 'force-dynamic';
 
-// Listado de clientes (tenants). Solo admin. El alta automática es Fase 1+ futura;
-// por ahora muestra los clientes cargados.
 export default async function ClientesPage() {
   const session = await getSession();
   if (!session) redirect('/login');
-  if (session.role !== 'admin') redirect('/convertidos');
+  if (session.role !== 'admin') redirect('/reportes');
 
-  const rows = await db
-    .select()
-    .from(tenants)
-    .orderBy(desc(tenants.createdAt));
-
-  const td: React.CSSProperties = { padding: '0.5rem 0.6rem', fontSize: '0.85rem', borderBottom: '1px solid #1c2026' };
-  const th: React.CSSProperties = { ...td, color: '#8a93a0', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: 1 };
+  const rows = await db.select().from(tenants).orderBy(desc(tenants.createdAt));
 
   return (
     <>
       <Nav slug={session.slug} role="admin" />
-      <main style={{ maxWidth: 980, margin: '0 auto', padding: '0 1rem' }}>
-        <h1 style={{ fontSize: '1.3rem' }}>Clientes</h1>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={th}>Slug</th><th style={th}>Nombre</th><th style={th}>Usuario</th><th style={th}>Rol</th><th style={th}>Suffix</th><th style={th}>Activo</th></tr></thead>
-          <tbody>
-            {rows.map((t) => (
-              <tr key={t.id}>
-                <td style={td}>{t.slug}</td>
-                <td style={td}>{t.name}</td>
-                <td style={td}>{t.panelUser ?? '—'}</td>
-                <td style={{ ...td, color: t.role === 'admin' ? '#ffb84d' : '#cfd3d9' }}>{t.role}</td>
-                <td style={td}>{t.eventSuffix ?? '—'}</td>
-                <td style={td}>{t.active ? '✓' : '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <main className="shell">
+        <div className="page-head"><h1>Clientes</h1><p>Cuentas dadas de alta en el sistema.</p></div>
+        <div className="card">
+          <table className="table">
+            <thead><tr><th>Slug</th><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Suffix</th><th>Activo</th></tr></thead>
+            <tbody>
+              {rows.map((t) => (
+                <tr key={t.id}>
+                  <td>{t.slug}</td>
+                  <td>{t.name}</td>
+                  <td style={{ color: 'var(--muted)' }}>{t.panelUser ?? '—'}</td>
+                  <td>{t.role === 'admin' ? <span className="badge" style={{ background: 'rgba(255,184,77,0.12)', color: 'var(--warn)' }}>admin</span> : <span className="badge badge--muted">client</span>}</td>
+                  <td>{t.eventSuffix ?? '—'}</td>
+                  <td>{t.active ? <span className="badge badge--green">activo</span> : <span className="badge badge--muted">—</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </main>
     </>
   );

@@ -19,72 +19,55 @@ export default async function ConvertidosPage() {
     limit: 200,
   });
 
-  const th: React.CSSProperties = {
-    textAlign: 'left',
-    padding: '0.5rem 0.6rem',
-    fontSize: '0.7rem',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    color: '#8a93a0',
-    borderBottom: '1px solid #2a2f36',
-  };
-  const td: React.CSSProperties = {
-    padding: '0.5rem 0.6rem',
-    fontSize: '0.85rem',
-    borderBottom: '1px solid #1c2026',
-  };
-
   return (
     <>
-    <Nav slug={session.slug} role={session.role} />
-    <main style={{ maxWidth: 980, margin: '0 auto 4vh', padding: '0 1rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h1 style={{ fontSize: '1.3rem', margin: 0 }}>
-          Convertidos · <span style={{ color: '#25d366' }}>{session.slug}</span>
-        </h1>
-        <span style={{ fontSize: '0.8rem', color: '#8a93a0' }}>{rows.length} leads</span>
-      </div>
+      <Nav slug={session.slug} role={session.role} />
+      <main className="shell">
+        <div className="page-head">
+          <h1>Convertidos</h1>
+          <p>Leads recibidos y su estado de conversión.</p>
+        </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th style={th}>Lead Kommo</th>
-            <th style={th}>Nombre</th>
-            <th style={th}>Teléfono</th>
-            <th style={th}>Campaña</th>
-            <th style={th}>fbc</th>
-            <th style={th}>Estado</th>
-            <th style={th}></th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 && (
-            <tr>
-              <td style={{ ...td, color: '#8a93a0' }} colSpan={7}>
-                Todavía no hay leads. Llegan por el webhook de Kommo.
-              </td>
-            </tr>
-          )}
-          {rows.map((l) => (
-            <tr key={l.id}>
-              <td style={td}>{l.kommoLeadId ?? '—'}</td>
-              <td style={td}>{l.name ?? '—'}</td>
-              <td style={td}>{l.phone ?? '—'}</td>
-              <td style={td}>{l.campaignId ?? '—'}</td>
-              <td style={{ ...td, color: l.fbc ? '#7fd99a' : '#ff6b6b', fontSize: '0.7rem' }}>
-                {l.fbc ? 'sí' : 'no'}
-              </td>
-              <td style={td}>{l.converted ? '✓' : '—'}</td>
-              <td style={td}>
-                {l.kommoLeadId != null && (
-                  <ConvertButton kommoLeadId={l.kommoLeadId} converted={!!l.converted} />
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </main>
+        <div className="card">
+          <div className="card__title" style={{ justifyContent: 'space-between' }}>
+            <span><span className="ico">✓</span> Leads</span>
+            <span className="badge badge--muted">{rows.length}</span>
+          </div>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Lead</th>
+                <th>Nombre</th>
+                <th>Teléfono</th>
+                <th>Campaña</th>
+                <th>Atribución</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 && (
+                <tr><td colSpan={7} className="empty">Todavía no hay leads. Llegan por el webhook de Kommo.</td></tr>
+              )}
+              {rows.map((l) => (
+                <tr key={l.id}>
+                  <td style={{ color: 'var(--muted)', fontVariantNumeric: 'tabular-nums' }}>{l.kommoLeadId ?? '—'}</td>
+                  <td>{l.name ?? '—'}</td>
+                  <td style={{ fontVariantNumeric: 'tabular-nums' }}>{l.phone ?? '—'}</td>
+                  <td>{l.campaignId ? <span className="badge badge--type">{l.campaignId}</span> : '—'}</td>
+                  <td>
+                    {l.fbc || l.fbclid ? <span className="badge badge--green">fbc ✓</span> : <span className="badge badge--muted">sin fbc</span>}
+                  </td>
+                  <td>{l.converted ? <span className="badge badge--green">Convertido</span> : <span className="badge badge--muted">—</span>}</td>
+                  <td>
+                    {l.kommoLeadId != null && <ConvertButton kommoLeadId={l.kommoLeadId} converted={!!l.converted} />}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </main>
     </>
   );
 }

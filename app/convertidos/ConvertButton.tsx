@@ -18,30 +18,14 @@ export function ConvertButton({ kommoLeadId, converted }: { kommoLeadId: number;
       body: JSON.stringify({ kommoLeadId }),
     });
     setLoading(false);
-    if (res.ok) {
-      setDone(true);
-      router.refresh();
-    } else {
-      alert('Error: ' + ((await res.json()).error ?? 'desconocido'));
-    }
+    if (res.ok) { setDone(true); router.refresh(); }
+    else alert('Error: ' + ((await res.json()).error ?? 'desconocido'));
   }
 
+  if (done) return <span className="badge badge--green">✓ Convertido</span>;
   return (
-    <button
-      onClick={convert}
-      disabled={loading || done}
-      style={{
-        padding: '0.35rem 0.7rem',
-        borderRadius: 6,
-        border: 'none',
-        cursor: done ? 'default' : 'pointer',
-        background: done ? '#1f3a24' : '#25d366',
-        color: done ? '#7fd99a' : '#000',
-        fontWeight: 700,
-        fontSize: '0.78rem',
-      }}
-    >
-      {done ? '✓ Convertido' : loading ? '...' : 'Marcar convertido'}
+    <button className="btn btn--sm" onClick={convert} disabled={loading}>
+      {loading ? '…' : 'Marcar convertido'}
     </button>
   );
 }

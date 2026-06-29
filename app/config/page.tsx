@@ -13,7 +13,7 @@ export default async function ConfigPage() {
   return (
     <>
       <Nav slug={session.slug} role={session.role} />
-      <main style={{ maxWidth: 880, margin: '0 auto 6vh', padding: '0 1rem' }}>
+      <main className="shell">
         <ConfigClient />
       </main>
     </>

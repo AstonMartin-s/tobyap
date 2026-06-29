@@ -2,45 +2,10 @@
 
 import { useEffect, useState } from 'react';
 
-// ---- estilos compartidos ----
-const card: React.CSSProperties = {
-  border: '1px solid #1c2026',
-  borderRadius: 10,
-  padding: '1.2rem',
-  marginBottom: '1.5rem',
-  background: '#101317',
-};
-const h2: React.CSSProperties = { fontSize: '1rem', margin: '0 0 1rem' };
-const input: React.CSSProperties = {
-  width: '100%',
-  padding: '0.5rem 0.7rem',
-  marginBottom: '0.7rem',
-  borderRadius: 6,
-  border: '1px solid #2a2f36',
-  background: '#15181d',
-  color: '#e7e9ec',
-  boxSizing: 'border-box',
-  fontSize: '0.85rem',
-};
-const label: React.CSSProperties = { fontSize: '0.72rem', color: '#8a93a0', display: 'block', marginBottom: 3 };
-const btn: React.CSSProperties = {
-  padding: '0.45rem 0.9rem',
-  borderRadius: 6,
-  border: 'none',
-  background: '#25d366',
-  color: '#000',
-  fontWeight: 700,
-  cursor: 'pointer',
-  fontSize: '0.82rem',
-};
-const btnGhost: React.CSSProperties = { ...btn, background: 'transparent', color: '#cfd3d9', border: '1px solid #2a2f36' };
-const td: React.CSSProperties = { padding: '0.4rem 0.5rem', fontSize: '0.82rem', borderBottom: '1px solid #1c2026' };
-const th: React.CSSProperties = { ...td, color: '#8a93a0', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: 1 };
-
 type Settings = Record<string, string | null>;
 interface NumberRow { id: string; name: string | null; phone: string | null; status: boolean | null; type: string | null }
 interface StatusRow { id: string; kommoStatusId: number | null; name: string | null; color: string | null }
-interface RuleRow { id: string; rule: string | null; text: string | null; priority: number | null; status: string | null }
+interface RuleRow { id: string; rule: string | null; text: string | null; priority: number | null }
 
 const TYPES = ['publi', 'regular', 'spam', 'soporte'];
 
@@ -54,7 +19,10 @@ async function j(url: string, opts?: RequestInit) {
 export function ConfigClient() {
   return (
     <>
-      <h1 style={{ fontSize: '1.3rem', marginBottom: '1.5rem' }}>Configuración</h1>
+      <div className="page-head">
+        <h1>Configuración</h1>
+        <p>Gestioná los datos de tu cuenta, números y reglas del CRM.</p>
+      </div>
       <SettingsSection />
       <NumbersSection />
       <StatusSection />
@@ -67,6 +35,7 @@ export function ConfigClient() {
 function SettingsSection() {
   const [s, setS] = useState<Settings>({});
   const [msg, setMsg] = useState('');
+  const [showCtx, setShowCtx] = useState(false);
 
   useEffect(() => {
     j('/api/settings').then((d) => setS(d.settings ?? {})).catch(() => {});
@@ -76,49 +45,48 @@ function SettingsSection() {
     setS((p) => ({ ...p, [k]: e.target.value }));
 
   async function save() {
-    setMsg('Guardando...');
+    setMsg('Guardando…');
     try {
-      await j('/api/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(s),
-      });
+      await j('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) });
       setMsg('✓ Guardado');
+      setTimeout(() => setMsg(''), 2500);
     } catch (e) {
       setMsg('Error: ' + (e as Error).message);
     }
   }
 
   return (
-    <section style={card}>
-      <h2 style={h2}>Configuración General</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem' }}>
-        <div>
-          <label style={label}>Nombre de cuenta</label>
-          <input style={input} value={s.accountName ?? ''} onChange={set('accountName')} />
+    <section className="card">
+      <div className="card__title"><span className="ico">⚙</span> Configuración general</div>
+      <div className="grid-2">
+        <div className="field">
+          <label>Nombre de cuenta (titular)</label>
+          <input className="input" value={s.accountName ?? ''} onChange={set('accountName')} placeholder="Titular para el CBU" />
         </div>
-        <div>
-          <label style={label}>CBU de cuenta</label>
-          <input style={input} value={s.accountCbu ?? ''} onChange={set('accountCbu')} />
+        <div className="field">
+          <label>CBU / CVU de cuenta</label>
+          <input className="input" value={s.accountCbu ?? ''} onChange={set('accountCbu')} placeholder="000000…" />
         </div>
-        <div>
-          <label style={label}>Mensaje de bienvenida / bono</label>
-          <input style={input} value={s.message ?? ''} onChange={set('message')} />
+        <div className="field">
+          <label>Mensaje de bienvenida / bono</label>
+          <input className="input" value={s.message ?? ''} onChange={set('message')} />
         </div>
-        <div>
-          <label style={label}>Mensaje regulares</label>
-          <input style={input} value={s.regularMessage ?? ''} onChange={set('regularMessage')} />
-        </div>
-        <div>
-          <label style={label}>WhatsApp base (walink)</label>
-          <input style={input} value={s.walink ?? ''} onChange={set('walink')} />
+        <div className="field">
+          <label>WhatsApp base (walink)</label>
+          <input className="input" value={s.walink ?? ''} onChange={set('walink')} />
         </div>
       </div>
-      <label style={label}>Contexto del Asistente IA (prompt)</label>
-      <textarea style={{ ...input, minHeight: 110, fontFamily: 'inherit' }} value={s.context ?? ''} onChange={set('context')} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <button style={btn} onClick={save}>Guardar</button>
-        <span style={{ fontSize: '0.8rem', color: '#8a93a0' }}>{msg}</span>
+
+      <div className="field">
+        <label style={{ cursor: 'pointer' }} onClick={() => setShowCtx((v) => !v)}>
+          Contexto del asistente IA {showCtx ? '▾' : '▸'}
+        </label>
+        {showCtx && <textarea className="textarea" value={s.context ?? ''} onChange={set('context')} placeholder="Prompt del clasificador…" />}
+      </div>
+
+      <div className="row" style={{ marginTop: '0.4rem' }}>
+        <button className="btn" onClick={save}>Guardar configuración</button>
+        <span style={{ color: 'var(--muted)', fontSize: '0.82rem' }}>{msg}</span>
       </div>
     </section>
   );
@@ -149,34 +117,35 @@ function NumbersSection() {
   }
 
   return (
-    <section style={card}>
-      <h2 style={h2}>Números de contacto</h2>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
-        <thead><tr><th style={th}>Nombre</th><th style={th}>Teléfono</th><th style={th}>Tipo</th><th style={th}>Estado</th><th style={th}></th></tr></thead>
+    <section className="card">
+      <div className="card__title"><span className="ico">☎</span> Números de contacto <span className="badge badge--muted">{rows.length}</span></div>
+      <table className="table" style={{ marginBottom: '1rem' }}>
+        <thead><tr><th>Nombre</th><th>Teléfono</th><th>Tipo</th><th>Estado</th><th></th></tr></thead>
         <tbody>
-          {rows.length === 0 && <tr><td style={{ ...td, color: '#8a93a0' }} colSpan={5}>Sin números.</td></tr>}
+          {rows.length === 0 && <tr><td colSpan={5} className="empty">Sin números cargados.</td></tr>}
           {rows.map((n) => (
             <tr key={n.id}>
-              <td style={td}>{n.name ?? '—'}</td>
-              <td style={td}>{n.phone}</td>
-              <td style={td}>{n.type ?? '—'}</td>
-              <td style={td}>
-                <button onClick={() => toggle(n)} style={{ ...btnGhost, padding: '0.2rem 0.6rem', color: n.status ? '#7fd99a' : '#ff6b6b' }}>
-                  {n.status ? 'Activo' : 'Inactivo'}
-                </button>
+              <td>{n.name ?? '—'}</td>
+              <td style={{ fontVariantNumeric: 'tabular-nums' }}>{n.phone}</td>
+              <td><span className="badge badge--type">{n.type ?? '—'}</span></td>
+              <td>
+                <label className="toggle">
+                  <input type="checkbox" checked={!!n.status} onChange={() => toggle(n)} />
+                  <span />
+                </label>
               </td>
-              <td style={td}><button onClick={() => del(n.id)} style={{ ...btnGhost, padding: '0.2rem 0.6rem' }}>✕</button></td>
+              <td><button className="btn btn--sm btn--danger-ghost" onClick={() => del(n.id)}>Eliminar</button></td>
             </tr>
           ))}
         </tbody>
       </table>
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-        <input style={{ ...input, marginBottom: 0 }} placeholder="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        <input style={{ ...input, marginBottom: 0 }} placeholder="Teléfono" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-        <select style={{ ...input, marginBottom: 0, width: 130 }} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+      <div className="row">
+        <input className="input" placeholder="Nombre" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        <input className="input" placeholder="Teléfono" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+        <select className="select" style={{ maxWidth: 140 }} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
           {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
-        <button style={btn} onClick={add}>Agregar</button>
+        <button className="btn" onClick={add}>Agregar</button>
       </div>
     </section>
   );
@@ -191,36 +160,33 @@ function StatusSection() {
   useEffect(() => { load(); }, []);
 
   async function sync() {
-    setMsg('Sincronizando...');
+    setMsg('Sincronizando…');
     try {
       const d = await j('/api/status', { method: 'POST' });
       setMsg(`✓ ${d.synced} estados`);
       load();
-    } catch (e) {
-      setMsg('Error: ' + (e as Error).message);
-    }
+      setTimeout(() => setMsg(''), 2500);
+    } catch (e) { setMsg('Error: ' + (e as Error).message); }
   }
 
   return (
-    <section style={card}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
-        <h2 style={{ ...h2, margin: 0 }}>Estados del sistema</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-          <span style={{ fontSize: '0.78rem', color: '#8a93a0' }}>{msg}</span>
-          <button style={btnGhost} onClick={sync}>Sincronizar desde Kommo</button>
-        </div>
+    <section className="card">
+      <div className="card__title" style={{ justifyContent: 'space-between' }}>
+        <span><span className="ico">≣</span> Estados del sistema <span className="badge badge--muted">{rows.length}</span></span>
+        <span className="row">
+          <span style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>{msg}</span>
+          <button className="btn btn--ghost btn--sm" onClick={sync}>Sincronizar desde Kommo</button>
+        </span>
       </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead><tr><th style={th}>ID Kommo</th><th style={th}>Nombre</th><th style={th}>Color</th></tr></thead>
+      <table className="table">
+        <thead><tr><th>ID Kommo</th><th>Nombre</th><th>Color</th></tr></thead>
         <tbody>
-          {rows.length === 0 && <tr><td style={{ ...td, color: '#8a93a0' }} colSpan={3}>Sin estados. Tocá “Sincronizar”.</td></tr>}
+          {rows.length === 0 && <tr><td colSpan={3} className="empty">Sin estados. Tocá “Sincronizar”.</td></tr>}
           {rows.map((s) => (
             <tr key={s.id}>
-              <td style={td}>{s.kommoStatusId}</td>
-              <td style={td}>{s.name}</td>
-              <td style={td}>
-                <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: 3, background: s.color ?? '#333', verticalAlign: 'middle' }} />
-              </td>
+              <td style={{ color: 'var(--muted)', fontVariantNumeric: 'tabular-nums' }}>{s.kommoStatusId}</td>
+              <td>{s.name}</td>
+              <td><span style={{ display: 'inline-block', width: 16, height: 16, borderRadius: 4, background: s.color ?? '#333', border: '1px solid var(--border-2)', verticalAlign: 'middle' }} /></td>
             </tr>
           ))}
         </tbody>
@@ -250,30 +216,30 @@ function RulesSection() {
   }
 
   return (
-    <section style={card}>
-      <h2 style={h2}>
-        Reglas del clasificador IA{' '}
-        <span style={{ fontSize: '0.7rem', color: '#ffb84d', fontWeight: 400 }}>· clasificador APAGADO (config disponible)</span>
-      </h2>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
-        <thead><tr><th style={th}>P.</th><th style={th}>Regla</th><th style={th}>→ Estado</th><th style={th}></th></tr></thead>
+    <section className="card">
+      <div className="card__title">
+        <span className="ico">✦</span> Reglas del clasificador IA
+        <span className="badge" style={{ background: 'rgba(255,184,77,0.12)', color: 'var(--warn)' }}>clasificador apagado</span>
+      </div>
+      <table className="table" style={{ marginBottom: '1rem' }}>
+        <thead><tr><th style={{ width: 40 }}>P.</th><th>Regla</th><th>→ Estado</th><th></th></tr></thead>
         <tbody>
-          {rows.length === 0 && <tr><td style={{ ...td, color: '#8a93a0' }} colSpan={4}>Sin reglas.</td></tr>}
+          {rows.length === 0 && <tr><td colSpan={4} className="empty">Sin reglas.</td></tr>}
           {rows.map((r) => (
             <tr key={r.id}>
-              <td style={td}>{r.priority}</td>
-              <td style={td}>{r.rule}</td>
-              <td style={td}>{r.text ?? '—'}</td>
-              <td style={td}><button onClick={() => del(r.id)} style={{ ...btnGhost, padding: '0.2rem 0.6rem' }}>✕</button></td>
+              <td style={{ color: 'var(--muted)' }}>{r.priority}</td>
+              <td>{r.rule}</td>
+              <td>{r.text ?? '—'}</td>
+              <td><button className="btn btn--sm btn--danger-ghost" onClick={() => del(r.id)}>✕</button></td>
             </tr>
           ))}
         </tbody>
       </table>
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-        <input style={{ ...input, marginBottom: 0, flex: 2 }} placeholder="Regla (instrucción)" value={form.rule} onChange={(e) => setForm({ ...form, rule: e.target.value })} />
-        <input style={{ ...input, marginBottom: 0, flex: 1 }} placeholder="Estado destino" value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} />
-        <input style={{ ...input, marginBottom: 0, width: 70 }} type="number" value={form.priority} onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })} />
-        <button style={btn} onClick={add}>Agregar</button>
+      <div className="row">
+        <input className="input" style={{ flex: 2 }} placeholder="Regla (instrucción)" value={form.rule} onChange={(e) => setForm({ ...form, rule: e.target.value })} />
+        <input className="input" style={{ flex: 1 }} placeholder="Estado destino" value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} />
+        <input className="input" style={{ maxWidth: 70 }} type="number" value={form.priority} onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })} />
+        <button className="btn" onClick={add}>Agregar</button>
       </div>
     </section>
   );

@@ -18,6 +18,63 @@ export interface ClientReport {
   conversion: number; // % cargas / conversaciones
 }
 
+// Reporte de UN cliente (su propia data), con filtros opcionales de campaña y fechas.
+export interface ClientKpis {
+  conversaciones: number;
+  cargas: number;
+  redirects: number;
+  totalEvents: number;
+  conversion: number;
+  byCampaign: Array<{ campaign: string; conversaciones: number; cargas: number; redirects: number }>;
+}
+
+export async function getClientKpis(
+  tenantId: string,
+  opts: { campaign?: string; start?: string; end?: string } = {},
+): Promise<ClientKpis> {
+  const conds = [eq(metaEvents.tenantId, tenantId), ...range(opts.start, opts.end)];
+  if (opts.campaign) conds.push(eq(metaEvents.campaignId, opts.campaign));
+
+  const rows = await db
+    .select({
+      type: metaEvents.eventType,
+      campaign: metaEvents.campaignId,
+      n: sql<number>`count(*)::int`,
+    })
+    .from(metaEvents)
+    .where(and(...conds))
+    .groupBy(metaEvents.eventType, metaEvents.campaignId);
+
+  let conversaciones = 0;
+  let cargas = 0;
+  let redirects = 0;
+  const byCamp = new Map<string, { conversaciones: number; cargas: number; redirects: number }>();
+  for (const r of rows) {
+    if (r.type === 'conversacion') conversaciones += r.n;
+    else if (r.type === 'cargo') cargas += r.n;
+    else if (r.type === 'redirect') redirects += r.n;
+    const key = r.campaign ?? '(sin campaña)';
+    const c = byCamp.get(key) ?? { conversaciones: 0, cargas: 0, redirects: 0 };
+    if (r.type === 'conversacion') c.conversaciones += r.n;
+    else if (r.type === 'cargo') c.cargas += r.n;
+    else if (r.type === 'redirect') c.redirects += r.n;
+    byCamp.set(key, c);
+  }
+
+  const byCampaign = [...byCamp.entries()]
+    .map(([campaign, v]) => ({ campaign, ...v }))
+    .sort((a, b) => b.conversaciones - a.conversaciones);
+
+  return {
+    conversaciones,
+    cargas,
+    redirects,
+    totalEvents: conversaciones + cargas,
+    conversion: conversaciones ? +(100 * cargas / conversaciones).toFixed(1) : 0,
+    byCampaign,
+  };
+}
+
 function range(start?: string, end?: string) {
   const conds = [];
   if (start) conds.push(gte(metaEvents.sentAt, new Date(start)));
