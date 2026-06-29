@@ -1,4 +1,7 @@
 import { redirect } from 'next/navigation';
+import { eq } from 'drizzle-orm';
+import { db } from '@/db';
+import { tenants } from '@/db/schema';
 import { getSession } from '@/lib/session';
 import { getDayCards, getDailyReport, todayAR } from '@/lib/reports';
 import { Nav } from '../_components/Nav';
@@ -21,9 +24,15 @@ export default async function AdminPage({
   const start = searchParams.start ?? today;
   const end = searchParams.end ?? today;
 
+  const clientList = await db
+    .select({ slug: tenants.slug, name: tenants.name, id: tenants.id })
+    .from(tenants)
+    .where(eq(tenants.role, 'client'));
+  const selected = clientList.find((c) => c.slug === searchParams.tenant);
+
   const [cards, daily] = await Promise.all([
     getDayCards(today),
-    getDailyReport({ start, end }),
+    getDailyReport({ start, end, tenantId: selected?.id }),
   ]);
 
   const activos = cards.filter((c) => c.chats + c.cargas > 0);
@@ -84,7 +93,14 @@ export default async function AdminPage({
           <div className="card__title">
             Reportes diarios de ads <span className="card__sub">cargá el gasto en la fila — se guarda solo</span>
           </div>
-          <form method="get" className="row" style={{ alignItems: 'flex-end', marginBottom: '1.1rem' }}>
+          <form method="get" className="row" style={{ alignItems: 'flex-end', marginBottom: '1.1rem', flexWrap: 'wrap' }}>
+            <div className="field" style={{ margin: 0, minWidth: 200 }}>
+              <label>Cliente</label>
+              <select className="select" name="tenant" defaultValue={searchParams.tenant ?? ''}>
+                <option value="">Todos los clientes</option>
+                {clientList.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
+              </select>
+            </div>
             <div className="field" style={{ margin: 0 }}>
               <label>Desde</label>
               <input className="input" type="date" name="start" defaultValue={start} />
@@ -96,6 +112,7 @@ export default async function AdminPage({
             <button className="btn" type="submit">Filtrar</button>
             <a className="btn btn--ghost" href="/admin">Hoy</a>
           </form>
+          {!selected && <p style={{ color: 'var(--muted-2)', fontSize: '.78rem', marginTop: 0 }}>Elegí un cliente para ver el saldo de su cuenta correctamente.</p>}
           <DailyReportClient initial={daily} />
         </div>
       </main>

@@ -183,11 +183,11 @@ export interface DailyRow {
   chats: number;
   cargas: number;
   gasto: number;
-  ingreso: number;
+  recarga: number; // depósito/recarga manual del día (Historial)
   conversion: number;
   costPerChat: number;
   costPerCarga: number;
-  balance: number;
+  saldo: number; // saldo corriente: Σ recargas − Σ gasto hasta ese día (por cliente)
 }
 
 export async function getDailyReport(opts: { start?: string; end?: string; tenantId?: string } = {}): Promise<DailyRow[]> {
@@ -215,14 +215,14 @@ export async function getDailyReport(opts: { start?: string; end?: string; tenan
     let r = map.get(key);
     if (!r) {
       const l = ledByKey.get(key);
-      r = { tenantId: e.tenantId, slug: t.slug, name: t.name, day: e.day, chats: 0, cargas: 0, gasto: l?.gasto ?? 0, ingreso: l?.ingreso ?? 0, conversion: 0, costPerChat: 0, costPerCarga: 0, balance: 0 };
+      r = { tenantId: e.tenantId, slug: t.slug, name: t.name, day: e.day, chats: 0, cargas: 0, gasto: l?.gasto ?? 0, recarga: l?.ingreso ?? 0, conversion: 0, costPerChat: 0, costPerCarga: 0, saldo: 0 };
       map.set(key, r);
     }
     if (e.type === 'conversacion') r.chats += e.n;
     else if (e.type === 'cargo') r.cargas += e.n;
   }
 
-  // Incluir también días que tienen gasto/ingreso manual aunque no haya eventos,
+  // Incluir también días que tienen gasto/recarga manual aunque no haya eventos,
   // para que el operador siempre tenga la fila donde editar.
   const inRange = (d: string) => (!opts.start || d >= opts.start) && (!opts.end || d <= opts.end);
   for (const l of led) {
@@ -232,16 +232,28 @@ export async function getDailyReport(opts: { start?: string; end?: string; tenan
     if (!t) continue;
     const key = `${l.tenantId}|${l.day}`;
     if (!map.has(key)) {
-      map.set(key, { tenantId: l.tenantId, slug: t.slug, name: t.name, day: l.day, chats: 0, cargas: 0, gasto: l.gasto ?? 0, ingreso: l.ingreso ?? 0, conversion: 0, costPerChat: 0, costPerCarga: 0, balance: 0 });
+      map.set(key, { tenantId: l.tenantId, slug: t.slug, name: t.name, day: l.day, chats: 0, cargas: 0, gasto: l.gasto ?? 0, recarga: l.ingreso ?? 0, conversion: 0, costPerChat: 0, costPerCarga: 0, saldo: 0 });
     }
   }
 
   const rows = [...map.values()];
+  // Saldo corriente por cliente: Σ(recarga − gasto) de TODO el ledger del cliente
+  // hasta ese día (incluye historia previa al rango mostrado).
+  const ledByTenant = new Map<string, typeof led>();
+  for (const l of led) {
+    const arr = ledByTenant.get(l.tenantId) ?? [];
+    arr.push(l);
+    ledByTenant.set(l.tenantId, arr);
+  }
   for (const r of rows) {
     r.conversion = r.chats ? +(100 * r.cargas / r.chats).toFixed(1) : 0;
     r.costPerChat = r.chats ? +(r.gasto / r.chats).toFixed(2) : 0;
     r.costPerCarga = r.cargas ? +(r.gasto / r.cargas).toFixed(2) : 0;
-    r.balance = +(r.ingreso - r.gasto).toFixed(2);
+    const hist = ledByTenant.get(r.tenantId) ?? [];
+    r.saldo = +hist
+      .filter((l) => l.day <= r.day)
+      .reduce((acc, l) => acc + (l.ingreso ?? 0) - (l.gasto ?? 0), 0)
+      .toFixed(2);
   }
   rows.sort((a, b) => (a.day < b.day ? 1 : -1));
   return rows;
