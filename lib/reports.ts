@@ -1,6 +1,16 @@
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { metaEvents, tenants } from '@/db/schema';
+import { metaEvents, tenants, ledger } from '@/db/schema';
+
+// Día (YYYY-MM-DD) en zona AR — usado para agrupar reportes diarios y el ledger.
+const AR_TZ = 'America/Argentina/Buenos_Aires';
+// TZ inyectada como literal (no parámetro) para que SELECT y GROUP BY generen la
+// MISMA expresión; si fuera $param, Postgres las ve distintas y falla el group by.
+const dayExpr = sql<string>`to_char(${metaEvents.sentAt} AT TIME ZONE 'America/Argentina/Buenos_Aires', 'YYYY-MM-DD')`;
+
+export function todayAR(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: AR_TZ }).format(new Date()); // YYYY-MM-DD
+}
 
 // ---------------------------------------------------------------------------
 // Reportes admin — agregan SIEMPRE desde nuestra DB (meta_events). El sistema es
@@ -113,4 +123,126 @@ export async function getAdminReport(start?: string, end?: string): Promise<Clie
   for (const c of list) c.conversion = c.conversaciones ? +(100 * c.cargas / c.conversaciones).toFixed(1) : 0;
   list.sort((a, b) => b.conversaciones - a.conversaciones);
   return list;
+}
+
+// ---------------------------------------------------------------------------
+// Tarjetas del día (hoy AR): un resumen por cliente con actividad, con el gasto
+// MANUAL del día cargado en el ledger -> costo por chat / carga.
+// ---------------------------------------------------------------------------
+export interface DayCard {
+  tenantId: string;
+  slug: string;
+  name: string;
+  chats: number; // conversaciones
+  cargas: number;
+  conversion: number;
+  gasto: number; // manual (ledger)
+  ingreso: number; // depósitos (ledger)
+  costPerChat: number;
+  costPerCarga: number;
+}
+
+export async function getDayCards(day = todayAR()): Promise<DayCard[]> {
+  const ev = await db
+    .select({ tenantId: metaEvents.tenantId, type: metaEvents.eventType, n: sql<number>`count(*)::int` })
+    .from(metaEvents)
+    .where(sql`${dayExpr} = ${day}`)
+    .groupBy(metaEvents.tenantId, metaEvents.eventType);
+
+  const ts = await db.select({ id: tenants.id, slug: tenants.slug, name: tenants.name }).from(tenants).where(eq(tenants.role, 'client'));
+  const led = await db.select().from(ledger).where(eq(ledger.day, day));
+  const ledByTenant = new Map(led.map((l) => [l.tenantId, l]));
+
+  const cards: DayCard[] = ts.map((t) => {
+    const chats = ev.filter((e) => e.tenantId === t.id && e.type === 'conversacion').reduce((a, e) => a + e.n, 0);
+    const cargas = ev.filter((e) => e.tenantId === t.id && e.type === 'cargo').reduce((a, e) => a + e.n, 0);
+    const l = ledByTenant.get(t.id);
+    const gasto = l?.gasto ?? 0;
+    const ingreso = l?.ingreso ?? 0;
+    return {
+      tenantId: t.id, slug: t.slug, name: t.name, chats, cargas,
+      conversion: chats ? +(100 * cargas / chats).toFixed(1) : 0,
+      gasto, ingreso,
+      costPerChat: chats ? +(gasto / chats).toFixed(2) : 0,
+      costPerCarga: cargas ? +(gasto / cargas).toFixed(2) : 0,
+    };
+  });
+  cards.sort((a, b) => (b.chats + b.cargas) - (a.chats + a.cargas));
+  return cards;
+}
+
+// ---------------------------------------------------------------------------
+// Reporte diario de ads: filas por (cliente, día) con chats/cargas + gasto e
+// ingreso manuales -> $/chat, $/carga, conversión y balance.
+// ---------------------------------------------------------------------------
+export interface DailyRow {
+  tenantId: string;
+  slug: string;
+  name: string;
+  day: string;
+  chats: number;
+  cargas: number;
+  gasto: number;
+  ingreso: number;
+  conversion: number;
+  costPerChat: number;
+  costPerCarga: number;
+  balance: number;
+}
+
+export async function getDailyReport(opts: { start?: string; end?: string; tenantId?: string } = {}): Promise<DailyRow[]> {
+  const conds = [];
+  if (opts.start) conds.push(gte(metaEvents.sentAt, new Date(`${opts.start}T00:00:00.000Z`)));
+  if (opts.end) conds.push(lte(metaEvents.sentAt, new Date(`${opts.end}T23:59:59.999Z`)));
+  if (opts.tenantId) conds.push(eq(metaEvents.tenantId, opts.tenantId));
+
+  const ev = await db
+    .select({ tenantId: metaEvents.tenantId, day: dayExpr, type: metaEvents.eventType, n: sql<number>`count(*)::int` })
+    .from(metaEvents)
+    .where(conds.length ? and(...conds) : undefined)
+    .groupBy(metaEvents.tenantId, dayExpr, metaEvents.eventType);
+
+  const ts = await db.select({ id: tenants.id, slug: tenants.slug, name: tenants.name }).from(tenants).where(eq(tenants.role, 'client'));
+  const tById = new Map(ts.map((t) => [t.id, t]));
+  const led = await db.select().from(ledger);
+  const ledByKey = new Map(led.map((l) => [`${l.tenantId}|${l.day}`, l]));
+
+  const map = new Map<string, DailyRow>();
+  for (const e of ev) {
+    const t = tById.get(e.tenantId);
+    if (!t || !e.day) continue;
+    const key = `${e.tenantId}|${e.day}`;
+    let r = map.get(key);
+    if (!r) {
+      const l = ledByKey.get(key);
+      r = { tenantId: e.tenantId, slug: t.slug, name: t.name, day: e.day, chats: 0, cargas: 0, gasto: l?.gasto ?? 0, ingreso: l?.ingreso ?? 0, conversion: 0, costPerChat: 0, costPerCarga: 0, balance: 0 };
+      map.set(key, r);
+    }
+    if (e.type === 'conversacion') r.chats += e.n;
+    else if (e.type === 'cargo') r.cargas += e.n;
+  }
+
+  // Incluir también días que tienen gasto/ingreso manual aunque no haya eventos,
+  // para que el operador siempre tenga la fila donde editar.
+  const inRange = (d: string) => (!opts.start || d >= opts.start) && (!opts.end || d <= opts.end);
+  for (const l of led) {
+    if (opts.tenantId && l.tenantId !== opts.tenantId) continue;
+    if (!inRange(l.day)) continue;
+    const t = tById.get(l.tenantId);
+    if (!t) continue;
+    const key = `${l.tenantId}|${l.day}`;
+    if (!map.has(key)) {
+      map.set(key, { tenantId: l.tenantId, slug: t.slug, name: t.name, day: l.day, chats: 0, cargas: 0, gasto: l.gasto ?? 0, ingreso: l.ingreso ?? 0, conversion: 0, costPerChat: 0, costPerCarga: 0, balance: 0 });
+    }
+  }
+
+  const rows = [...map.values()];
+  for (const r of rows) {
+    r.conversion = r.chats ? +(100 * r.cargas / r.chats).toFixed(1) : 0;
+    r.costPerChat = r.chats ? +(r.gasto / r.chats).toFixed(2) : 0;
+    r.costPerCarga = r.cargas ? +(r.gasto / r.cargas).toFixed(2) : 0;
+    r.balance = +(r.ingreso - r.gasto).toFixed(2);
+  }
+  rows.sort((a, b) => (a.day < b.day ? 1 : -1));
+  return rows;
 }

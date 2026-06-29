@@ -6,8 +6,30 @@ import {
   boolean,
   jsonb,
   timestamp,
+  doublePrecision,
   unique,
 } from 'drizzle-orm/pg-core';
+
+// ---------------------------------------------------------------------------
+// ledger — gasto/ingreso (depósitos) manual por cliente y día. Alimenta los
+// reportes diarios de ads: $/chat, $/carga, balance. Una fila por (tenant, día);
+// "Agregar Ingreso/Gasto" suma sobre la fila del día.
+// ---------------------------------------------------------------------------
+export const ledger = pgTable(
+  'ledger',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    day: text('day').notNull(), // 'YYYY-MM-DD' (zona AR del operador)
+    gasto: doublePrecision('gasto').default(0), // inversión en ads (USD)
+    ingreso: doublePrecision('ingreso').default(0), // depósitos / ingresos (USD)
+    note: text('note'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({ uniqDay: unique('ledger_tenant_day').on(t.tenantId, t.day) }),
+);
 
 // ---------------------------------------------------------------------------
 // tenants — un registro por cliente. Secretos cifrados (AES-256-GCM) en reposo.

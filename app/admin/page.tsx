@@ -1,25 +1,33 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
-import { getAdminReport } from '@/lib/reports';
+import { getDayCards, getDailyReport, todayAR } from '@/lib/reports';
 import { Nav } from '../_components/Nav';
+import { DailyReportClient } from './DailyReportClient';
 
 export const dynamic = 'force-dynamic';
 
-const fmt = (n: number) => n.toLocaleString('es-AR');
+const money = (n: number) => `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: { start?: string; end?: string };
+  searchParams: { start?: string; end?: string; tenant?: string };
 }) {
   const session = await getSession();
   if (!session) redirect('/login');
   if (session.role !== 'admin') redirect('/reportes');
 
-  const start = searchParams.start;
-  const end = searchParams.end;
-  const report = await getAdminReport(start ? `${start}T00:00:00.000Z` : undefined, end ? `${end}T23:59:59.999Z` : undefined);
-  const tot = report.reduce((a, c) => ({ conv: a.conv + c.conversaciones, carg: a.carg + c.cargas, red: a.red + c.redirects }), { conv: 0, carg: 0, red: 0 });
+  const today = todayAR();
+  const start = searchParams.start ?? today;
+  const end = searchParams.end ?? today;
+
+  const [cards, daily] = await Promise.all([
+    getDayCards(today),
+    getDailyReport({ start, end }),
+  ]);
+
+  const activos = cards.filter((c) => c.chats + c.cargas > 0);
+  const inactivos = cards.filter((c) => c.chats + c.cargas === 0);
 
   return (
     <>
@@ -27,13 +35,56 @@ export default async function AdminPage({
       <main className="shell">
         <div className="page-head">
           <div className="page-head__text">
-            <h1>Reportes · todos los clientes</h1>
-            <p>Resultados agregados desde la base propia.</p>
+            <h1>Panel de administración</h1>
+            <p>Estadísticas por cliente · el gasto se carga manual y queda fijo.</p>
           </div>
         </div>
 
-        <form method="get" className="card" style={{ paddingBottom: '1.1rem' }}>
-          <div className="row" style={{ alignItems: 'flex-end' }}>
+        {/* ---- Reporte del día (tarjetas) ---- */}
+        <div className="card">
+          <div className="card__title">
+            Reporte del día <span className="card__sub">{today} · {cards.length} clientes · con actividad {activos.length}</span>
+          </div>
+          {activos.length === 0 ? (
+            <div className="empty">Todavía no hay actividad hoy.</div>
+          ) : (
+            <div className="daycards">
+              {activos.map((c) => (
+                <div className="daycard" key={c.tenantId}>
+                  <div className="daycard__head">
+                    <div>
+                      <div className="daycard__name">{c.name}</div>
+                      <div className="daycard__sub">{c.slug}</div>
+                    </div>
+                    <span className="badge badge--green">{c.conversion}%</span>
+                  </div>
+                  <div className="daycard__grid">
+                    <div className="daycard__cell"><div className="l">Chats</div><div className="v">{c.chats}</div></div>
+                    <div className="daycard__cell"><div className="l">Cargas</div><div className="v" style={{ color: 'var(--accent)' }}>{c.cargas}</div></div>
+                    <div className="daycard__cell"><div className="l">Gasto</div><div className="v" style={{ color: 'var(--blue)' }}>{money(c.gasto)}</div></div>
+                    <div className="daycard__cell"><div className="l">Depósitos</div><div className="v">{money(c.ingreso)}</div></div>
+                  </div>
+                  <div className="daycard__foot">
+                    <span>Costo/Chat <b>{money(c.costPerChat)}</b></span>
+                    <span>Costo/Carga <b>{money(c.costPerCarga)}</b></span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {inactivos.length > 0 && (
+            <p style={{ color: 'var(--muted-2)', fontSize: '.8rem', marginTop: '1rem', marginBottom: 0 }}>
+              Sin actividad hoy: {inactivos.map((c) => c.slug).join(' · ')}
+            </p>
+          )}
+        </div>
+
+        {/* ---- Reportes diarios (tabla editable) ---- */}
+        <div className="card">
+          <div className="card__title">
+            Reportes diarios de ads <span className="card__sub">cargá el gasto en la fila — se guarda solo</span>
+          </div>
+          <form method="get" className="row" style={{ alignItems: 'flex-end', marginBottom: '1.1rem' }}>
             <div className="field" style={{ margin: 0 }}>
               <label>Desde</label>
               <input className="input" type="date" name="start" defaultValue={start} />
@@ -43,34 +94,9 @@ export default async function AdminPage({
               <input className="input" type="date" name="end" defaultValue={end} />
             </div>
             <button className="btn" type="submit">Filtrar</button>
-            <a className="btn btn--ghost" href="/admin">Limpiar</a>
-          </div>
-        </form>
-
-        <div className="kpis">
-          <div className="kpi"><div className="kpi__icon">↗</div><div className="kpi__label">Conversaciones</div><div className="kpi__value">{fmt(tot.conv)}</div></div>
-          <div className="kpi kpi--warn"><div className="kpi__icon">⚡</div><div className="kpi__label">Cargas</div><div className="kpi__value">{fmt(tot.carg)}</div></div>
-          <div className="kpi kpi--blue"><div className="kpi__icon">→</div><div className="kpi__label">Redirecciones</div><div className="kpi__value">{fmt(tot.red)}</div></div>
-          <div className="kpi kpi--accent"><div className="kpi__icon">%</div><div className="kpi__label">Conversión global</div><div className="kpi__value">{tot.conv ? +(100 * tot.carg / tot.conv).toFixed(1) : 0}%</div></div>
-        </div>
-
-        <div className="card">
-          <div className="card__title">Por cliente</div>
-          <table className="table">
-            <thead><tr><th>Cliente</th><th className="num">Conversaciones</th><th className="num">Cargas</th><th className="num">Redirects</th><th className="num">% Conv.</th></tr></thead>
-            <tbody>
-              {report.length === 0 && <tr><td colSpan={5} className="empty">Sin clientes.</td></tr>}
-              {report.map((c) => (
-                <tr key={c.tenantId}>
-                  <td>{c.name} <span style={{ color: 'var(--muted)' }}>· {c.slug}</span></td>
-                  <td className="num">{fmt(c.conversaciones)}</td>
-                  <td className="num">{fmt(c.cargas)}</td>
-                  <td className="num">{fmt(c.redirects)}</td>
-                  <td className="num" style={{ color: 'var(--accent)' }}>{c.conversion}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            <a className="btn btn--ghost" href="/admin">Hoy</a>
+          </form>
+          <DailyReportClient initial={daily} />
         </div>
       </main>
     </>

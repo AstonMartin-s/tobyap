@@ -170,6 +170,23 @@ a { color: inherit; }
 
 .empty { color: var(--muted); text-align: center; padding: 2rem 1rem; font-size: 0.9rem; }
 
+/* Input compacto dentro de celdas de tabla (gasto/ingreso editable) */
+.input--cell { width: 92px; padding: 0.3rem 0.45rem; font-size: 0.82rem; text-align: right; font-variant-numeric: tabular-nums; }
+.input--cell::-webkit-outer-spin-button, .input--cell::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Tarjetas "Reporte del día" por cliente */
+.daycards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
+.daycard { background: linear-gradient(180deg, var(--card-2), var(--card)); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.1rem 1.2rem; }
+.daycard__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.9rem; }
+.daycard__name { font-weight: 700; font-size: 1rem; color: var(--blue); }
+.daycard__sub { color: var(--muted-2); font-size: 0.74rem; }
+.daycard__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.daycard__cell { background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.6rem 0.7rem; }
+.daycard__cell .l { color: var(--muted); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.daycard__cell .v { font-size: 1.25rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.daycard__foot { display: flex; justify-content: space-between; margin-top: 0.8rem; padding-top: 0.7rem; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--muted); }
+.daycard__foot b { color: var(--text); display: block; font-size: 0.95rem; }
+
 @keyframes spin { to { transform: rotate(360deg); } }
 .spinner { width: 18px; height: 18px; border: 2px solid var(--border-2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 
