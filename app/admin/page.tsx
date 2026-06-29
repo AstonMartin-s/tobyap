@@ -62,11 +62,11 @@ export default async function AdminPage({
                     <div className="daycard__cell"><div className="l">Chats</div><div className="v">{c.chats}</div></div>
                     <div className="daycard__cell"><div className="l">Cargas</div><div className="v" style={{ color: 'var(--accent)' }}>{c.cargas}</div></div>
                     <div className="daycard__cell"><div className="l">Gasto</div><div className="v" style={{ color: 'var(--blue)' }}>{money(c.gasto)}</div></div>
-                    <div className="daycard__cell"><div className="l">Depósitos</div><div className="v">{money(c.ingreso)}</div></div>
+                    <div className="daycard__cell"><div className="l">Costo/Chat</div><div className="v">{money(c.costPerChat)}</div></div>
                   </div>
                   <div className="daycard__foot">
-                    <span>Costo/Chat <b>{money(c.costPerChat)}</b></span>
                     <span>Costo/Carga <b>{money(c.costPerCarga)}</b></span>
+                    <span>Conversión <b style={{ color: 'var(--accent)' }}>{c.conversion}%</b></span>
                   </div>
                 </div>
               ))}
