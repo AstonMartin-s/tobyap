@@ -88,7 +88,7 @@ export async function discoverKommoConfig(
   const byName = (name: string) => fields.find((f) => norm(f.name) === name)?.id;
 
   const customFields: Record<string, number> = {};
-  for (const key of ['fbclid', 'utm_campaign', 'utm_source', 'utm_content']) {
+  for (const key of ['fbclid', 'utm_campaign', 'utm_source', 'utm_content', 'ad_code']) {
     const id = byName(key);
     if (id) customFields[key] = id;
   }

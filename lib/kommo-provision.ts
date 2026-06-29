@@ -32,7 +32,7 @@ export const REGULARES_STATUSES: Array<{ name: string; sort: number; color: stri
 ];
 
 // Custom fields base (todos type "text" para poder leerlos y escribirlos).
-export const STANDARD_FIELDS = ['fbclid', 'utm_campaign', 'utm_source', 'utm_content', 'CBU', 'TITULAR'];
+export const STANDARD_FIELDS = ['fbclid', 'utm_campaign', 'utm_source', 'utm_content', 'CBU', 'TITULAR', 'ad_code'];
 
 interface ProvisionResult {
   pipelineId: number;

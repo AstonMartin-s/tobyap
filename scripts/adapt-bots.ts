@@ -5,8 +5,66 @@
 //   npm run adapt-bots -- <slug> <sourceToken> <sourceSubdomain>
 //
 // Salida: bots-adapted/<slug>/*.json
+import crypto from 'crypto';
 import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
 import { getTenantBySlug } from '@/lib/tenants';
+
+// Inyecta al inicio del WELCOME un nodo "Establecer campo" que guarda el primer
+// mensaje en ad_code (para capturar el token de atribución). Idempotente.
+function injectAdCode(bot: { model: { text: string; positions: string } }, adFieldId: number): void {
+  const text = JSON.parse(bot.model.text) as Record<string, unknown>;
+  const pos = JSON.parse(bot.model.positions) as Array<Record<string, unknown>>;
+
+  const action = {
+    name: 'set_custom_fields',
+    params: { value: '{{message.text}}', value_type: 'custom_value', custom_field: `{{lead.cf.${adFieldId}}}` },
+  };
+  // Ya inyectado?
+  const exists = pos.some((b) =>
+    ((b.actions as Array<Record<string, unknown>>) ?? []).some(
+      (a) => ((a.params as Record<string, unknown>)?.params as Record<string, unknown>)?.name === 'set_custom_fields',
+    ),
+  );
+  if (exists) return;
+
+  const start = pos.find((b) => b.type === 'start');
+  if (!start || !(start.goto as { block?: number })?.block) return;
+  const origBlock = (start.goto as { block: number }).block;
+  const origPos = pos.find((b) => b.id === origBlock);
+  const origStep = (origPos?.step as number) ?? 0;
+  const newId = Math.max(...pos.map((b) => b.id as number)) + 1;
+  const newStep = 900;
+  const uuid = crypto.randomUUID();
+
+  // model.text: nuevo step con la acción + goto al primer step original.
+  text[String(newStep)] = {
+    question: [
+      { params: action, handler: 'action' },
+      { params: { step: origStep, type: 'question' }, handler: 'goto' },
+    ],
+    block_uuid: uuid,
+  };
+  // positions: nuevo bloque + reapuntar el start.
+  pos.push({
+    x: (start.x as number) - 100,
+    y: (start.y as number) + 220,
+    z: 99,
+    id: newId,
+    goto: { block: origBlock },
+    name: 'Establecer campo',
+    step: newStep,
+    type: 'question',
+    width: 400,
+    height: 105,
+    actions: [{ id: 9000, sort: 0, links: [], params: { params: action, handler: 'action' } }],
+    deletable: true,
+    block_uuid: uuid,
+  });
+  (start.goto as { block: number }).block = newId;
+
+  bot.model.text = JSON.stringify(text);
+  bot.model.positions = JSON.stringify(pos);
+}
 
 const APP = 'https://tobyap-production.up.railway.app';
 // Normalización tolerante: minúsculas + solo alfanumérico ("Pidio cbu/alias" == "Pidio CbuAlias").
@@ -184,8 +242,19 @@ async function main() {
     const m = bot.model ?? {};
     if (typeof m.text === 'string') m.text = transform(m.text);
     if (typeof m.positions === 'string') m.positions = transform(m.positions);
+    // WELCOME: inyectar el guardado del primer mensaje en ad_code (atribución por token).
+    let extra = '';
+    if (file === 'WELCOME.json') {
+      const adId = t.customFields['ad_code'];
+      if (adId) {
+        injectAdCode(bot, adId);
+        extra = ` (+ ad_code ${adId})`;
+      } else {
+        cfWarn.push('WELCOME: el tenant no tiene ad_code, no se inyectó el guardado del token');
+      }
+    }
     writeFileSync(`${outDir}/${file}`, JSON.stringify(bot));
-    console.log(`✓ ${file}`);
+    console.log(`✓ ${file}${extra}`);
   }
   const allWarn = [...new Set([...warnings, ...cfWarn])];
   if (allWarn.length) {
