@@ -58,27 +58,32 @@ export default async function AdminPage({
             <div className="empty">Todavía no hay actividad hoy.</div>
           ) : (
             <div className="daycards">
-              {activos.map((c) => (
-                <div className="daycard" key={c.tenantId}>
-                  <div className="daycard__head">
-                    <div>
-                      <div className="daycard__name">{c.name}</div>
-                      <div className="daycard__sub">{c.slug}</div>
+              {activos.map((c) => {
+                const status = c.conversion >= 15 ? 'great' : c.conversion >= 5 ? 'good' : 'low';
+                const label = status === 'great' ? 'Excelente' : status === 'good' ? 'Bueno' : 'Bajo';
+                const badgeCls = status === 'great' ? 'badge--green' : status === 'good' ? 'badge--blue' : 'badge--danger';
+                return (
+                  <div className={`daycard daycard--${status}`} key={c.tenantId}>
+                    <div className="daycard__head">
+                      <div>
+                        <div className="daycard__name">{c.name}</div>
+                        <div className="daycard__sub">{c.slug}</div>
+                      </div>
+                      <span className={`badge ${badgeCls}`}>{label}</span>
                     </div>
-                    <span className="badge badge--green">{c.conversion}%</span>
+                    <div className="daycard__grid">
+                      <div className="daycard__cell"><div className="l">Chats</div><div className="v">{c.chats}</div></div>
+                      <div className="daycard__cell"><div className="l">Cargas</div><div className="v" style={{ color: 'var(--success)' }}>{c.cargas}</div></div>
+                      <div className="daycard__cell"><div className="l">Gasto</div><div className="v" style={{ color: 'var(--blue)' }}>{money(c.gasto)}</div></div>
+                      <div className="daycard__cell"><div className="l">Costo/Chat</div><div className="v">{money(c.costPerChat)}</div></div>
+                    </div>
+                    <div className="daycard__foot">
+                      <span>Costo/Carga <b>{money(c.costPerCarga)}</b></span>
+                      <span>Conversión <b style={{ color: 'var(--status)' }}>{c.conversion}%</b></span>
+                    </div>
                   </div>
-                  <div className="daycard__grid">
-                    <div className="daycard__cell"><div className="l">Chats</div><div className="v">{c.chats}</div></div>
-                    <div className="daycard__cell"><div className="l">Cargas</div><div className="v" style={{ color: 'var(--accent)' }}>{c.cargas}</div></div>
-                    <div className="daycard__cell"><div className="l">Gasto</div><div className="v" style={{ color: 'var(--blue)' }}>{money(c.gasto)}</div></div>
-                    <div className="daycard__cell"><div className="l">Costo/Chat</div><div className="v">{money(c.costPerChat)}</div></div>
-                  </div>
-                  <div className="daycard__foot">
-                    <span>Costo/Carga <b>{money(c.costPerCarga)}</b></span>
-                    <span>Conversión <b style={{ color: 'var(--accent)' }}>{c.conversion}%</b></span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
           {inactivos.length > 0 && (

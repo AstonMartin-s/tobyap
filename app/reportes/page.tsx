@@ -59,25 +59,25 @@ export default async function ReportesPage({
         </form>
 
         <div className="kpis">
-          <div className="kpi">
+          <div className="kpi kpi--accent">
             <div className="kpi__icon">◷</div>
             <div className="kpi__label">Total de eventos</div>
             <div className="kpi__value">{fmt(k.totalEvents)}</div>
             <div className="kpi__hint">Conversaciones + cargas</div>
           </div>
-          <div className="kpi">
+          <div className="kpi kpi--blue">
             <div className="kpi__icon">↗</div>
             <div className="kpi__label">Conversaciones</div>
             <div className="kpi__value">{fmt(k.conversaciones)}</div>
             <div className="kpi__hint">Chats iniciados (evento 1)</div>
           </div>
-          <div className="kpi kpi--warn">
+          <div className="kpi kpi--green">
             <div className="kpi__icon">⚡</div>
             <div className="kpi__label">Cargas</div>
             <div className="kpi__value">{fmt(k.cargas)}</div>
             <div className="kpi__hint">Depósitos (evento 2)</div>
           </div>
-          <div className="kpi kpi--blue">
+          <div className="kpi kpi--purple">
             <div className="kpi__icon">→</div>
             <div className="kpi__label">Redirecciones</div>
             <div className="kpi__value">{fmt(k.redirects)}</div>

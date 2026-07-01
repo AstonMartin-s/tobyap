@@ -221,7 +221,7 @@ function RulesSection() {
     <section className="card">
       <div className="card__title">
         <span className="ico">✦</span> Reglas del clasificador IA
-        <span className="badge" style={{ background: 'rgba(255,184,77,0.12)', color: 'var(--warn)' }}>clasificador apagado</span>
+        <span className="badge badge--warn">clasificador apagado</span>
       </div>
       <table className="table" style={{ marginBottom: '1rem' }}>
         <thead><tr><th style={{ width: 40 }}>P.</th><th>Regla</th><th>→ Estado</th><th></th></tr></thead>

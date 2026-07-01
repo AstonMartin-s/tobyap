@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
 // Iconos inline (stroke currentColor) — sin dependencias.
@@ -31,12 +31,34 @@ const I = {
       <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" /><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" /><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" /><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
     </svg>
   ),
+  moon: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  ),
+  sun: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+    </svg>
+  ),
 };
 
 export function Nav({ slug, role = 'client' }: { slug: string; role?: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const isAdmin = role === 'admin';
+
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  useEffect(() => {
+    setTheme((document.documentElement.dataset.theme as 'dark' | 'light') || 'dark');
+  }, []);
+  function toggleTheme() {
+    const next = theme === 'light' ? 'dark' : 'light';
+    setTheme(next);
+    if (next === 'dark') delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('theme', next); } catch { /* ignore */ }
+  }
 
   async function logout() {
     await fetch('/api/logout', { method: 'POST' });
@@ -83,6 +105,10 @@ export function Nav({ slug, role = 'client' }: { slug: string; role?: string }) 
       <div className="sidebar__status">
         <span className="nav__dot" /> Sistema conectado
       </div>
+      <button className="sidebar__theme" onClick={toggleTheme} aria-label="Cambiar tema">
+        {theme === 'light' ? I.moon : I.sun}
+        <span>{theme === 'light' ? 'Modo oscuro' : 'Modo claro'}</span>
+      </button>
       <button className="sidebar__logout" onClick={logout}>
         {I.logout}
         <span>Cerrar sesión</span>

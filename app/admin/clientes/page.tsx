@@ -29,7 +29,7 @@ export default async function ClientesPage() {
                   <td><Link href={`/admin/clientes/${t.slug}`} style={{ color: 'var(--accent)', fontWeight: 600 }}>{t.slug}</Link></td>
                   <td>{t.name}</td>
                   <td style={{ color: 'var(--muted)' }}>{t.panelUser ?? '—'}</td>
-                  <td>{t.role === 'admin' ? <span className="badge" style={{ background: 'rgba(255,184,77,0.12)', color: 'var(--warn)' }}>admin</span> : <span className="badge badge--muted">client</span>}</td>
+                  <td>{t.role === 'admin' ? <span className="badge badge--warn">admin</span> : <span className="badge badge--muted">client</span>}</td>
                   <td>{t.eventSuffix ?? '—'}</td>
                   <td>{t.active ? <span className="badge badge--green">activo</span> : <span className="badge badge--muted">—</span>}</td>
                 </tr>
