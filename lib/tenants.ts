@@ -31,6 +31,7 @@ function tenantValues(input: CreateTenantInput) {
     customFields: input.customFields ?? {},
     bonoMap: input.bonoMap ?? {},
     readonly: input.readonly ?? false,
+    allowTags: input.allowTags ?? false,
     // Documento de cliente (§4)
     role: input.role ?? 'client',
     platform: input.platform ?? 'meta',
@@ -136,6 +137,7 @@ export interface UpdateTenantPatch {
   name?: string;
   eventSuffix?: string;
   readonly?: boolean;
+  allowTags?: boolean;
   active?: boolean;
   panelPassword?: string; // reset
   metaPixelId?: string;
@@ -149,6 +151,7 @@ export async function updateTenantFields(slug: string, patch: UpdateTenantPatch)
   if (patch.name !== undefined) set.name = patch.name;
   if (patch.eventSuffix !== undefined) set.eventSuffix = patch.eventSuffix;
   if (patch.readonly !== undefined) set.readonly = patch.readonly;
+  if (patch.allowTags !== undefined) set.allowTags = patch.allowTags;
   if (patch.active !== undefined) set.active = patch.active;
   if (patch.metaPixelId !== undefined) set.metaPixelId = patch.metaPixelId;
   if (patch.metaCapiToken) set.metaCapiToken = encrypt(patch.metaCapiToken);
@@ -187,6 +190,7 @@ function resolve(row: TenantRow): ResolvedTenant {
     customFields: cf,
     bonoMap: (row.bonoMap ?? {}) as Record<string, string>,
     readonly: row.readonly ?? false,
+    allowTags: row.allowTags ?? false,
     statusCargoId: num('status_cargo'),
     statusRevisarImagenId: num('status_revisar_imagen'),
     fieldFbclid: num('fbclid'),

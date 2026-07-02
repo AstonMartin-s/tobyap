@@ -47,14 +47,16 @@ export async function applyAttributionByCode(
   });
   if (!attr) return null;
 
-  // En modo readonly NO escribimos nada en el lead del CRM: solo matcheamos y
-  // devolvemos la atribución para enriquecer el evento a Meta (tracking).
-  if (!tenant.readonly) {
-    // Etiquetas
+  // Etiquetas (categoría + bono): se escriben si el tenant NO es readonly, O si es
+  // readonly pero tiene la excepción allowTags. Es la única escritura permitida
+  // en ese modo (nada de CBU/titular ni custom fields).
+  if (!tenant.readonly || tenant.allowTags) {
     const tags = [attr.campaignId, attr.bono].filter((x): x is string => !!x);
     if (tags.length) await addLeadTags(tenant, kommoLeadId, tags).catch(() => false);
+  }
 
-    // Custom fields (fbclid / utm) si el tenant los tiene mapeados
+  // Custom fields (fbclid / utm): SOLO si no es readonly. allowTags NO los habilita.
+  if (!tenant.readonly) {
     const fields: Array<{ fieldId: number; value: string }> = [];
     const cf = tenant.customFields;
     if (cf.fbclid && attr.fbclid) fields.push({ fieldId: cf.fbclid, value: attr.fbclid });

@@ -79,6 +79,9 @@ export const tenants = pgTable('tenants', {
   // Modo solo-lectura: trackeamos (leemos + DB propia + Meta) pero NUNCA escribimos
   // en los leads del CRM del cliente (sin etiquetas, sin CBU, sin custom fields).
   readonly: boolean('readonly').default(false),
+  // Excepción a readonly: permite postear SOLO etiquetas (categoría + bono),
+  // manteniendo bloqueados CBU/titular y custom fields (fbclid/utm).
+  allowTags: boolean('allow_tags').default(false),
 
   active: boolean('active').default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),

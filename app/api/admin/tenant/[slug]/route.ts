@@ -24,6 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       panelUser: t.panelUser,
       eventSuffix: t.eventSuffix,
       readonly: t.readonly,
+      allowTags: t.allowTags,
       active: t.active,
       role: t.role,
       kommoSubdomain: t.kommoSubdomain,

@@ -25,6 +25,8 @@ export interface ResolvedTenant {
   bonoMap: Record<string, string>;
   // Solo-lectura: no escribir en los leads del CRM del cliente.
   readonly: boolean;
+  // Excepción: permitir SOLO etiquetas aunque readonly esté activo.
+  allowTags: boolean;
 
   // Derivados de customFields (atajos):
   statusCargoId: number | null; // customFields.status_cargo
@@ -91,6 +93,7 @@ export interface CreateTenantInput {
   // Override CCPP -> bono
   bonoMap?: Record<string, string>;
   readonly?: boolean;
+  allowTags?: boolean;
 
   // Documento de cliente (estructura PAYBOT §4)
   role?: 'client' | 'admin' | string;

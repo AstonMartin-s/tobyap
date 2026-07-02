@@ -15,6 +15,7 @@ interface TenantInfo {
   panelUser: string | null;
   eventSuffix: string | null;
   readonly: boolean;
+  allowTags: boolean;
   active: boolean;
   kommoSubdomain: string | null;
   kommoPipelineId: number | null;
@@ -91,6 +92,10 @@ export function ManageClient({ slug }: { slug: string }) {
           <div className="row">
             <label className="toggle"><input type="checkbox" checked={t.readonly} onChange={(e) => patch({ readonly: e.target.checked })} /><span /></label>
             <span style={{ fontSize: '.85rem', color: 'var(--muted)' }}>Solo lectura</span>
+          </div>
+          <div className="row">
+            <label className="toggle"><input type="checkbox" checked={t.allowTags} onChange={(e) => patch({ allowTags: e.target.checked })} /><span /></label>
+            <span style={{ fontSize: '.85rem', color: 'var(--muted)' }}>Permitir etiquetas (aún en solo-lectura)</span>
           </div>
           <div style={{ fontSize: '.82rem', color: 'var(--muted)' }}>
             Pipeline <b>{t.kommoPipelineId ?? '—'}</b> · Campos {Object.keys(t.customFields).length} · Kommo {t.hasKommoToken ? '🔑' : '—'} · Meta {t.hasMetaToken ? '🔑' : '—'}
