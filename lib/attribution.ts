@@ -52,7 +52,11 @@ export async function applyAttributionByCode(
   // en ese modo (nada de CBU/titular ni custom fields).
   if (!tenant.readonly || tenant.allowTags) {
     const tags = [attr.campaignId, attr.bono].filter((x): x is string => !!x);
-    if (tags.length) await addLeadTags(tenant, kommoLeadId, tags).catch(() => false);
+    // Colores (paleta Kommo): bono en ámbar, campaña en rosa, para que resalten.
+    const colors: Record<string, string> = {};
+    if (attr.bono) colors[attr.bono] = 'FFCE5A';
+    if (attr.campaignId) colors[attr.campaignId] = 'FFC8C8';
+    if (tags.length) await addLeadTags(tenant, kommoLeadId, tags, colors).catch(() => false);
   }
 
   // Custom fields (fbclid / utm): SOLO si no es readonly. allowTags NO los habilita.

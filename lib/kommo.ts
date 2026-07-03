@@ -83,14 +83,45 @@ export async function updateLeadFields(
 
 // Agrega etiquetas a un lead SIN pisar las existentes (Kommo PATCH reemplaza la
 // lista, así que primero leemos las actuales y mergeamos por nombre).
+// Asegura el color de un tag a nivel cuenta (paleta fija de Kommo: hex de 6
+// chars MAYÚSCULA sin #, ej "FFCE5A"). Crea el tag si no existe, o le setea el
+// color si difiere. No rompe el flujo si Kommo lo rechaza.
+async function ensureTagColors(
+  tenant: ResolvedTenant,
+  headers: Record<string, string>,
+  colors: Record<string, string>,
+): Promise<void> {
+  if (!Object.keys(colors).length) return;
+  const tagsUrl = `https://${tenant.kommoSubdomain}.kommo.com/api/v4/leads/tags`;
+  try {
+    const r = await fetch(`${tagsUrl}?limit=250`, { headers });
+    const list: Array<{ id: number; name: string; color: string | null }> =
+      r.ok ? ((await r.json())?._embedded?.tags ?? []) : [];
+    const byName = new Map(list.map((t) => [t.name, t]));
+    for (const [name, color] of Object.entries(colors)) {
+      const existing = byName.get(name);
+      if (!existing) {
+        await fetch(tagsUrl, { method: 'POST', headers, body: JSON.stringify([{ name, color }]) }).catch(() => {});
+      } else if (existing.color !== color) {
+        await fetch(tagsUrl, { method: 'PATCH', headers, body: JSON.stringify([{ id: existing.id, color }]) }).catch(() => {});
+      }
+    }
+  } catch {
+    /* si falla el coloreado, la etiqueta igual se adjunta */
+  }
+}
+
 export async function addLeadTags(
   tenant: ResolvedTenant,
   leadId: number,
   names: string[],
+  colors?: Record<string, string>,
 ): Promise<boolean> {
   if (!tenant.kommoSubdomain || !tenant.kommoToken || !names.length) return false;
   const base = `https://${tenant.kommoSubdomain}.kommo.com/api/v4/leads/${leadId}`;
   const headers = { Authorization: `Bearer ${tenant.kommoToken}`, 'Content-Type': 'application/json' };
+
+  if (colors) await ensureTagColors(tenant, headers, colors);
 
   const cur = await fetch(`${base}?with=tags`, { headers });
   const existing: Array<{ name: string }> =
