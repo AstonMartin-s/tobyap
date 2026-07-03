@@ -3,8 +3,9 @@ import { and, desc, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { landings, tenants } from '@/db/schema';
 import { getSession } from '@/lib/session';
+import { DEFAULT_BONO_MAP } from '@/lib/attribution';
 
-// GET /api/landings — landings del cliente logueado + su slug (para armar URLs).
+// GET /api/landings — landings del cliente + su slug + CCPP disponibles (ccpp->bono).
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'no autenticado' }, { status: 401 });
@@ -15,8 +16,14 @@ export async function GET() {
     .where(eq(landings.tenantId, session.tenantId))
     .orderBy(desc(landings.createdAt));
 
-  const [t] = await db.select({ slug: tenants.slug }).from(tenants).where(eq(tenants.id, session.tenantId));
-  return NextResponse.json({ slug: t?.slug ?? session.slug, landings: rows });
+  const [t] = await db
+    .select({ slug: tenants.slug, bonoMap: tenants.bonoMap })
+    .from(tenants)
+    .where(eq(tenants.id, session.tenantId));
+
+  // CCPP disponibles = mapa global por defecto + override del cliente.
+  const bonos = { ...DEFAULT_BONO_MAP, ...((t?.bonoMap ?? {}) as Record<string, string>) };
+  return NextResponse.json({ slug: t?.slug ?? session.slug, bonos, landings: rows });
 }
 
 // POST /api/landings — crea una landing del cliente.
