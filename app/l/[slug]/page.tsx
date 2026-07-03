@@ -2,9 +2,10 @@ import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
-import { tenants, clientSettings, numbers, landings } from '@/db/schema';
+import { tenants, clientSettings, landings } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { resolveBono } from '@/lib/attribution';
+import { pickPubliRotating } from '@/lib/rotation';
 import { LandingView, landingMetadata, fichasFromBono, type LandingConfig } from '../_landing';
 
 export const dynamic = 'force-dynamic';
@@ -51,12 +52,8 @@ export default async function Landing({
   }
 
   const [s] = await db.select().from(clientSettings).where(eq(clientSettings.tenantId, t.id));
-  const publi = await db
-    .select()
-    .from(numbers)
-    .where(and(eq(numbers.tenantId, t.id), eq(numbers.type, 'publi'), eq(numbers.status, true)));
-  // Rotación: elegimos aleatoriamente entre los números publi activos.
-  const rotated = publi.length ? publi[Math.floor(Math.random() * publi.length)].phone : null;
+  // Rotación estricta round-robin entre los números publi activos.
+  const rotated = await pickPubliRotating(t.id);
   const [lp] = await db
     .select()
     .from(landings)

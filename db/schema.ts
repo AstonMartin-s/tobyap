@@ -7,6 +7,7 @@ import {
   jsonb,
   timestamp,
   doublePrecision,
+  integer,
   unique,
 } from 'drizzle-orm/pg-core';
 
@@ -82,6 +83,8 @@ export const tenants = pgTable('tenants', {
   // Excepción a readonly: permite postear SOLO etiquetas (categoría + bono),
   // manteniendo bloqueados CBU/titular y custom fields (fbclid/utm).
   allowTags: boolean('allow_tags').default(false),
+  // Cursor para rotación round-robin estricta de números publi en las landings.
+  rotationCursor: integer('rotation_cursor').default(0),
 
   active: boolean('active').default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
