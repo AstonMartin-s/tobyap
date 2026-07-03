@@ -98,6 +98,26 @@ async function upsertLead(tenant: ResolvedTenant, lead: KommoLead) {
   return row;
 }
 
+// Reintenta traer el lead: cubre la latencia entre que Kommo dispara el webhook
+// y el lead queda disponible en la API (lead recién creado por un mensaje).
+async function fetchLeadWithRetry(
+  tenant: ResolvedTenant,
+  leadId: number,
+  tries = 4,
+  delayMs = 1200,
+) {
+  let lastErr: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fetchKommoLead(tenant, leadId);
+    } catch (e) {
+      lastErr = e;
+      if (i < tries - 1) await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  throw lastErr;
+}
+
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const tenant = await getTenantBySlug(params.slug);
   if (!tenant) return NextResponse.json({ error: 'tenant desconocido' }, { status: 404 });
@@ -111,7 +131,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   for (const sig of signals.values()) {
     try {
-      const lead = await fetchKommoLead(tenant, sig.leadId);
+      // Race: cuando entra un mensaje que crea el lead, el webhook del mensaje
+      // puede llegar ~1s ANTES de que el lead sea consultable por API. Sin esto,
+      // fetchKommoLead tira 404/204 y se pierde el matcheo/etiquetado. Reintentamos.
+      const lead = await fetchLeadWithRetry(tenant, sig.leadId);
 
       // FILTRO: solo el pipeline trackeado del tenant.
       if (tenant.kommoPipelineId && lead.pipeline_id !== tenant.kommoPipelineId) {
