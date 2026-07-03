@@ -137,7 +137,7 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
         }}
       />
       <div style={{ width: 42, height: 42, border: '4px solid #2a2f36', borderTopColor: accent, borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-      <p style={{ margin: 0 }}>{headline}</p>
+      <p style={{ margin: 0, color: accent, fontWeight: 700 }}>{headline}</p>
       <p style={{ color: '#8a93a0', fontSize: '.9rem', margin: 0 }}>{subtext}</p>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       {pixelScript ? <script dangerouslySetInnerHTML={{ __html: pixelScript }} /> : null}
