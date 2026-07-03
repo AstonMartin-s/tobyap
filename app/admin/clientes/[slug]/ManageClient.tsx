@@ -132,7 +132,8 @@ function LandingsSection({ slug, landings, reload }: { slug: string; landings: L
   const [open, setOpen] = useState(false);
   const [err, setErr] = useState('');
   const [n, setN] = useState({ landingSlug: '', name: '', type: 'publi', brandName: '', primaryColor: '#25d366', waNumber: '', message: '', pixelId: '', ccpp: '', campaign: '' });
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  // Dominio público de las landings (no el del panel).
+  const origin = process.env.NEXT_PUBLIC_LANDING_ORIGIN || 'https://go.fichaslibres.online';
 
   async function create() {
     setErr('');

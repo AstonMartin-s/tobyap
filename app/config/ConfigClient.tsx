@@ -172,7 +172,8 @@ function LandingsSection() {
   const [n, setN] = useState({ ...emptyForm });
   // Generador de link
   const [gen, setGen] = useState({ landingId: '', ccpp: '', campaign: '' });
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  // Dominio público de las landings (no el del panel). Configurable por env.
+  const origin = process.env.NEXT_PUBLIC_LANDING_ORIGIN || 'https://go.fichaslibres.online';
 
   const load = () =>
     j('/api/landings').then((d) => {
