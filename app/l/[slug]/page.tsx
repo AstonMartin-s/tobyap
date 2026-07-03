@@ -51,11 +51,12 @@ export default async function Landing({
   }
 
   const [s] = await db.select().from(clientSettings).where(eq(clientSettings.tenantId, t.id));
-  const [n] = await db
+  const publi = await db
     .select()
     .from(numbers)
-    .where(and(eq(numbers.tenantId, t.id), eq(numbers.type, 'publi'), eq(numbers.status, true)))
-    .limit(1);
+    .where(and(eq(numbers.tenantId, t.id), eq(numbers.type, 'publi'), eq(numbers.status, true)));
+  // Rotación: elegimos aleatoriamente entre los números publi activos.
+  const rotated = publi.length ? publi[Math.floor(Math.random() * publi.length)].phone : null;
   const [lp] = await db
     .select()
     .from(landings)
@@ -66,7 +67,7 @@ export default async function Landing({
   const cfg: LandingConfig = {
     tenantSlug: t.slug,
     pixelId: String(c.pixelId ?? t.metaPixelId ?? ''),
-    waNumber: String(c.waNumber ?? searchParams.wa ?? n?.phone ?? '').replace(/\D/g, ''),
+    waNumber: String(c.waNumber ?? searchParams.wa ?? rotated ?? '').replace(/\D/g, ''),
     message: String(c.message ?? s?.message ?? 'Hola, vi el anuncio y quiero mi beneficio'),
     brandName: c.brandName ? String(c.brandName) : t.name,
     logoUrl: c.logoUrl ? String(c.logoUrl) : undefined,
