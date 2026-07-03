@@ -1,9 +1,44 @@
+import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { tenants, clientSettings, numbers, landings } from '@/db/schema';
-import { LandingView, type LandingConfig } from '../../_landing';
+import { getTenantBySlug } from '@/lib/tenants';
+import { resolveBono } from '@/lib/attribution';
+import { LandingView, landingMetadata, fichasFromBono, type LandingConfig } from '../../_landing';
 
 export const dynamic = 'force-dynamic';
+
+function baseUrl(): string {
+  const h = headers();
+  return `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('host')}`;
+}
+
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: { slug: string; landing: string };
+  searchParams: { ccpp?: string };
+}): Promise<Metadata> {
+  const tenant = await getTenantBySlug(params.slug);
+  if (!tenant) return {};
+  const [lp] = await db
+    .select()
+    .from(landings)
+    .where(and(eq(landings.tenantId, tenant.id), eq(landings.landingSlug, params.landing)))
+    .limit(1);
+  const c = (lp?.config ?? {}) as Record<string, string | null>;
+  const ccpp = searchParams.ccpp ?? (c.ccpp as string | undefined);
+  const fichas = fichasFromBono(resolveBono(tenant, ccpp));
+  const base = baseUrl();
+  return landingMetadata({
+    brand: c.brandName ? String(c.brandName) : tenant.name,
+    fichas,
+    logoAbs: c.logoUrl ? base + String(c.logoUrl) : null,
+    url: `${base}/l/${params.slug}/${params.landing}`,
+  });
+}
 
 // Landing específica del cliente: /l/<slug>/<landingSlug>
 export default async function NamedLanding({

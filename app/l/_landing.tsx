@@ -1,7 +1,38 @@
+import type { Metadata } from 'next';
+
 // Vista de landing compartida (servida por nuestra app en Railway).
 // Capta fbclid/fbp/fbc + utm, dispara el Pixel, registra la visita vía
 // /api/track/redirect (que además genera el token de atribución) y redirige a
 // WhatsApp con el código en el mensaje. Mismo origen => sin CORS.
+
+// Fichas a partir del bono ("Bono50000" -> "50.000"). Ignora bonos porcentuales.
+export function fichasFromBono(bono: string | null | undefined): string | null {
+  if (!bono || /%/.test(bono)) return null;
+  const m = String(bono).match(/(\d{2,})/);
+  return m ? Number(m[1]).toLocaleString('es-AR') : null;
+}
+
+// Metadata Open Graph de la landing (preview al compartir en WhatsApp/redes).
+// NO expone el nombre de la herramienta; muestra la marca + las fichas del tier.
+export function landingMetadata(o: {
+  brand: string;
+  fichas?: string | null;
+  logoAbs?: string | null;
+  url: string;
+}): Metadata {
+  const title = o.fichas ? `🎁 ${o.fichas} fichas libres` : o.brand;
+  const description = o.fichas
+    ? `Reclamá tus ${o.fichas} fichas gratis en ${o.brand} 🎰`
+    : `Reclamá tu bono en ${o.brand} 🎰`;
+  const images = o.logoAbs ? [{ url: o.logoAbs }] : undefined;
+  return {
+    title,
+    description,
+    openGraph: { title, description, url: o.url, type: 'website', siteName: o.brand, images },
+    twitter: { card: images ? 'summary_large_image' : 'summary', title, description, images: o.logoAbs ? [o.logoAbs] : undefined },
+    robots: { index: false, follow: false },
+  };
+}
 
 export interface LandingConfig {
   tenantSlug: string; // slug del tenant (lo que espera /api/track/redirect)
