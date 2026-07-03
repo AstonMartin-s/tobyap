@@ -40,6 +40,8 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
     ccpp: cfg.ccpp ?? null,
     campaign: cfg.campaign ?? null,
     redirectDelayMs: delay,
+    // Si el mensaje configurado trae {fichas} o {bono}, se usa como plantilla.
+    messageTpl: cfg.message && cfg.message.indexOf('{') !== -1 ? cfg.message : null,
   };
 
   const logic = `
@@ -61,8 +63,27 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
     fbp:fbp, fbc:fbc, fbclid:fbclid,
     eventSourceUrl:location.href
   };
-  function go(code){
-    var msg = (code ? ('Codigo Promocion: '+code+'.') : '') + C.defaultMessage;
+  // Cantidad de fichas a partir del bono (ej "Bono50000" -> "50.000"). Ignora
+  // bonos porcentuales (ej "Bono10%") u otros sin fichas.
+  function fichasFrom(bono){
+    if(!bono || /%/.test(bono)) return null;
+    var m = String(bono).match(/(\\d{2,})/);
+    if(!m) return null;
+    return Number(m[1]).toLocaleString('es-AR');
+  }
+  function buildText(d){
+    var bono = d && d.bono;
+    var fichas = fichasFrom(bono);
+    // Template configurable: {fichas} y {bono}. Si no hay template, arma el default.
+    if (C.messageTpl) {
+      return C.messageTpl.replace('{fichas}', fichas||'').replace('{bono}', bono||'');
+    }
+    if (fichas) return 'Hola, quiero mis ' + fichas + ' fichas libres 🎁';
+    return C.defaultMessage;
+  }
+  function go(d){
+    var code = d && d.code;
+    var msg = (code ? ('Codigo Promocion: '+code+'. ') : '') + buildText(d);
     var wa='https://wa.me/'+C.waNumber+'?text='+encodeURIComponent(msg);
     window.location.href=wa;
   }
@@ -70,7 +91,7 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
   var fallback=setTimeout(function(){ if(!done){done=true; go(null);} }, C.redirectDelayMs+2000);
   fetch('/api/track/redirect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     .then(function(r){return r.json();})
-    .then(function(d){ if(!done){done=true; clearTimeout(fallback); setTimeout(function(){go(d&&d.code);}, C.redirectDelayMs);} })
+    .then(function(d){ if(!done){done=true; clearTimeout(fallback); setTimeout(function(){go(d);}, C.redirectDelayMs);} })
     .catch(function(){ if(!done){done=true; clearTimeout(fallback); go(null);} });
 })();`;
 
