@@ -39,6 +39,7 @@ export default async function NamedLanding({
     waNumber: String(c.waNumber ?? n?.phone ?? '').replace(/\D/g, ''),
     message: String(c.message ?? s?.message ?? 'Hola, vi el anuncio y quiero mi beneficio'),
     brandName: c.brandName ? String(c.brandName) : t.name,
+    logoUrl: c.logoUrl ? String(c.logoUrl) : undefined,
     primaryColor: c.primaryColor ? String(c.primaryColor) : undefined,
     headline: c.headline ? String(c.headline) : undefined,
     subtext: c.subtext ? String(c.subtext) : undefined,

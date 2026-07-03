@@ -9,6 +9,7 @@ export interface LandingConfig {
   waNumber: string; // solo dígitos
   message: string;
   brandName?: string;
+  logoUrl?: string; // si está, se muestra la imagen del logo en vez del texto
   primaryColor?: string;
   headline?: string;
   subtext?: string;
@@ -97,7 +98,13 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
 
   return (
     <main style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', textAlign: 'center', padding: '1rem', background: '#0a0d12', color: '#e6edf3' }}>
-      <div style={{ fontWeight: 800, fontSize: '1.3rem', letterSpacing: '-0.02em', color: accent }}>{brand}</div>
+      <div
+        dangerouslySetInnerHTML={{
+          __html: cfg.logoUrl
+            ? `<img src="${cfg.logoUrl}" alt="${brand}" style="max-width:280px;max-height:150px;object-fit:contain" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"/><div style="display:none;font-weight:800;font-size:1.3rem;letter-spacing:-0.02em;color:${accent}">${brand}</div>`
+            : `<div style="font-weight:800;font-size:1.3rem;letter-spacing:-0.02em;color:${accent}">${brand}</div>`,
+        }}
+      />
       <div style={{ width: 42, height: 42, border: '4px solid #2a2f36', borderTopColor: accent, borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
       <p style={{ margin: 0 }}>{headline}</p>
       <p style={{ color: '#8a93a0', fontSize: '.9rem', margin: 0 }}>{subtext}</p>
