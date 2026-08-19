@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isAdmin } from '@/lib/admin-auth';
 import { provisionClient } from '@/lib/kommo-provision';
 import { discoverKommoConfig } from '@/lib/kommo-onboard';
+import { healClient } from '@/lib/heal';
 import { upsertTenant } from '@/lib/tenants';
 import type { CreateTenantInput } from '@/lib/types';
 
@@ -89,12 +90,24 @@ export async function POST(req: NextRequest) {
     customFields: { ...customFields, ...(body.customFields ?? {}) },
   });
 
+  // HEAL automático: asegura campos (ad_code/CBU/TITULAR), etapas estándar del
+  // pipeline trackeado y mapeo de status_cargo/revisar_imagen. Idempotente y
+  // best-effort — si falla, el cliente igual se crea (se puede correr a mano
+  // con `npm run heal-client -- <slug>`).
+  let heal: Awaited<ReturnType<typeof healClient>> | { error: string } | null = null;
+  try {
+    heal = await healClient(row.slug);
+  } catch (e) {
+    heal = { error: String((e as Error).message ?? e) };
+  }
+
   return NextResponse.json({
     ok: true,
     tenant: { id: row.id, slug: row.slug },
     pipelineId,
     customFields: { ...customFields, ...(body.customFields ?? {}) },
     webhook: `/api/webhooks/kommo/${row.slug}`,
+    heal,
     ...detail,
   });
 }

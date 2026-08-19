@@ -47,6 +47,9 @@ export interface LandingConfig {
   ccpp?: string | null; // código de bono por defecto de esta landing
   campaign?: string | null; // campaña por defecto
   redirectDelayMs?: number;
+  chatSlug?: string | null; // si está, redirige al chat web /chat/<slug> en vez de wa.me
+  chatOrigin?: string | null; // origen del chat (ej https://chat.fichaslibres.online); vacío = relativo
+  noCode?: boolean; // no incluir "Codigo Promocion:" en el mensaje (CRM sin webhook, no matchea)
 }
 
 export function LandingView(cfg: LandingConfig) {
@@ -71,6 +74,9 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
     defaultMessage: cfg.message,
     ccpp: cfg.ccpp ?? null,
     campaign: cfg.campaign ?? null,
+    chatSlug: cfg.chatSlug ?? null,
+    chatOrigin: cfg.chatOrigin ?? '',
+    noCode: cfg.noCode ?? false,
     redirectDelayMs: delay,
     // Si el mensaje configurado trae {fichas} o {bono}, se usa como plantilla.
     messageTpl: cfg.message && cfg.message.indexOf('{') !== -1 ? cfg.message : null,
@@ -82,19 +88,24 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
   function p(n){return new URLSearchParams(location.search).get(n);}
   function c(n){var m=document.cookie.match('(^|;)\\\\s*'+n+'\\\\s*=\\\\s*([^;]+)');return m?m.pop():null;}
   var fbclid=p('fbclid');
-  var fbp=c('_fbp');
-  var fbc=c('_fbc')||(fbclid?('fb.1.'+Date.now()+'.'+fbclid):null);
-  var payload={
-    slug:C.slug,
-    campaign:p('campaign')||C.campaign,
-    ccpp:p('CCPP')||p('ccpp')||C.ccpp,
-    utmSource:p('utm_source'),
-    utmCampaign:p('utm_campaign'),
-    utmContent:p('utm_content'),
-    namead:p('namead'),
-    fbp:fbp, fbc:fbc, fbclid:fbclid,
-    eventSourceUrl:location.href
-  };
+  // El _fbp lo setea fbevents.js de forma ASÍNCRONA tras cargar el Pixel; si lo
+  // leemos al instante suele venir vacío. Por eso construimos el payload recién
+  // al momento de enviar (ver waitFbp más abajo), leyendo la cookie fresca.
+  function buildPayload(){
+    var fbp=c('_fbp');
+    var fbc=c('_fbc')||(fbclid?('fb.1.'+Date.now()+'.'+fbclid):null);
+    return {
+      slug:C.slug,
+      campaign:p('campaign')||C.campaign,
+      ccpp:p('CCPP')||p('ccpp')||C.ccpp,
+      utmSource:p('utm_source'),
+      utmCampaign:p('utm_campaign'),
+      utmContent:p('utm_content'),
+      namead:p('namead'),
+      fbp:fbp, fbc:fbc, fbclid:fbclid,
+      eventSourceUrl:location.href
+    };
+  }
   // Cantidad de fichas a partir del bono (ej "Bono50000" -> "50.000"). Ignora
   // bonos porcentuales (ej "Bono10%") u otros sin fichas.
   function fichasFrom(bono){
@@ -115,16 +126,44 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
   }
   function go(d){
     var code = d && d.code;
-    var msg = (code ? ('Codigo Promocion: '+code+'. ') : '') + buildText(d);
+    // Destino CHAT WEB: redirige al chat embebido con el token + campaña + ccpp.
+    if(C.chatSlug){
+      var camp=p('campaign')||C.campaign||'';
+      var cc=p('CCPP')||p('ccpp')||C.ccpp||'';
+      var base=C.chatOrigin||'';
+      var u=base+'/chat/'+C.chatSlug+'?token='+encodeURIComponent(code||'')+'&campaign='+encodeURIComponent(camp)+'&ccpp='+encodeURIComponent(cc);
+      window.location.href=u;
+      return;
+    }
+    // Sin número asignado (ni fijo ni por rotación): NO redirigimos.
+    if(!C.waNumber){
+      var sp=document.getElementById('ll-spin'); if(sp) sp.style.display='none';
+      var hd=document.getElementById('ll-headline'); if(hd) hd.textContent='No disponible por el momento';
+      var st=document.getElementById('ll-subtext'); if(st) st.textContent='Volvé a intentar más tarde.';
+      return;
+    }
+    // noCode: sin CRM/webhook detrás no hay forma de matchear el token, así que
+    // no lo metemos en el mensaje (igual seguimos contando el clic/redirect).
+    var msg = (code && !C.noCode ? ('Codigo Promocion: '+code+'. ') : '') + buildText(d);
     var wa='https://wa.me/'+C.waNumber+'?text='+encodeURIComponent(msg);
     window.location.href=wa;
   }
   var done=false;
   var fallback=setTimeout(function(){ if(!done){done=true; go(null);} }, C.redirectDelayMs+2000);
-  fetch('/api/track/redirect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-    .then(function(r){return r.json();})
-    .then(function(d){ if(!done){done=true; clearTimeout(fallback); setTimeout(function(){go(d);}, C.redirectDelayMs);} })
-    .catch(function(){ if(!done){done=true; clearTimeout(fallback); go(null);} });
+  function send(){
+    fetch('/api/track/redirect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(buildPayload())})
+      .then(function(r){return r.json();})
+      .then(function(d){ if(!done){done=true; clearTimeout(fallback); setTimeout(function(){go(d);}, C.redirectDelayMs);} })
+      .catch(function(){ if(!done){done=true; clearTimeout(fallback); go(null);} });
+  }
+  // Esperamos a que el Pixel setee _fbp (hasta ~1s) para capturarlo; si no llega,
+  // enviamos igual (fbc/fbclid ya alcanzan para atribuir). Dentro del presupuesto
+  // del fallback (redirectDelayMs+2000).
+  var waited=0;
+  (function waitFbp(){
+    if(c('_fbp')||waited>=1000){ send(); return; }
+    waited+=150; setTimeout(waitFbp,150);
+  })();
 })();`;
 
   return (
@@ -136,9 +175,9 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
             : `<div style="font-weight:800;font-size:1.3rem;letter-spacing:-0.02em;color:${accent}">${brand}</div>`,
         }}
       />
-      <div style={{ width: 42, height: 42, border: '4px solid #2a2f36', borderTopColor: accent, borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-      <p style={{ margin: 0, color: accent, fontWeight: 700 }}>{headline}</p>
-      <p style={{ color: '#8a93a0', fontSize: '.9rem', margin: 0 }}>{subtext}</p>
+      <div id="ll-spin" style={{ width: 42, height: 42, border: '4px solid #2a2f36', borderTopColor: accent, borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+      <p id="ll-headline" style={{ margin: 0, color: accent, fontWeight: 700 }}>{headline}</p>
+      <p id="ll-subtext" style={{ color: '#8a93a0', fontSize: '.9rem', margin: 0 }}>{subtext}</p>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       {pixelScript ? <script dangerouslySetInnerHTML={{ __html: pixelScript }} /> : null}
       <script dangerouslySetInnerHTML={{ __html: logic }} />

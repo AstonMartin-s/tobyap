@@ -92,10 +92,41 @@ a { color: inherit; }
 
 /* ---------- Layout (sidebar + content) ---------- */
 :root { --sidebar-w: 244px; }
+/* Sidebar colapsado (solo iconos) — estilo Black Dragon. Una sola variable
+   maneja el ancho del sidebar y el margen del contenido. */
+:root[data-sidebar="collapsed"] { --sidebar-w: 74px; }
+:root[data-sidebar="collapsed"] .sidebar { padding-left: 0.5rem; padding-right: 0.5rem; }
+:root[data-sidebar="collapsed"] .sidebar__name,
+:root[data-sidebar="collapsed"] .sidebar__tag,
+:root[data-sidebar="collapsed"] .sidebar__brand > span:last-child,
+:root[data-sidebar="collapsed"] .sidebar__link span,
+:root[data-sidebar="collapsed"] .sidebar__status,
+:root[data-sidebar="collapsed"] .sidebar__logout span,
+:root[data-sidebar="collapsed"] .sidebar__theme span { display: none; }
+:root[data-sidebar="collapsed"] .sidebar__link,
+:root[data-sidebar="collapsed"] .sidebar__logout,
+:root[data-sidebar="collapsed"] .sidebar__theme { justify-content: center; padding-left: 0; padding-right: 0; }
+/* Centrado prolijo de todo el sidebar colapsado */
+:root[data-sidebar="collapsed"] .sidebar__burger { margin-left: auto; margin-right: auto; }
+:root[data-sidebar="collapsed"] .sidebar__brand { justify-content: center; gap: 0; padding-left: 0; padding-right: 0; }
+:root[data-sidebar="collapsed"] .sidebar__nav { align-items: stretch; }
+:root[data-sidebar="collapsed"] .sidebar__link.active::before { display: none; }
+.sidebar__burger {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 9px; flex: 0 0 auto;
+  background: var(--hover); color: var(--text); border: 1px solid var(--border); cursor: pointer;
+}
+.sidebar__burger:hover { border-color: var(--accent); color: var(--accent); }
+.sidebar__burger svg { width: 18px; height: 18px; }
 .shell {
   margin-left: var(--sidebar-w);
   max-width: 1180px;
   padding: 1.75rem 2rem 5rem;
+}
+/* Variante a todo el ancho (panel de chats): usa toda la pantalla disponible. */
+.shell--wide {
+  max-width: none;
+  padding: 1.25rem 1.5rem 1.25rem;
 }
 .page-head { margin-bottom: 1.6rem; display: flex; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
 .page-head__text { flex: 1 1 auto; }

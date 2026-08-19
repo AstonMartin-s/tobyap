@@ -73,6 +73,11 @@ export const tenants = pgTable('tenants', {
   pspKey: text('psp_key'), // cifrado — clave del PSP
   externalApiKey: text('external_api_key'), // cifrado — pbx_ext_live_... (API externa §8)
 
+  // Pagoda (dat4win) — integración de creación de cuentas de portal. El bot pide
+  // un usuario y Pagoda devuelve login_url/usuario/clave. Por-cliente.
+  pagodaUrl: text('pagoda_url'), // ej: https://pagoda.dat4win.com
+  pagodaApiKey: text('pagoda_api_key'), // cifrado — pgk_...
+
   // Override por cliente del mapa CCPP -> bono (ej. { "A1": "Bono10%" }).
   // Si falta una clave, se usa el mapa global por defecto (lib/attribution).
   bonoMap: jsonb('bono_map').$type<Record<string, string>>().default({}),
@@ -171,13 +176,15 @@ export const landings = pgTable(
       .references(() => tenants.id, { onDelete: 'cascade' }),
     // landingSlug: identifica la landing dentro del cliente => /l/<tenant>/<landingSlug>
     landingSlug: text('landing_slug'),
+    // alias: URL corta que NO expone el tenant => /l/<alias> (único globalmente).
+    alias: text('alias').unique(),
     name: text('name'),
     type: text('type'), // publi | regular | spam | remarketing | soporte
     active: boolean('active').default(true),
     // Presentación + comportamiento de NUESTRA landing (servida en Railway):
     // { brandName, primaryColor, logoUrl, headline, subtext, message, waNumber,
     //   pixelId, ccpp, campaign, redirectDelayMs }
-    config: jsonb('config').$type<Record<string, string | number | null>>().default({}),
+    config: jsonb('config').$type<Record<string, string | number | boolean | null>>().default({}),
     url: text('url'), // URL final (dominio propio cuando se mapee)
     environments: jsonb('environments').$type<string[]>().default(['production']),
     db: text('db'),
@@ -333,6 +340,34 @@ export const attributions = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// send_list — lista de envío de reactivación (phone -> tier/ccpp) por tenant.
+// Fallback de atribución para el CRM cuando el lead borra/modifica el token del
+// mensaje: se resuelve el bono por teléfono contra esta lista (latest-wins).
+// La escribe el admin (carga por campaña); la LEE el CRM vía /api/v1/resolve?phone=.
+// phoneKey = solo dígitos (sin +, espacios ni guiones) para matchear formatos.
+// ---------------------------------------------------------------------------
+export const sendList = pgTable(
+  'send_list',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    phone: text('phone').notNull(), // E.164 como vino (display)
+    phoneKey: text('phone_key').notNull(), // solo dígitos, clave de match
+    ccpp: text('ccpp').notNull(), // tier / código promocional (W50, E15, ...)
+    campaign: text('campaign'), // opcional, nombre de la campaña de envío
+    portalSlug: text('portal_slug'), // opcional, portal multi-landing al que va el segmento
+    sentAt: timestamp('sent_at', { withTimezone: true }), // enviado_at (para latest-wins / ts)
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    uniqPhone: unique('send_list_tenant_phone').on(t.tenantId, t.phoneKey),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // kommo_webhook_log — log crudo para debug / reprocesar.
 // ---------------------------------------------------------------------------
 export const kommoWebhookLog = pgTable('kommo_webhook_log', {
@@ -342,6 +377,30 @@ export const kommoWebhookLog = pgTable('kommo_webhook_log', {
   receivedAt: timestamp('received_at', { withTimezone: true }).defaultNow(),
   processed: boolean('processed').default(false),
 });
+
+// ---------------------------------------------------------------------------
+// chatSessions — sesión del CHAT WEB embebido (look WhatsApp) que reemplaza el
+// redirect a wa.me. Adaptador B: el guion corre en nuestro backend, se espeja en
+// Kommo y dispara Pagoda. Una fila por conversación.
+// ---------------------------------------------------------------------------
+export const chatSessions = pgTable('chat_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  sessionKey: text('session_key').notNull().unique(), // id opaco que usa el widget
+  phone: text('phone'),
+  name: text('name'),
+  waVerified: boolean('wa_verified').default(false), // pasó el wachecker
+  token: text('token'), // código de atribución del redirect
+  campaign: text('campaign'),
+  ccpp: text('ccpp'),
+  step: text('step').default('form'), // form|welcome|credenciales|cbu|comprobante|done
+  kommoLeadId: bigint('kommo_lead_id', { mode: 'number' }),
+  data: jsonb('data').$type<Record<string, unknown>>().default({}), // credenciales, etc.
+  messages: jsonb('messages').$type<Array<{ from: 'bot' | 'user'; text?: string; image?: string; at: number }>>().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+export type ChatSessionRow = typeof chatSessions.$inferSelect;
 
 export type TenantRow = typeof tenants.$inferSelect;
 export type NewTenant = typeof tenants.$inferInsert;
@@ -355,3 +414,35 @@ export type AdAccountRow = typeof adAccounts.$inferSelect;
 export type CampaignRow = typeof campaigns.$inferSelect;
 export type MetaEventRow = typeof metaEvents.$inferSelect;
 export type AttributionRow = typeof attributions.$inferSelect;
+
+// ===========================================================================
+// MÓDULO AISLADO A3 (ClienteA3 · Pagoda + Meta Ads · landing + relay webhook).
+// Tablas propias con prefijo a3_. NO se relacionan con tenants ni con el resto
+// del circuito (Kommo/CAPI/attributions). Sólo las usa el namespace `a3`.
+// ===========================================================================
+
+// Una fila por conversación NUEVA (primer mensaje entrante de un teléfono por
+// línea). Sirve para medir conversaciones generadas y atribuirlas a la campaña
+// (parseada del marcador [campaign] del texto pre-cargado por la landing).
+export const a3Conversations = pgTable(
+  'a3_conversations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    line: text('line').notNull(), // clave de línea (ej. "sri", "shinde")
+    phoneKey: text('phone_key').notNull(), // solo dígitos
+    phone: text('phone'), // wa_id como vino
+    campaign: text('campaign'), // del marcador [C1]; null si no vino
+    firstText: text('first_text'), // texto del primer mensaje (debug)
+    waMessageId: text('wa_message_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({ uniqConv: unique('a3_conv_line_phone').on(t.line, t.phoneKey) }),
+);
+
+// Estado interno del módulo a3 (cursor de rotación round-robin de líneas).
+export const a3State = pgTable('a3_state', {
+  id: integer('id').primaryKey().default(1),
+  rotationCursor: integer('rotation_cursor').default(0),
+});
+
+export type A3ConversationRow = typeof a3Conversations.$inferSelect;

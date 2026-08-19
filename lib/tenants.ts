@@ -41,6 +41,8 @@ function tenantValues(input: CreateTenantInput) {
     pspActive: input.pspActive ?? false,
     pspKey: encryptOptional(input.pspKey),
     externalApiKey: encryptOptional(input.externalApiKey),
+    pagodaUrl: input.pagodaUrl ?? null,
+    pagodaApiKey: encryptOptional(input.pagodaApiKey),
   };
 }
 
@@ -187,6 +189,8 @@ function resolve(row: TenantRow): ResolvedTenant {
     eventSuffix: row.eventSuffix ?? '',
     apiUrl: row.apiUrl,
     externalApiKey: decryptOptional(row.externalApiKey),
+    pagodaUrl: row.pagodaUrl,
+    pagodaApiKey: decryptOptional(row.pagodaApiKey),
     customFields: cf,
     bonoMap: (row.bonoMap ?? {}) as Record<string, string>,
     readonly: row.readonly ?? false,

@@ -5,7 +5,7 @@ import { db } from '@/db';
 import { tenants, clientSettings, landings } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { resolveBono } from '@/lib/attribution';
-import { pickPubliRotating } from '@/lib/rotation';
+import { pickNumberByCategory } from '@/lib/rotation';
 import { LandingView, landingMetadata, fichasFromBono, type LandingConfig } from '../../_landing';
 
 export const dynamic = 'force-dynamic';
@@ -62,14 +62,18 @@ export default async function NamedLanding({
   }
 
   const [s] = await db.select().from(clientSettings).where(eq(clientSettings.tenantId, t.id));
-  // Rotación estricta round-robin (solo se usa si la landing no fija un waNumber).
-  const rotated = await pickPubliRotating(t.id);
-
-  const c = (lp.config ?? {}) as Record<string, string | number | null>;
+  const c = (lp.config ?? {}) as Record<string, string | number | boolean | null>;
+  // waNumber manual en la landing = solo fallback si no hay números en la categoría.
+  const fixedWa = c.waNumber != null && String(c.waNumber).replace(/\D/g, '') !== '' ? c.waNumber : null;
+  // Rotación round-robin entre los números ACTIVOS de la categoría (tipo) de la
+  // landing (sección Números de contacto). Se puede desactivar con
+  // config.useFixedNumber = true, para que la landing use SIEMPRE su número fijo
+  // sin importar qué números activos haya en esa categoría.
+  const rotated = c.useFixedNumber ? null : await pickNumberByCategory(t.id, lp.type);
   const cfg: LandingConfig = {
     tenantSlug: t.slug,
     pixelId: String(c.pixelId ?? t.metaPixelId ?? ''),
-    waNumber: String(c.waNumber ?? rotated ?? '').replace(/\D/g, ''),
+    waNumber: String(rotated ?? fixedWa ?? '').replace(/\D/g, ''),
     message: String(c.message ?? s?.message ?? 'Hola, vi el anuncio y quiero mi beneficio'),
     brandName: c.brandName ? String(c.brandName) : t.name,
     logoUrl: c.logoUrl ? String(c.logoUrl) : undefined,
@@ -79,6 +83,10 @@ export default async function NamedLanding({
     ccpp: c.ccpp != null ? String(c.ccpp) : null,
     campaign: c.campaign != null ? String(c.campaign) : null,
     redirectDelayMs: c.redirectDelayMs != null ? Number(c.redirectDelayMs) : undefined,
+    // Si la landing tiene chatSlug, redirige al chat web en vez de wa.me.
+    chatSlug: c.chatSlug != null ? String(c.chatSlug) : null,
+    chatOrigin: process.env.CHAT_ORIGIN || '', // ej https://chat.fichaslibres.online
+    noCode: c.noCode === true,
   };
 
   return <LandingView {...cfg} />;

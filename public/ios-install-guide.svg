@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200" font-family="system-ui,Segoe UI,Roboto,sans-serif">
+  <rect width="320" height="200" rx="14" fill="#F2F3F5"/>
+  <!-- Paso 1: botón Compartir -->
+  <g transform="translate(24,34)">
+    <rect x="0" y="0" width="112" height="112" rx="16" fill="#fff" stroke="#D7DBE0"/>
+    <!-- ícono share iOS -->
+    <g transform="translate(40,26)" fill="none" stroke="#007AFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M16 4 L16 40"/>
+      <path d="M6 14 L16 4 L26 14"/>
+      <path d="M4 30 L4 56 L28 56 L28 30" />
+    </g>
+    <text x="56" y="132" text-anchor="middle" font-size="15" font-weight="700" fill="#111B21">1) Tocá Compartir</text>
+    <text x="56" y="150" text-anchor="middle" font-size="12" fill="#667781">(abajo, en el centro)</text>
+  </g>
+  <!-- flecha -->
+  <path d="M150 90 L184 90" stroke="#9AA3AB" stroke-width="4" stroke-linecap="round"/>
+  <path d="M176 82 L186 90 L176 98" fill="none" stroke="#9AA3AB" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Paso 2: Agregar a inicio -->
+  <g transform="translate(196,50)">
+    <rect x="0" y="0" width="100" height="52" rx="12" fill="#fff" stroke="#25D366" stroke-width="2.5"/>
+    <text x="14" y="32" font-size="20">➕</text>
+    <text x="42" y="27" font-size="13" font-weight="700" fill="#111B21">Agregar</text>
+    <text x="42" y="43" font-size="13" font-weight="700" fill="#111B21">a inicio</text>
+    <text x="50" y="82" text-anchor="middle" font-size="15" font-weight="700" fill="#008069">2) Elegí esto</text>
+  </g>
+</svg>

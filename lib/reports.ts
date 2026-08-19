@@ -191,9 +191,20 @@ export interface DailyRow {
 }
 
 export async function getDailyReport(opts: { start?: string; end?: string; tenantId?: string } = {}): Promise<DailyRow[]> {
+  // El día se agrupa en hora AR (dayExpr), pero el filtro es sobre sentAt (UTC).
+  // Ensanchamos ±1 día la ventana UTC para no cortar las cargas de la tarde/noche
+  // AR (que en UTC caen al día siguiente) y luego recortamos por el día ya
+  // convertido a AR (inRange). Robusto ante el offset y DST.
+  const shift = (d: string, days: number) => {
+    const x = new Date(`${d}T00:00:00.000Z`);
+    x.setUTCDate(x.getUTCDate() + days);
+    return x;
+  };
+  const inRange = (d: string) => (!opts.start || d >= opts.start) && (!opts.end || d <= opts.end);
+
   const conds = [];
-  if (opts.start) conds.push(gte(metaEvents.sentAt, new Date(`${opts.start}T00:00:00.000Z`)));
-  if (opts.end) conds.push(lte(metaEvents.sentAt, new Date(`${opts.end}T23:59:59.999Z`)));
+  if (opts.start) conds.push(gte(metaEvents.sentAt, shift(opts.start, -1)));
+  if (opts.end) conds.push(lte(metaEvents.sentAt, shift(opts.end, +2)));
   if (opts.tenantId) conds.push(eq(metaEvents.tenantId, opts.tenantId));
 
   const ev = await db
@@ -210,7 +221,7 @@ export async function getDailyReport(opts: { start?: string; end?: string; tenan
   const map = new Map<string, DailyRow>();
   for (const e of ev) {
     const t = tById.get(e.tenantId);
-    if (!t || !e.day) continue;
+    if (!t || !e.day || !inRange(e.day)) continue; // recorte preciso por día AR
     const key = `${e.tenantId}|${e.day}`;
     let r = map.get(key);
     if (!r) {
@@ -224,7 +235,6 @@ export async function getDailyReport(opts: { start?: string; end?: string; tenan
 
   // Incluir también días que tienen gasto/recarga manual aunque no haya eventos,
   // para que el operador siempre tenga la fila donde editar.
-  const inRange = (d: string) => (!opts.start || d >= opts.start) && (!opts.end || d <= opts.end);
   for (const l of led) {
     if (opts.tenantId && l.tenantId !== opts.tenantId) continue;
     if (!inRange(l.day)) continue;

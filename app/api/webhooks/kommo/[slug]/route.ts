@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
-import { leads, kommoWebhookLog, metaEvents, clientSettings } from '@/db/schema';
+import { leads, kommoWebhookLog, metaEvents, clientSettings, attributions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
-import { sendCapiEvent } from '@/lib/meta';
+import { sendCapiEvent, CAPI_VALUE } from '@/lib/meta';
 import { applyAttributionByCode, CODE_REGEX } from '@/lib/attribution';
 import { fetchKommoLead, fetchContactPhone, readLeadField, readPhone, contactId, updateLeadFields, type KommoLead } from '@/lib/kommo';
 import type { ResolvedTenant } from '@/lib/types';
+import { releaseChatOnCargo, syncChatStepFromKommo } from '@/lib/chat/release';
 
 // CBU robusto: escribe el CBU/Titular del panel en el lead (sin depender del bot).
 // Idempotente; solo escribe si el tenant tiene los campos mapeados.
@@ -118,6 +119,14 @@ async function fetchLeadWithRetry(
   throw lastErr;
 }
 
+// GET = health-check. Kommo valida la URL con un GET antes de dejar guardarla
+// (si no responde 200 la rechaza como "URL inválida / dirección privada"). Nunca
+// procesa eventos: los webhooks reales llegan por POST.
+export async function GET(_req: NextRequest, { params }: { params: { slug: string } }) {
+  const tenant = await getTenantBySlug(params.slug);
+  return NextResponse.json({ ok: true, tenant: tenant ? params.slug : null });
+}
+
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const tenant = await getTenantBySlug(params.slug);
   if (!tenant) return NextResponse.json({ error: 'tenant desconocido' }, { status: 404 });
@@ -135,10 +144,33 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       // puede llegar ~1s ANTES de que el lead sea consultable por API. Sin esto,
       // fetchKommoLead tira 404/204 y se pierde el matcheo/etiquetado. Reintentamos.
       const lead = await fetchLeadWithRetry(tenant, sig.leadId);
+      const inPipeline = !tenant.kommoPipelineId || lead.pipeline_id === tenant.kommoPipelineId;
 
-      // FILTRO: solo el pipeline trackeado del tenant.
-      if (tenant.kommoPipelineId && lead.pipeline_id !== tenant.kommoPipelineId) {
-        results.push({ leadId: sig.leadId, skipped: 'fuera del pipeline trackeado' });
+      // ===== TOKEN + ATRIBUCIÓN (etiquetas) — SIEMPRE, independiente del pipeline =====
+      // El token solo lo tienen los leads que vinieron de NUESTRA landing, así que
+      // etiquetar es correcto aunque el lead esté (momentáneamente) en otro pipeline.
+      // Esto evita perder el etiquetado cuando el lead entra por el embudo default de
+      // WhatsApp y recién después un bot lo mueve al pipeline trackeado.
+      let code = sig.code;
+      const adField = tenant.customFields['ad_code'];
+      const adCurrent = adField ? readLeadField(lead, adField) : null;
+      if (!code && adField) {
+        const m = adCurrent?.match(CODE_REGEX);
+        if (m) code = m[0];
+      }
+      // RED DE SEGURIDAD: persistimos el token en ad_code (idempotente, nunca readonly).
+      if (code && adField && !tenant.readonly && !adCurrent?.match(CODE_REGEX)) {
+        await updateLeadFields(tenant, sig.leadId, [{ fieldId: adField, value: code }]).catch(() => {});
+      }
+      let attr: Awaited<ReturnType<typeof applyAttributionByCode>> = null;
+      if (code) {
+        attr = await applyAttributionByCode(tenant, sig.leadId, code);
+        if (attr) results.push({ leadId: sig.leadId, attribution: { campaign: attr.campaignId, bono: attr.bono } });
+      }
+
+      // El resto (espejado, CBU y eventos CAPI) solo para el pipeline trackeado.
+      if (!inPipeline) {
+        results.push({ leadId: sig.leadId, skipped: 'fuera del pipeline (etiquetado igual aplicado)' });
         continue;
       }
 
@@ -161,41 +193,60 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       }
 
       let campaign = readLeadField(lead, tenant.fieldUtmCampaign) ?? undefined;
-
-      // TOKEN: del mensaje (si vino por webhook) o del campo ad_code que el bot WELCOME
-      // graba con el primer mensaje. Extraemos el código PBxxxxxx y aplicamos atribución.
-      let code = sig.code;
-      if (!code && tenant.customFields['ad_code']) {
-        const adVal = readLeadField(lead, tenant.customFields['ad_code']);
-        const m = adVal?.match(CODE_REGEX);
-        if (m) code = m[0];
+      // Enriquecemos el evento con la atribución ya resuelta arriba.
+      if (attr) {
+        ud.fbclid = ud.fbclid ?? attr.fbclid;
+        ud.fbc = ud.fbc ?? attr.fbc;
+        ud.fbp = ud.fbp ?? attr.fbp;
+        campaign = campaign ?? attr.campaignId ?? undefined;
       }
 
-      // TOKEN: matchea atribución -> etiquetas (campaña+bono) + fbclid/utm en el lead,
-      // y enriquece el evento con los datos guardados desde la landing.
-      if (code) {
-        const attr = await applyAttributionByCode(tenant, sig.leadId, code);
-        if (attr) {
-          ud.fbclid = ud.fbclid ?? attr.fbclid;
-          ud.fbc = ud.fbc ?? attr.fbc;
-          ud.fbp = ud.fbp ?? attr.fbp;
-          campaign = campaign ?? attr.campaignId ?? undefined;
-          results.push({ leadId: sig.leadId, attribution: { campaign: attr.campaignId, bono: attr.bono } });
+      // RECUPERO de atribución: si este webhook no trajo el token (ej. llegó por
+      // "lead agregado" o cambio de estado), pero el token YA se procesó en un
+      // webhook anterior, la atribución quedó matcheada al lead. La leemos para
+      // no disparar eventos sin campaign/fbc.
+      if (!campaign || !ud.fbc) {
+        const [prev] = await db
+          .select({
+            campaignId: attributions.campaignId,
+            fbc: attributions.fbc,
+            fbp: attributions.fbp,
+            fbclid: attributions.fbclid,
+          })
+          .from(attributions)
+          .where(and(eq(attributions.tenantId, tenant.id), eq(attributions.matchedLeadId, sig.leadId)))
+          .limit(1);
+        if (prev) {
+          campaign = campaign ?? prev.campaignId ?? undefined;
+          ud.fbc = ud.fbc ?? prev.fbc;
+          ud.fbp = ud.fbp ?? prev.fbp;
+          ud.fbclid = ud.fbclid ?? prev.fbclid;
         }
       }
 
-      // CONVERSACIÓN (idempotente).
+      // CONVERSACIÓN (idempotente). Solo la disparamos cuando ya tenemos la
+      // atribución resuelta (campaign o fbc): sin fbc, Meta no puede atribuirla a
+      // la campaña (llega al pixel pero no a la cuenta publicitaria) y sin campaign
+      // se rompe el tracker. Si todavía no hay atribución, DIFERIMOS: no la
+      // quemamos; el webhook del mensaje con el token la disparará enriquecida.
+      // Excepción: si ya hubo Cargo, forzamos (hubo conversación sí o sí).
       const convId = `conv-${sig.leadId}`;
       if (!(await eventExists(tenant.id, convId))) {
-        results.push(
-          await sendCapiEvent(tenant, {
-            eventName: 'Conversacion',
-            eventId: convId,
-            userData: ud,
-            customData: { campaign_id: campaign, internal_event: 'ConversacionCRM' },
-            leadId: row?.id ?? null,
-          }),
-        );
+        const hasAttribution = !!(campaign || ud.fbc);
+        const cargoAlready = await eventExists(tenant.id, `cargo-${sig.leadId}`);
+        if (hasAttribution || cargoAlready) {
+          results.push(
+            await sendCapiEvent(tenant, {
+              eventName: 'Conversacion',
+              eventId: convId,
+              userData: ud,
+              customData: { campaign_id: campaign, internal_event: 'ConversacionCRM', ...CAPI_VALUE },
+              leadId: row?.id ?? null,
+            }),
+          );
+        } else {
+          results.push({ leadId: sig.leadId, deferred: 'conversacion: atribución aún no resuelta' });
+        }
       }
 
       // CARGA: cuando entra al estado Cargo$. Miramos el estado del EVENTO (por si un
@@ -209,12 +260,19 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
             eventName: 'Cargo',
             eventId: cargoId,
             userData: ud,
-            customData: { campaign_id: campaign, internal_event: 'CargoCRM' },
+            customData: { campaign_id: campaign, internal_event: 'CargoCRM', ...CAPI_VALUE },
             leadId: row?.id ?? null,
           }),
         );
         if (row) await db.update(leads).set({ converted: true }).where(eq(leads.id, row.id));
       }
+      // CHAT WEB: si este lead tiene un chat embebido esperando validación,
+      // liberamos la acreditación al entrar a Cargo$ (best-effort, sin bloquear).
+      if (isCargo) releaseChatOnCargo(tenant, sig.leadId).catch(() => {});
+      // KOMMO MANDA: reflejamos en el panel cualquier etapa de resultado que el
+      // empleado haya movido en Kommo (Cargo$ / No Cargo / Revisar imagen).
+      const statusNow = sig.statusId ?? lead.status_id;
+      syncChatStepFromKommo(tenant, sig.leadId, statusNow).catch(() => {});
     } catch (e) {
       console.error(`[kommo-webhook ${tenant.slug}] lead ${sig.leadId}:`, e);
       results.push({ leadId: sig.leadId, error: String(e) });

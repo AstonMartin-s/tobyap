@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { tenants, clientSettings, numbers, landings } from '@/db/schema';
 import { isAdmin } from '@/lib/admin-auth';
 import { updateTenantFields, type UpdateTenantPatch } from '@/lib/tenants';
+import { DEFAULT_BONO_MAP } from '@/lib/attribution';
 
 // GET /api/admin/tenant/[slug] — info NO secreta del cliente para el detalle admin.
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
@@ -37,6 +38,8 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     settings: s ? { accountName: s.accountName, accountCbu: s.accountCbu, message: s.message } : null,
     numbers: nums.map((n) => ({ id: n.id, name: n.name, phone: n.phone, type: n.type, status: n.status })),
     landings: lps,
+    // Mapa CCPP -> bono para el generador de link (default global + override del tenant).
+    bonos: { ...DEFAULT_BONO_MAP, ...((t.bonoMap ?? {}) as Record<string, string>) },
   });
 }
 

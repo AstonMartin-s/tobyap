@@ -1,18 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { attributions, tenants } from '@/db/schema';
+import { attributions, sendList, tenants } from '@/db/schema';
+import { DEFAULT_BONO_MAP } from '@/lib/attribution';
+import { phoneCandidates } from '@/lib/phone';
 
 // ===========================================================================
 // API v1 — Superficie EXTERNA aislada para el CRM 360dialog.
-// Módulo autocontenido: solo LEE la tabla attributions (que ya escribe el
-// landing/track). No importa ni modifica nada del circuito existente
-// (webhook Kommo, atribución, landing). Credencial propia: RESOLVE_API_KEY.
+// Módulo autocontenido: solo LEE (attributions / send_list). No importa ni
+// modifica nada del circuito existente (webhook Kommo, atribución, landing).
+// Credencial propia: RESOLVE_API_KEY.
 //
-//   GET /api/v1/resolve?code=PB6JW9G6
+//   GET /api/v1/resolve?code=PB6JW9G6   (atribución principal: por token)
 //     200 { code, bono, ccpp, campaign, fbp, fbc, fbclid, eventSourceUrl, ts, client }
-//     401 si falta / no coincide la API key (cuando RESOLVE_API_KEY está seteada)
 //     404 si el code no existe (o expiró, si RESOLVE_TTL_DAYS está seteada)
+//
+//   GET /api/v1/resolve?phone=+5491128471195   (fallback: por lista de envío)
+//     200 { phone, ccpp, bono, campaign, client, ts }
+//     404 si el teléfono no está en la lista de envío
+//
+//   401 si falta / no coincide la API key (cuando RESOLVE_API_KEY está seteada)
 // ===========================================================================
 
 const CORS = {
@@ -38,9 +45,52 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'no autorizado' }, { status: 401, headers: CORS });
   }
 
+  // --- Fallback por teléfono (lista de envío) -----------------------------
+  const phoneParam = req.nextUrl.searchParams.get('phone');
+  if (phoneParam != null) {
+    const candidates = phoneCandidates(phoneParam);
+    if (!candidates.length) {
+      return NextResponse.json({ error: 'phone inválido' }, { status: 400, headers: CORS });
+    }
+    // latest-wins por el último envío (sent_at); si falta, cae a updatedAt.
+    const tsExpr = sql<Date>`coalesce(${sendList.sentAt}, ${sendList.updatedAt})`;
+    const [row] = await db
+      .select({
+        phone: sendList.phone,
+        ccpp: sendList.ccpp,
+        campaign: sendList.campaign,
+        portalSlug: sendList.portalSlug,
+        ts: tsExpr,
+        client: tenants.slug,
+        bonoMap: tenants.bonoMap,
+      })
+      .from(sendList)
+      .leftJoin(tenants, eq(tenants.id, sendList.tenantId))
+      .where(inArray(sendList.phoneKey, candidates)) // tolera el 9 móvil AR
+      .orderBy(desc(tsExpr)) // latest-wins si hubo varios envíos
+      .limit(1);
+
+    if (!row) {
+      return NextResponse.json({ error: 'phone no encontrado' }, { status: 404, headers: CORS });
+    }
+    const map = { ...DEFAULT_BONO_MAP, ...(row.bonoMap ?? {}) };
+    return NextResponse.json(
+      {
+        phone: row.phone,
+        ccpp: row.ccpp,
+        bono: map[row.ccpp] ?? null,
+        portal_slug: row.portalSlug ?? null,
+        campaign: row.campaign ?? null,
+        client: row.client,
+        ts: row.ts,
+      },
+      { headers: CORS },
+    );
+  }
+
   const code = req.nextUrl.searchParams.get('code')?.trim();
   if (!code) {
-    return NextResponse.json({ error: 'code requerido' }, { status: 400, headers: CORS });
+    return NextResponse.json({ error: 'code o phone requerido' }, { status: 400, headers: CORS });
   }
 
   const [row] = await db

@@ -41,8 +41,16 @@ export async function POST(req: NextRequest) {
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
   const userAgent = req.headers.get('user-agent') ?? null;
-  const campaignId = b.campaign ?? b.campaignId ?? b.utmCampaign ?? null;
-  const bono = resolveBono(tenant, b.ccpp);
+  // Sanitizamos campaign/ccpp: tomamos SOLO el prefijo alfanumérico (+ - _) para
+  // que un valor contaminado (ej. "CC1.kommo.com/leads/pipeline/...") no genere
+  // un tag basura ni ensucie la atribución.
+  const cleanParam = (v?: string | null, max = 40): string | null => {
+    const m = (v ?? '').match(/^[A-Za-z0-9_-]+/);
+    return m ? m[0].slice(0, max) : null;
+  };
+  const campaignId = cleanParam(b.campaign ?? b.campaignId ?? b.utmCampaign, 40);
+  const ccpp = cleanParam(b.ccpp, 12);
+  const bono = resolveBono(tenant, ccpp);
 
   // 1) Visita (redirect) para el reporte.
   await db.insert(metaEvents).values({
@@ -52,7 +60,7 @@ export async function POST(req: NextRequest) {
     eventType: 'redirect',
     campaignId,
     conversionData: {
-      ccpp: b.ccpp ?? null,
+      ccpp: ccpp,
       bono,
       fbp: b.fbp ?? null,
       fbc: b.fbc ?? null,
@@ -74,7 +82,7 @@ export async function POST(req: NextRequest) {
         tenantId: tenant.id,
         code,
         campaignId,
-        ccpp: b.ccpp ?? null,
+        ccpp: ccpp,
         bono,
         fbclid: b.fbclid ?? null,
         fbp: b.fbp ?? null,

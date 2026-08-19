@@ -19,6 +19,10 @@ export interface ResolvedTenant {
   apiUrl: string | null;
   externalApiKey: string | null; // descifrado
 
+  // Pagoda (dat4win) — creación de cuentas de portal (token descifrado)
+  pagodaUrl: string | null;
+  pagodaApiKey: string | null;
+
   // Mapa de custom fields de Kommo
   customFields: Record<string, number>;
   // Override CCPP -> bono (se combina con el mapa global por defecto)
@@ -104,6 +108,8 @@ export interface CreateTenantInput {
   pspActive?: boolean;
   pspKey?: string; // cifrado
   externalApiKey?: string; // cifrado
+  pagodaUrl?: string;
+  pagodaApiKey?: string; // cifrado
 
   // Sub-entidades opcionales (se insertan en sus tablas)
   settings?: TenantSettingsInput;

@@ -1,0 +1,53 @@
+import { promises as fs } from 'fs';
+import path from 'path';
+
+// Almacenamiento de imágenes (comprobantes) FUERA de Postgres.
+//
+// Motivo: guardar el base64 en la fila de la sesión infla la DB (backups, costo,
+// performance) y no escala a volumen alto. Con un volumen de Railway montado
+// (barato, sin egress, bajo tu control) escribimos los archivos a disco y en la
+// DB queda solo la RUTA. Si UPLOAD_DIR no está seteado, se cae al modo anterior
+// (base64 en DB) — así nada se rompe hasta que montes el volumen.
+//
+// Setup (una vez, en Railway): crear un Volume, montarlo (ej. en /data) y setear
+//   UPLOAD_DIR=/data
+// Listo — los comprobantes nuevos van a disco; los viejos (base64) se siguen
+// sirviendo igual.
+
+const DIR = process.env.UPLOAD_DIR || '';
+
+export function storageEnabled(): boolean {
+  return DIR.length > 0;
+}
+
+const extFromMime = (mime: string): string => {
+  if (mime.includes('png')) return 'png';
+  if (mime.includes('webp')) return 'webp';
+  if (mime.includes('gif')) return 'gif';
+  if (mime.includes('pdf')) return 'pdf';
+  return 'jpg';
+};
+
+// Guarda el buffer y devuelve la ruta RELATIVA (a persistir en la sesión), o null
+// si el storage no está configurado (el caller cae a base64).
+export async function saveComprobante(sessionKey: string, buf: Buffer, mime: string): Promise<string | null> {
+  if (!storageEnabled()) return null;
+  const rel = path.join('comprobantes', `${sessionKey}-${Date.now()}.${extFromMime(mime)}`);
+  const full = path.join(DIR, rel);
+  await fs.mkdir(path.dirname(full), { recursive: true });
+  await fs.writeFile(full, buf);
+  return rel;
+}
+
+// Lee un comprobante por su ruta relativa. Null si no existe / storage off.
+export async function readComprobante(rel: string): Promise<Buffer | null> {
+  if (!storageEnabled() || !rel) return null;
+  try {
+    // Guardas contra path traversal: solo dentro de DIR.
+    const full = path.resolve(DIR, rel);
+    if (!full.startsWith(path.resolve(DIR))) return null;
+    return await fs.readFile(full);
+  } catch {
+    return null;
+  }
+}

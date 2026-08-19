@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, gt, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { metaEvents, tenants } from '@/db/schema';
 import { decryptOptional } from '@/lib/crypto';
@@ -13,6 +13,11 @@ import type { ResolvedTenant } from '@/lib/types';
 // ---------------------------------------------------------------------------
 
 const GRAPH_VERSION = 'v21.0';
+
+// Valor nominal por evento (para reporte de valor en Meta y consistencia con el
+// resto de los CRMs). No es el valor real del depósito; es un valor fijo para
+// poblar value/currency. Se puede tunear por evento acá.
+export const CAPI_VALUE = { value: 1, currency: 'USD' } as const;
 
 export type BaseEventName = 'Conversacion' | 'Cargo';
 
@@ -34,6 +39,9 @@ export interface SendCapiInput {
   eventSourceUrl?: string | null;
   actionSource?: 'website' | 'business_messaging' | 'system_generated';
   leadId?: string | null; // uuid interno para auditoría
+  // Fecha del evento (event_time de Meta + sentAt en la DB). Default: ahora.
+  // Se usa para recuperar conversiones pasadas con su fecha real.
+  eventTime?: Date;
 }
 
 // ---- Helpers de hashing (Meta exige SHA-256, lowercase, trim) -------------
@@ -103,7 +111,7 @@ export async function sendCapiEvent(
 
   const event = {
     event_name: eventName,
-    event_time: Math.floor(Date.now() / 1000),
+    event_time: Math.floor((input.eventTime ?? new Date()).getTime() / 1000),
     event_id: input.eventId,
     action_source: actionSource,
     ...(actionSource === 'business_messaging' ? { messaging_channel: 'whatsapp' } : {}),
@@ -166,7 +174,7 @@ export async function retryFailedEvents(opts?: { maxAgeHours?: number; limit?: n
     })
     .from(metaEvents)
     .innerJoin(tenants, eq(tenants.id, metaEvents.tenantId))
-    .where(and(eq(metaEvents.status, 'failed'), sql`${metaEvents.createdAt} > ${cutoff}`))
+    .where(and(eq(metaEvents.status, 'failed'), gt(metaEvents.createdAt, cutoff)))
     .limit(limit);
 
   let sent = 0;
@@ -207,7 +215,7 @@ async function persistEvent(
   try {
     const eventType = input.eventName === 'Conversacion' ? 'conversacion' : 'cargo';
     const campaignId = (input.customData?.campaign_id as string) ?? null;
-    const sentAt = status === 'sent' ? new Date() : null;
+    const sentAt = status === 'sent' ? (input.eventTime ?? new Date()) : null;
     await db
       .insert(metaEvents)
       .values({

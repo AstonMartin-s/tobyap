@@ -8,6 +8,7 @@ import type { ResolvedTenant } from '@/lib/types';
 // Mapa global por defecto CCPP -> bono. El tenant puede override (tenant.bonoMap).
 export const DEFAULT_BONO_MAP: Record<string, string> = {
   A1: 'Bono10%',
+  A2: 'Bono20%',
   A3: 'Bono30%',
   A5: 'Bono50%',
   F1: 'FichasGratis',

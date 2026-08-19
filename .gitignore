@@ -10,3 +10,9 @@ tenants/*.json
 !tenants/example.json
 
 bots-adapted/
+
+# Listas de envío con datos personales — nunca subir
+docs/*.csv
+
+# build artifact
+tsconfig.tsbuildinfo

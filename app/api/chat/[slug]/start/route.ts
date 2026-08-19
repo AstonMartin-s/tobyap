@@ -1,0 +1,114 @@
+import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
+import { and, desc, eq } from 'drizzle-orm';
+import { db } from '@/db';
+import { chatSessions, metaEvents, attributions } from '@/db/schema';
+import { getTenantBySlug } from '@/lib/tenants';
+import { checkWhatsApp } from '@/lib/chat/wachecker';
+import { welcomeStep } from '@/lib/chat/flow';
+import { createChatLead, addLeadNote } from '@/lib/chat/kommoMirror';
+import { sendCapiEvent, CAPI_VALUE } from '@/lib/meta';
+
+export const dynamic = 'force-dynamic';
+
+// POST /api/chat/[slug]/start  { phone, name?, token?, campaign?, ccpp? }
+export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
+  const tenant = await getTenantBySlug(params.slug);
+  if (!tenant) return NextResponse.json({ error: 'tenant desconocido' }, { status: 404 });
+
+  const b = (await req.json().catch(() => ({}))) as Record<string, string>;
+  if (!b.phone) return NextResponse.json({ error: 'phone requerido' }, { status: 400 });
+
+  const wa = await checkWhatsApp(b.phone);
+  if (!wa.ok) {
+    return NextResponse.json({ ok: false, error: wa.reason === 'sin WhatsApp' ? 'Ese número no tiene WhatsApp. Poné el correcto para recibir tu bonificación.' : 'Número inválido. Revisá que esté completo.' }, { status: 422 });
+  }
+
+  // DEDUPE POR TELÉFONO (nuestro ID principal): si ya existe una sesión con ese
+  // número, la reutilizamos en vez de crear un duplicado (mismo cliente que vuelve
+  // desde otro navegador / sin el sessionKey guardado). Así no se duplican leads.
+  const existing = await db.query.chatSessions.findFirst({
+    where: and(eq(chatSessions.tenantId, tenant.id), eq(chatSessions.phone, wa.phone)),
+    orderBy: [desc(chatSessions.updatedAt)],
+  });
+  if (existing) {
+    const bot = (m: { text?: string; at: number }) => ({ from: 'bot' as const, text: m.text, at: m.at });
+    const terminal = ['closed', 'no_cargo'].includes(existing.step ?? '');
+    if (terminal) {
+      // Vuelve tras cerrar/no-cargar: reabrimos EN LA MISMA fila con una bienvenida.
+      const w = welcomeStep(b.name ?? existing.name);
+      const history = [...(existing.messages ?? []), ...w.messages.map(bot)];
+      await db.update(chatSessions).set({ step: 'welcome', messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, existing.id));
+      return NextResponse.json({ ok: true, resumed: true, sessionKey: existing.sessionKey, messages: history, buttons: w.buttons, step: 'welcome', total: history.length, leadId: existing.kommoLeadId ?? null });
+    }
+    // Sesión activa: la reanudamos tal cual (historial + estado actuales).
+    if (b.name && !existing.name) await db.update(chatSessions).set({ name: b.name, updatedAt: new Date() }).where(eq(chatSessions.id, existing.id));
+    const step = existing.step ?? 'welcome';
+    const buttons = step === 'welcome' ? [{ id: 'want_account', label: 'Quiero mi cuenta 🎁' }] : step === 'credenciales' ? [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }] : [];
+    const msgs = existing.messages ?? [];
+    return NextResponse.json({ ok: true, resumed: true, sessionKey: existing.sessionKey, messages: msgs, buttons, step, total: msgs.length, leadId: existing.kommoLeadId ?? null });
+  }
+
+  const sessionKey = crypto.randomBytes(12).toString('hex');
+  const leadId = await createChatLead(tenant, { phone: wa.phone, name: b.name, token: b.token, campaign: b.campaign, ccpp: b.ccpp });
+  if (!leadId) {
+    console.error(`[chat start] ${tenant.slug}: no se pudo crear el lead en Kommo (tel ${wa.phone}). Igual medimos la conversión a Meta.`);
+  }
+
+  const { messages, buttons } = welcomeStep(b.name);
+
+  await db.insert(chatSessions).values({
+    tenantId: tenant.id,
+    sessionKey,
+    phone: wa.phone,
+    name: b.name ?? null,
+    waVerified: wa.onWhatsApp === true,
+    token: b.token ?? null,
+    campaign: b.campaign ?? null,
+    ccpp: b.ccpp ?? null,
+    step: 'welcome',
+    kommoLeadId: leadId,
+    data: {},
+    messages: messages.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at })),
+    updatedAt: new Date(),
+  });
+
+  // Leemos la atribución del token SIEMPRE, independiente de si el lead se creó
+  // en Kommo: el evento a Meta no puede depender de que Kommo ande bien, son dos
+  // sistemas separados y uno no debe tumbar al otro.
+  let attr: { campaignId: string | null; fbc: string | null; fbp: string | null; fbclid: string | null } | null = null;
+  if (b.token) {
+    const row = await db.query.attributions.findFirst({
+      where: and(eq(attributions.tenantId, tenant.id), eq(attributions.code, b.token)),
+    });
+    if (row) attr = { campaignId: row.campaignId, fbc: row.fbc, fbp: row.fbp, fbclid: row.fbclid };
+  }
+
+  // El lead ya se crea con etiquetas (Chat Web + campaña + bono), custom fields
+  // y la atribución matcheada en UNA sola llamada dentro de createChatLead. Acá
+  // sólo dejamos la nota (best-effort, paceada por el throttle).
+  if (leadId) {
+    addLeadNote(tenant, leadId, `🌐 Chat web iniciado. Tel: ${wa.phone}${wa.onWhatsApp === true ? ' (WA ✓)' : ''}`);
+  }
+
+  // CONVERSACIÓN a Meta (idempotente): manda el TELÉFONO capturado (Meta lo
+  // hashea SHA-256) + fbc/fbp/fbclid. NO depende de que el lead se haya creado en
+  // Kommo — antes un fallo del mirror tumbaba también la medición en Meta.
+  if (tenant.metaPixelId && tenant.metaCapiToken) {
+    const convId = leadId ? `conv-${leadId}` : `conv-session-${sessionKey}`;
+    const dup = await db.query.metaEvents.findFirst({
+      where: and(eq(metaEvents.tenantId, tenant.id), eq(metaEvents.eventId, convId), eq(metaEvents.status, 'sent')),
+    });
+    if (!dup) {
+      sendCapiEvent(tenant, {
+        eventName: 'Conversacion',
+        eventId: convId,
+        userData: { phone: wa.phone, fbc: attr?.fbc, fbp: attr?.fbp, fbclid: attr?.fbclid },
+        customData: { campaign_id: attr?.campaignId ?? b.campaign, internal_event: 'ConversacionCRM', ...CAPI_VALUE },
+        leadId: null,
+      }).catch(() => {});
+    }
+  }
+
+  return NextResponse.json({ ok: true, sessionKey, messages, buttons, step: 'welcome', leadId: leadId ?? null });
+}
