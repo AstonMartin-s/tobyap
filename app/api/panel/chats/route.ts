@@ -6,10 +6,9 @@ import { getSession } from '@/lib/session';
 import { getTenantBySlug } from '@/lib/tenants';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadStatus } from '@/lib/kommo';
-import { kommoStatusFromPanelStep } from '@/lib/chat/release';
+import { kommoStatusFromPanelStep, acreditarChat } from '@/lib/chat/release';
 import { emitCargo, panelApproveEmitsCargo } from '@/lib/cargo/emit';
 import {
-  accreditedMessages,
   comprobantePendingMessages,
   comprobanteRejectedMessages,
   supportMessage,
@@ -159,8 +158,8 @@ export async function POST(req: NextRequest) {
 
   switch (b.op) {
     case 'approve':
-      newMsgs = accreditedMessages(loginUrl).map((m) => ({ from: 'bot', text: m.text, at: m.at }));
-      newStep = 'done';
+      // El mensaje de acreditación NO se agrega acá: lo hace acreditarChat abajo,
+      // con candado atómico, para no duplicar si el webhook/poll también disparan.
       note = '✅ Comprobante APROBADO manualmente desde el panel (ficha entregada en el chat).';
       break;
     case 'pending':
@@ -226,20 +225,31 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Fase 1: approve dispara CargoCRM (antes no lo hacía). Kill switch EMIT_CARGO_FROM_PANEL=0.
-  // skipKommoStatus/skipChatRelease: este handler ya acreditó el chat y movió Kommo.
-  if (b.op === 'approve' && panelApproveEmitsCargo()) {
+  // APPROVE: acreditación idempotente + mover Kommo a Cargo$ + emitir CargoCRM.
+  if (b.op === 'approve') {
     const tenant = await getTenantBySlug(session.slug);
     if (tenant) {
-      await emitCargo(tenant, {
-        kommoLeadId: s.kommoLeadId,
-        sessionKey: s.sessionKey,
-        source: 'panel',
-        operator: session.slug,
-        skipKommoStatus: true,
-        skipChatRelease: true,
-      }).catch((e) => console.error(`[panel/chats ${session.slug}] emitCargo:`, e));
+      // Agrega el mensaje "¡Acreditado!" UNA sola vez (candado atómico). Aunque
+      // después llegue el webhook de Cargo$ o el poll, no se duplica. El panel
+      // recarga el detalle tras la acción, así que el operador lo ve igual.
+      await acreditarChat(tenant, { sessionKey: s.sessionKey });
+      // Movemos el lead a Cargo$ (dispara webhook; el candado impide duplicar).
+      if (s.kommoLeadId && tenant.statusCargoId) {
+        updateLeadStatus(tenant, s.kommoLeadId, tenant.statusCargoId).catch(() => {});
+      }
+      // Fase 1: dispara CargoCRM a Meta. Kill switch EMIT_CARGO_FROM_PANEL=0.
+      if (panelApproveEmitsCargo()) {
+        await emitCargo(tenant, {
+          kommoLeadId: s.kommoLeadId,
+          sessionKey: s.sessionKey,
+          source: 'panel',
+          operator: session.slug,
+          skipKommoStatus: true,
+          skipChatRelease: true,
+        }).catch((e) => console.error(`[panel/chats ${session.slug}] emitCargo:`, e));
+      }
     }
+    return NextResponse.json({ ok: true, messages: newMsgs, step: 'done' });
   }
 
   return NextResponse.json({ ok: true, messages: newMsgs, step: newStep ?? s.step });

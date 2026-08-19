@@ -39,7 +39,7 @@ export function welcomeStep(name?: string | null): { messages: BotMsg[]; buttons
   return {
     messages: [{
       from: 'bot', delayMs: 500, at: now(),
-      text: `${hi} Un gusto atenderte 🎰\nBienvenido a *King*.\n\n🎁 Promo activa: *20% en tu primera carga*\n💰 Mínimo de carga: $1.000`,
+      text: `${hi} Un gusto atenderte 🎰\nBienvenido a *King*.\n\n🎁 Promo activa: *30% en tu primera carga*\n💰 Mínimo de carga: $1.000`,
     }],
     buttons: [{ id: 'want_account', label: 'Quiero mi cuenta 🎁' }],
   };
@@ -89,7 +89,7 @@ export async function cbuStep(tenant: ResolvedTenant): Promise<{ messages: BotMs
     { from: 'bot', delayMs: 500, at: now(), text: `Perfecto 🙌 Datos para tu carga:\n🏦 Titular: *${titular}*` },
   ];
   if (cbu) messages.push({ from: 'bot', delayMs: 800, at: now(), text: cbu, copy: cbu }); // CBU solo + botón copiar
-  messages.push({ from: 'bot', delayMs: 900, at: now(), text: 'Desde *$1.000* y te sumo *20%* 🎁 Cuando transfieras, mandame el comprobante 📸 y te acredito.' });
+  messages.push({ from: 'bot', delayMs: 900, at: now(), text: 'Desde *$1.000* y te sumo *30%* 🎁 Cuando transfieras, mandame el comprobante 📸 y te acredito.' });
   return { messages, data: { cbu, titular }, step: 'comprobante' };
 }
 
@@ -155,7 +155,7 @@ export function postActionMessages(action: string, data: Record<string, unknown>
   ];
   switch (action) {
     case 'deposit':
-      return { messages: ref(`💰 *Cargar saldo*\nEntrá al portal y tocá *"Cargar saldo"* 👇${portal}\n\nMínimo *$1.000* y se bonifica un *20%* 🎁`) };
+      return { messages: ref(`💰 *Cargar saldo*\nEntrá al portal y tocá *"Cargar saldo"* 👇${portal}\n\nMínimo *$1.000* y se bonifica un *30%* 🎁`) };
     case 'withdraw':
       return { messages: ref(`💸 *Retirar saldo*\nEntrá al portal y tocá *"Retirar saldo"* 👇${portal}\n\nCargá tu CBU en "Mi cuenta bancaria" y listo.`) };
     case 'support':
@@ -180,13 +180,28 @@ function supportReply(): BotMsg[] {
 // app) — esas SÍ van directo a soporte incluso durante app_onboarding.
 const REAL_ISSUE_RE = /(problema|reclamo|estafa|error|no me lleg|no anda|no funciona)/i;
 
+// Confusión puntual con "la app" — muy común, no requiere soporte humano.
+const APP_CONFUSION_RE = /(qu[eé] app|cu[aá]l aplicaci|qu[eé] aplicaci|c[oó]mo (la )?descargo|descargar|instalar|apk|play store|app store|me piden|tu nombre)/i;
+
+// Cliente tipea la intención en vez de tocar el botón "Quiero mi cuenta 🎁"
+// (pasa seguido en mobile). Si no lo detectamos acá, el chat queda trabado en
+// 'welcome' para siempre — nunca se crea el usuario/contraseña.
+export const WANT_ACCOUNT_RE = /(quiero|dame|necesito|abr[ií]|crea|hace).*(mi )?cuenta|abrir cuenta|crear cuenta|registrar(me)?|jugar|empezar|usuario y contrase/i;
+
 export function onFreeText(step: string, text?: string): BotMsg[] {
-  // Confusión con "la app" durante el gate: la causa más común de que alguien se
+  const asksAboutApp = !!(text && APP_CONFUSION_RE.test(text));
+
+  // Confusión con "la app" DURANTE el gate: la causa más común de que alguien se
   // quede trabado es no entender qué es "instalar la app" (PWA). En vez de
   // mandarlo a WhatsApp (fricción extra), le damos la salida DENTRO del chat:
   // puede saltear el paso y mandar el comprobante igual.
   if (step === 'app_onboarding' && !(text && REAL_ISSUE_RE.test(text))) {
     return [{ from: 'bot', delayMs: 600, at: now(), text: '📲 No hace falta instalar nada ahora, es opcional. Tocá *"Enviar mi comprobante"* ahí abajo y seguimos con tu acreditación 🎁' }];
+  }
+  // Misma confusión, pero DESPUÉS de mandar el comprobante (ya pasó el gate):
+  // tranquilizamos, no hace falta nada más de la app.
+  if (asksAboutApp && step !== 'app_onboarding') {
+    return [{ from: 'bot', delayMs: 600, at: now(), text: '✅ Tranquilo/a, no hace falta nada más con la app. Tu comprobante ya quedó en proceso y en breve te acreditamos 🎉' }];
   }
   // Si pide ayuda en cualquier paso → soporte (no lo dejamos dando vueltas).
   if (text && HELP_RE.test(text)) return supportReply();

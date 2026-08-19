@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { accreditedMessages } from '@/lib/chat/flow';
@@ -51,26 +51,57 @@ export async function syncChatStepFromKommo(tenant: ResolvedTenant, kommoLeadId:
   }
 }
 
-// Libera la acreditación de un chat web cuando el lead entra a Cargo$ (lo llama
-// el webhook de Kommo). Idempotente: solo actúa si la sesión está en curso.
-// IMPORTANTE: sólo entrega al cliente el mensaje de aprobación de la ficha en el
-// chat. NO cambia el estado del lead en Kommo — el movimiento de embudo lo
-// maneja el operador manualmente (pedido del cliente).
-export async function releaseChatOnCargo(tenant: ResolvedTenant, kommoLeadId: number): Promise<boolean> {
-  try {
-    const [s] = await db
-      .select()
-      .from(chatSessions)
-      .where(and(eq(chatSessions.tenantId, tenant.id), eq(chatSessions.kommoLeadId, kommoLeadId)));
-    if (!s || s.step === 'done') return false;
-    // Libera si ya subió el comprobante (en cualquiera de sus sub-estados).
-    if (!['comprobante', 'app_onboarding', 'validando'].includes(s.step ?? '')) return false;
+// ── ACREDITACIÓN idempotente (candado atómico) ─────────────────────────────
+// Entrega el mensaje "¡Acreditado!" al cliente UNA SOLA VEZ, sin importar cuántas
+// fuentes lo disparen (webhook Cargo$, poll del widget, panel approve) ni el
+// timing. El candado es `data.accreditedAt`: el UPDATE solo agrega los mensajes
+// si ese flag todavía no existe, y Postgres serializa el UPDATE sobre la fila, así
+// que dos disparos concurrentes NO pueden ambos ganar. Devuelve true solo si ESTA
+// llamada fue la que acreditó (agregó los mensajes).
+export async function acreditarChat(
+  tenant: ResolvedTenant,
+  opts: { kommoLeadId?: number | null; sessionKey?: string | null; requireComprobanteStep?: boolean },
+): Promise<boolean> {
+  const cond = opts.sessionKey
+    ? and(eq(chatSessions.tenantId, tenant.id), eq(chatSessions.sessionKey, opts.sessionKey))
+    : opts.kommoLeadId != null
+      ? and(eq(chatSessions.tenantId, tenant.id), eq(chatSessions.kommoLeadId, opts.kommoLeadId))
+      : null;
+  if (!cond) return false;
 
-    const acc = accreditedMessages((s.data as Record<string, unknown> | null)?.loginUrl as string | undefined);
-    const messages = [...(s.messages ?? []), ...acc.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }))];
-    await db.update(chatSessions).set({ messages, step: 'done', updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
-    return true;
+  try {
+    const [s] = await db.select().from(chatSessions).where(cond);
+    if (!s) return false;
+    const data = (s.data ?? {}) as Record<string, unknown>;
+    if (data.accreditedAt) return false; // ya acreditado (fast-path)
+    // Acreditación automática (webhook/poll): solo si ya mandó comprobante. El
+    // approve del panel es explícito → pasa requireComprobanteStep=false.
+    if (opts.requireComprobanteStep && !['comprobante', 'app_onboarding', 'validando'].includes(s.step ?? '')) return false;
+
+    const acc = accreditedMessages(data.loginUrl as string | undefined);
+    const accJson = JSON.stringify(acc.map((m) => ({ from: 'bot', text: m.text, at: m.at })));
+    const now = Date.now();
+
+    // UPDATE atómico con CANDADO: agrega los mensajes y marca accreditedAt solo si
+    // aún no estaba marcado. `messages || ...` concatena jsonb atómicamente.
+    const res = (await db.execute(sql`
+      UPDATE chat_sessions
+      SET messages = coalesce(messages, '[]'::jsonb) || ${accJson}::jsonb,
+          step = 'done',
+          data = jsonb_set(coalesce(data, '{}'::jsonb), '{accreditedAt}', to_jsonb(${now}::bigint)),
+          updated_at = now()
+      WHERE id = ${s.id}
+        AND coalesce(data->>'accreditedAt', '') = ''
+      RETURNING id
+    `)) as unknown as { length?: number };
+    return (res?.length ?? 0) > 0;
   } catch {
     return false;
   }
+}
+
+// Libera la acreditación cuando el lead entra a Cargo$ (lo llama emitCargo desde
+// el webhook). Delega en la función idempotente. Firma estable para emitCargo.
+export async function releaseChatOnCargo(tenant: ResolvedTenant, kommoLeadId: number): Promise<boolean> {
+  return acreditarChat(tenant, { kommoLeadId, requireComprobanteStep: true });
 }

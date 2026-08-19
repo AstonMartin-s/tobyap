@@ -50,6 +50,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const pollBase = useRef<number | null>(null);
+  const autoPromptedRef = useRef(false); // instalador nativo auto-disparado — solo 1 vez
 
   // PWA: registrar el service worker + capturar el instalador nativo (Android/Chrome).
   useEffect(() => {
@@ -114,6 +115,19 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     return () => { clearInterval(iv); clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, appInstall, appNotif, nudge]);
+
+  // Auto-disparo del instalador NATIVO (Android/Chrome): apenas entra al paso, si
+  // el navegador ya nos dio el prompt de instalación, lo mostramos solo — la
+  // persona ve el diálogo del sistema y toca "Instalar", sin leer instrucciones
+  // ni buscar un botón. Solo una vez por sesión (autoPromptedRef).
+  useEffect(() => {
+    if (step !== 'app_onboarding' || autoPromptedRef.current) return;
+    if (isStandalone() || appInstall) return;
+    if (!deferredPrompt) return;
+    autoPromptedRef.current = true;
+    installApp();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, deferredPrompt]);
 
   // Si el dispositivo YA tiene la app instalada (standalone) o las notificaciones
   // concedidas, no volvemos a pedir ese paso. Si ya cumplió ambos, avanzamos solo.
@@ -256,7 +270,8 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     const r = await fetch(`/api/chat/${slug}/message`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionKey, text }) });
     const d = await r.json().catch(() => ({}));
     if (typeof d.total === 'number') pollBase.current = d.total;
-    await play(d.messages ?? [], buttons);
+    if (d.step) setStep(d.step);
+    await play(d.messages ?? [], d.buttons ?? buttons);
   }
 
   async function upload(file: File) {
