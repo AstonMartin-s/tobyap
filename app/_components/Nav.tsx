@@ -21,6 +21,11 @@ const I = {
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
   ),
+  funnel: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 4h18l-7 8v6l-4 2v-8z" />
+    </svg>
+  ),
   clients: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
@@ -93,17 +98,12 @@ export function Nav({ slug, role = 'client' }: { slug: string; role?: string }) 
 
   return (
     <nav className="sidebar">
-      <button className="sidebar__burger" onClick={toggleCollapse} aria-label="Contraer menú" title="Contraer / expandir menú" style={{ marginBottom: '.8rem' }}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
-        </svg>
-      </button>
       <div className="sidebar__brand">
-        <span className="sidebar__mark">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 12h4l3 8 4-16 3 8h4" />
+        <button className="sidebar__burger" onClick={toggleCollapse} aria-label="Contraer menú" title="Contraer / expandir menú">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
           </svg>
-        </span>
+        </button>
         <span>
           <span className="sidebar__name">Tracker<b>IO</b></span>
           <div className="sidebar__tag">{isAdmin ? 'Panel administrador' : `Cuenta · ${slug}`}</div>
@@ -121,6 +121,7 @@ export function Nav({ slug, role = 'client' }: { slug: string; role?: string }) 
           <>
             {NavLink('/reportes', 'Reportes', I.report)}
             {NavLink('/chats', 'Chats web', I.chat)}
+            {NavLink('/embudo', 'Embudo', I.funnel)}
             {NavLink('/config', 'Configuración', I.config)}
           </>
         )}

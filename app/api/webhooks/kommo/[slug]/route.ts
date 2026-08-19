@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
-import { leads, kommoWebhookLog, metaEvents, clientSettings, attributions } from '@/db/schema';
+import { leads, kommoWebhookLog, clientSettings, attributions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
-import { sendCapiEvent, CAPI_VALUE } from '@/lib/meta';
+import { sendCapiEvent, eventExists, CAPI_VALUE } from '@/lib/meta';
+import { emitCargo } from '@/lib/cargo/emit';
 import { applyAttributionByCode, CODE_REGEX } from '@/lib/attribution';
 import { fetchKommoLead, fetchContactPhone, readLeadField, readPhone, contactId, updateLeadFields, type KommoLead } from '@/lib/kommo';
 import type { ResolvedTenant } from '@/lib/types';
-import { releaseChatOnCargo, syncChatStepFromKommo } from '@/lib/chat/release';
+import { syncChatStepFromKommo } from '@/lib/chat/release';
 
 // CBU robusto: escribe el CBU/Titular del panel en el lead (sin depender del bot).
 // Idempotente; solo escribe si el tenant tiene los campos mapeados.
@@ -249,26 +250,21 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         }
       }
 
-      // CARGA: cuando entra al estado Cargo$. Miramos el estado del EVENTO (por si un
-      // bot lo mueve enseguida) y también el actual. La fuente más confiable sigue
-      // siendo /api/conversion-event (bot CARGO), esto es el fallback por estado.
-      const cargoId = `cargo-${sig.leadId}`;
+      // CARGA: fallback por etapa Cargo$. Autoridad = bot /api/conversion-event.
+      // emitCargo es idempotente (mismo event_id que bot/panel) y libera el chat.
       const isCargo = sig.statusId === tenant.statusCargoId || lead.status_id === tenant.statusCargoId;
-      if (isCargo && !(await eventExists(tenant.id, cargoId))) {
+      if (isCargo) {
         results.push(
-          await sendCapiEvent(tenant, {
-            eventName: 'Cargo',
-            eventId: cargoId,
+          await emitCargo(tenant, {
+            kommoLeadId: sig.leadId,
+            source: 'webhook',
             userData: ud,
-            customData: { campaign_id: campaign, internal_event: 'CargoCRM', ...CAPI_VALUE },
-            leadId: row?.id ?? null,
+            campaign: campaign ?? null,
+            leadRowId: row?.id ?? null,
+            skipKommoStatus: true,
           }),
         );
-        if (row) await db.update(leads).set({ converted: true }).where(eq(leads.id, row.id));
       }
-      // CHAT WEB: si este lead tiene un chat embebido esperando validación,
-      // liberamos la acreditación al entrar a Cargo$ (best-effort, sin bloquear).
-      if (isCargo) releaseChatOnCargo(tenant, sig.leadId).catch(() => {});
       // KOMMO MANDA: reflejamos en el panel cualquier etapa de resultado que el
       // empleado haya movido en Kommo (Cargo$ / No Cargo / Revisar imagen).
       const statusNow = sig.statusId ?? lead.status_id;
@@ -280,11 +276,4 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
 
   return NextResponse.json({ ok: true, processed: results.length, results });
-}
-
-async function eventExists(tenantId: string, eventId: string): Promise<boolean> {
-  const r = await db.query.metaEvents.findFirst({
-    where: and(eq(metaEvents.tenantId, tenantId), eq(metaEvents.eventId, eventId), eq(metaEvents.status, 'sent')),
-  });
-  return !!r;
 }

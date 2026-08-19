@@ -32,6 +32,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     orderBy: [desc(chatSessions.updatedAt)],
   });
   if (existing) {
+    // Bloqueado: devolvemos la sesión tal cual, sin reabrir ni crear lead (los
+    // endpoints de mensaje/upload también lo rechazan).
+    if ((existing.data as Record<string, unknown> | null)?.blocked) {
+      const msgs = existing.messages ?? [];
+      return NextResponse.json({ ok: true, resumed: true, sessionKey: existing.sessionKey, messages: msgs, buttons: [], step: existing.step ?? 'welcome', total: msgs.length, leadId: existing.kommoLeadId ?? null });
+    }
     const bot = (m: { text?: string; at: number }) => ({ from: 'bot' as const, text: m.text, at: m.at });
     const terminal = ['closed', 'no_cargo'].includes(existing.step ?? '');
     if (terminal) {

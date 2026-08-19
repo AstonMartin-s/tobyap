@@ -7,6 +7,7 @@ import { getTenantBySlug } from '@/lib/tenants';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadStatus } from '@/lib/kommo';
 import { kommoStatusFromPanelStep } from '@/lib/chat/release';
+import { emitCargo, panelApproveEmitsCargo } from '@/lib/cargo/emit';
 import {
   accreditedMessages,
   comprobantePendingMessages,
@@ -40,15 +41,25 @@ export async function GET() {
 
   const items = rows.map((s) => {
     const msgs = (s.messages ?? []) as Msg[];
-    const last = msgs[msgs.length - 1];
     const sdata = (s.data ?? {}) as Record<string, unknown>;
     const username = sdata.username as string | undefined;
+    // Si está sin leer, la vista previa muestra el mensaje del CLIENTE que lo
+    // generó (no un recontacto/autoreply saliente posterior) — así se entiende
+    // por qué está pendiente en vez de mostrar nuestro propio mensaje de salida.
+    let last = msgs[msgs.length - 1];
+    if (sdata.unread === true) {
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].from === 'user') { last = msgs[i]; break; }
+      }
+    }
     return {
       sessionKey: s.sessionKey,
       phone: s.phone,
       name: s.name,
       username: username ?? null, // usuario del portal (ej. camilo787) — búscable
       archived: sdata.archived === true,
+      unread: sdata.unread === true,
+      blocked: sdata.blocked === true,
       step: s.step,
       kommoLeadId: s.kommoLeadId,
       campaign: s.campaign,
@@ -116,11 +127,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, archived });
   }
 
+  // Marcar no leído a mano (para volver después). Leer se hace solo al abrir.
+  if (b.op === 'mark_unread') {
+    await db.update(chatSessions).set({ data: { ...((s.data ?? {}) as Record<string, unknown>), unread: true }, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+    return NextResponse.json({ ok: true, unread: true });
+  }
+
+  // Bloquear / desbloquear: un bloqueado no puede seguir en el chat (start/message/
+  // upload lo rechazan). Además lo archivamos para sacarlo de la bandeja.
+  if (b.op === 'block' || b.op === 'unblock') {
+    const blocked = b.op === 'block';
+    await db.update(chatSessions).set({ data: { ...((s.data ?? {}) as Record<string, unknown>), blocked, ...(blocked ? { archived: true, unread: false } : {}) }, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+    return NextResponse.json({ ok: true, blocked });
+  }
+
   // Detalle: devuelve el transcript completo (para abrir la conversación). Quitamos
   // el comprobante en base64 de `data` — pesa MBs y la imagen ya se sirve por /file;
   // bajarlo en cada refresh del panel es puro desperdicio de banda.
   if (b.op === 'get') {
-    const { comprobante, ...dataLite } = (s.data ?? {}) as Record<string, unknown>;
+    const full = (s.data ?? {}) as Record<string, unknown>;
+    // Abrir el chat = leerlo → limpia el "no leído" (best-effort, sin bloquear).
+    if (full.unread) db.update(chatSessions).set({ data: { ...full, unread: false } }).where(eq(chatSessions.id, s.id)).catch(() => {});
+    const { comprobante, ...dataLite } = full;
     void comprobante;
     return NextResponse.json({ ok: true, session: { ...s, data: dataLite } });
   }
@@ -195,6 +223,22 @@ export async function POST(req: NextRequest) {
         const kstatus = kommoStatusFromPanelStep(tenant, newStep);
         if (kstatus) updateLeadStatus(tenant, s.kommoLeadId, kstatus).catch(() => {});
       }
+    }
+  }
+
+  // Fase 1: approve dispara CargoCRM (antes no lo hacía). Kill switch EMIT_CARGO_FROM_PANEL=0.
+  // skipKommoStatus/skipChatRelease: este handler ya acreditó el chat y movió Kommo.
+  if (b.op === 'approve' && panelApproveEmitsCargo()) {
+    const tenant = await getTenantBySlug(session.slug);
+    if (tenant) {
+      await emitCargo(tenant, {
+        kommoLeadId: s.kommoLeadId,
+        sessionKey: s.sessionKey,
+        source: 'panel',
+        operator: session.slug,
+        skipKommoStatus: true,
+        skipChatRelease: true,
+      }).catch((e) => console.error(`[panel/chats ${session.slug}] emitCargo:`, e));
     }
   }
 

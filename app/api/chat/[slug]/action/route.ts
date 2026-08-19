@@ -18,6 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const [s] = await db.select().from(chatSessions).where(and(eq(chatSessions.tenantId, tenant.id), eq(chatSessions.sessionKey, b.sessionKey)));
   if (!s) return NextResponse.json({ error: 'sesión desconocida' }, { status: 404 });
+  if ((s.data as Record<string, unknown> | null)?.blocked) return NextResponse.json({ ok: true, messages: [], blocked: true });
 
   // Persistimos el toque del cliente (la etiqueta del botón) como mensaje suyo,
   // así el panel del operador ve la conversación completa (antes solo se guardaban

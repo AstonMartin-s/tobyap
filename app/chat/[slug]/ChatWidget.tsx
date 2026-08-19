@@ -115,6 +115,20 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand }: { slu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, appInstall, appNotif, nudge]);
 
+  // Si el dispositivo YA tiene la app instalada (standalone) o las notificaciones
+  // concedidas, no volvemos a pedir ese paso. Si ya cumplió ambos, avanzamos solo.
+  useEffect(() => {
+    if (step !== 'app_onboarding') return;
+    const installed = isStandalone();
+    const notif = typeof Notification !== 'undefined' && Notification.permission === 'granted';
+    if (installed && !appInstall) setAppInstall(true);
+    if (notif && !appNotif) setAppNotif(true);
+    if ((installed || appInstall) && (notif || appNotif)) {
+      tapMenu('finish_upload', 'Enviar mi comprobante');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, appInstall, appNotif]);
+
   // Mientras está "validando", consultamos si el operador liberó la acreditación.
   // El poll a la DB va cada 3.5s (barato) y detecta el "Aprobar" del panel al toque.
   // El chequeo del estado en KOMMO es caro (1 request a Kommo por poll), así que

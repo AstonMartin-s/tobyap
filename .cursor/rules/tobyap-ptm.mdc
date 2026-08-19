@@ -1,0 +1,44 @@
+---
+description: PTM TOBYAP — identidad, instancias paralelas, plan de mejoras sin romper prod
+alwaysApply: true
+---
+
+# TOBYAP [TOB] — PTM instancia Cursor (auditoría + backend)
+
+## Identidad
+- **Programa:** TrackerIO / TOBYAP — atribución Meta + CAPI + chat Adaptador B + panel ops.
+- **Carpeta:** `~/Projects/TOBYAP/tobyap` · **Prod:** Railway `tobyap-production.up.railway.app`
+- **NO es:** GATE+CRM ni PAM. Parche Kommo + empleados; **operario humano siempre** aprueba comprobantes.
+- **Tag PTM:** `[TOB]` · R1 cross-repo → CRM Main si tocás `/api/v1/resolve`.
+
+## Instancias paralelas (misma carpeta, roles distintos)
+
+| Instancia | Dueño | Alcance |
+|-----------|-------|---------|
+| **Cursor TOBYAP (esta ventana)** | Aston | `emitCargo`, hardening, CI/smokes, índices, retención `lead_summary`, docs maestro, `lib/*`, webhooks, `app/api/*` |
+| **Claude TOBYAP** | Equipo dev blando | Correcciones clientes, front/panel/chat UX, copy, hotfixes visuales, admin UI |
+
+**Coordinación:** antes de tocar archivos compartidos (`flow.ts`, `ChatWidget.tsx`, `ChatsClient.tsx`, `panel/chats`, webhooks) → R1 a la otra instancia. Máx **1 deploy prod/día** por instancia; coordinar orden.
+
+## Plan vivo (no reescribir prod)
+Leer **`docs/00_PLAN_MEJORAS_2026-08-19.md`** antes de codear. Bitácora: **`docs/00_CONTEXTO_MAESTRO.md`**.
+
+Fases ordenadas (aditivas, feature flags, rollback):
+0 Docs · **1 emitCargo (1 CargoCRM/lead)** · 2 Hardening · 3 CI/smokes · 4 chatConfig · 5 retención · 6 índices/schedulers
+
+## Reglas duras
+- Clientes **en vivo** — cambios aditivos; no alterar flujos lead/operador sin smoke + checklist del plan.
+- **Un CargoCRM por lead** vía `emitCargo()` idempotente (`event_id` = `cargo-{kommoLeadId}`).
+- **Nunca DELETE** identidad cliente: conservar `phone`, `username`, `converted_once` (tabla `lead_summary`).
+- Pagoda: solo `create-portal-account` — no ampliar integración por ahora.
+- Secretos: `.env` fuera de git · cifrado AES existente en `lib/crypto.ts`.
+- Deploy prod: checklist en plan · rollback commit anotado.
+
+## Docs (orden)
+`docs/00_PLAN_MEJORAS_2026-08-19.md` → `README.md` → `docs/ONBOARDING.md` → `git status`.
+
+## Gate local (pre-merge)
+```bash
+npm run typecheck
+# Fase 3+: npm run smoke:gate
+```

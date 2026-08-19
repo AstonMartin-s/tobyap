@@ -257,6 +257,32 @@ input[type='date']:hover::-webkit-calendar-picker-indicator { opacity: 0.9; }
 .btn--ghost { background: transparent; border: 1px solid var(--border-2); color: var(--text); }
 .btn--ghost:hover { border-color: var(--accent); color: var(--accent); filter: none; }
 .btn--sm { padding: 0.35rem 0.7rem; font-size: 0.78rem; }
+
+/* Tooltip flotante (para que el operario aprenda qué hace cada botón). */
+.tt { position: relative; }
+.tt[data-tt]:hover::after {
+  content: attr(data-tt);
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  background: #0b0e16; color: #e9edf6; border: 1px solid var(--border-2);
+  padding: 0.4rem 0.6rem; border-radius: 9px; font-size: 0.72rem; font-weight: 500; line-height: 1.3;
+  width: max-content; max-width: 220px; white-space: normal; text-align: center;
+  z-index: 200; box-shadow: 0 8px 24px rgba(0,0,0,0.45); pointer-events: none;
+}
+.tt[data-tt]:hover::before {
+  content: ''; position: absolute; bottom: calc(100% + 3px); left: 50%; transform: translateX(-50%);
+  border: 5px solid transparent; border-top-color: var(--border-2); z-index: 200; pointer-events: none;
+}
+/* Variante hacia abajo: para botones pegados al borde superior (no se recorta). */
+.tt--down[data-tt]:hover::after {
+  bottom: auto; top: calc(100% + 8px);
+}
+.tt--down[data-tt]:hover::before {
+  bottom: auto; top: calc(100% + 3px);
+  border-top-color: transparent; border-bottom-color: var(--border-2);
+}
+/* Alineadas a la derecha: para botones del extremo derecho (no se salen de pantalla). */
+.tt--right[data-tt]:hover::after { left: auto; right: 0; transform: none; }
+.tt--right[data-tt]:hover::before { left: auto; right: 12px; transform: none; }
 .btn--danger-ghost { background: transparent; border: 1px solid var(--border-2); color: var(--muted); }
 .btn--danger-ghost:hover { border-color: var(--danger); color: var(--danger); filter: none; }
 

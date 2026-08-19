@@ -13,13 +13,7 @@ export default async function ChatsPage() {
   return (
     <>
       <Nav slug={session.slug} role={session.role} />
-      <main className="shell shell--wide">
-        <div className="page-head" style={{ marginBottom: '.9rem' }}>
-          <div className="page-head__text">
-            <h1>Chats web</h1>
-            <p>Gestioná las conversaciones en curso y ejecutá acciones manuales.</p>
-          </div>
-        </div>
+      <main className="shell shell--wide" style={{ paddingTop: '.8rem' }}>
         <ChatsClient />
       </main>
     </>

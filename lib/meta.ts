@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { and, eq, gt, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { metaEvents, tenants } from '@/db/schema';
 import { decryptOptional } from '@/lib/crypto';
@@ -93,6 +93,22 @@ export interface CapiResult {
   eventId: string;
   eventName: string;
   body: unknown;
+}
+
+// Idempotencia CAPI: un event_id ya 'sent' no se reenvía (Meta también dedup).
+export async function eventExists(tenantId: string, eventId: string): Promise<boolean> {
+  const r = await db.query.metaEvents.findFirst({
+    where: and(eq(metaEvents.tenantId, tenantId), eq(metaEvents.eventId, eventId), eq(metaEvents.status, 'sent')),
+  });
+  return !!r;
+}
+
+export async function eventExistsAny(tenantId: string, eventIds: string[]): Promise<boolean> {
+  if (!eventIds.length) return false;
+  const r = await db.query.metaEvents.findFirst({
+    where: and(eq(metaEvents.tenantId, tenantId), inArray(metaEvents.eventId, eventIds), eq(metaEvents.status, 'sent')),
+  });
+  return !!r;
 }
 
 export async function sendCapiEvent(

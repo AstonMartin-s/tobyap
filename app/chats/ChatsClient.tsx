@@ -8,6 +8,8 @@ type Item = {
   name: string | null;
   username: string | null;
   archived: boolean;
+  unread: boolean;
+  blocked: boolean;
   step: string | null;
   kommoLeadId: number | null;
   campaign: string | null;
@@ -79,11 +81,17 @@ const timeAgo = (iso: string | null) => {
   return `hace ${Math.floor(s / 86400)} d`;
 };
 
+// Un chat está "activo" si no está archivado ni en un estado terminal (acreditado,
+// no cargó, cerrado). Los terminales NO cuentan para atención / no leídos.
+const isActive = (i: Item): boolean => !i.archived && i.step !== 'done' && i.step !== 'no_cargo' && i.step !== 'closed';
+// "Activos" (bandeja) = activo Y con actividad en los últimos 30 min. Si pasa ese
+// tiempo sin movimiento, sale de Activos (sigue en su etapa / Todos).
+const within30 = (iso: string | null): boolean => !!iso && (Date.now() - new Date(iso).getTime()) <= 30 * 60000;
+const isActivoReciente = (i: Item): boolean => isActive(i) && within30(i.updatedAt);
 // Predicado a nivel módulo (para detectar atención nueva en el poll).
 const itemNeedsAttention = (i: Item): boolean => {
-  if (i.archived) return false;
-  const review = (i.step === 'validando' || i.hasComprobante) && i.step !== 'done' && i.step !== 'closed';
-  return review || i.lastFrom === 'user';
+  if (!isActive(i)) return false;
+  return i.step === 'validando' || i.hasComprobante || i.unread;
 };
 
 export function ChatsClient() {
@@ -96,6 +104,33 @@ export function ChatsClient() {
   const [q, setQ] = useState('');
   const [kpiRange, setKpiRange] = useState<'hoy' | 'ayer' | 'siempre'>('hoy');
   const [stats, setStats] = useState<Array<{ step: string | null; createdAt: string | null }>>([]);
+  // Ancho de la lista (barra divisora arrastrable, estilo Black Dragon).
+  const [listW, setListW] = useState(380);
+  const listWRef = useRef(380);
+  const gridRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const v = Number((() => { try { return localStorage.getItem('chatListW') || ''; } catch { return ''; } })());
+    if (v >= 280 && v <= 600) { setListW(v); listWRef.current = v; }
+  }, []);
+  function startDrag(e: React.MouseEvent) {
+    e.preventDefault();
+    const move = (ev: MouseEvent) => {
+      const rect = gridRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const w = Math.max(280, Math.min(600, ev.clientX - rect.left));
+      listWRef.current = w; setListW(w);
+    };
+    const up = () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+      document.body.style.userSelect = '';
+      try { localStorage.setItem('chatListW', String(listWRef.current)); } catch { /* ignore */ }
+    };
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  }
+  function resetDrag() { setListW(380); listWRef.current = 380; try { localStorage.setItem('chatListW', '380'); } catch { /* ignore */ } }
   const [soundOn, setSoundOn] = useState(true);
   const soundRef = useRef(true);
   const prevAttn = useRef<Set<string> | null>(null);
@@ -146,6 +181,13 @@ export function ChatsClient() {
   }, []);
 
   useEffect(() => { loadList(); const t = setInterval(loadList, 8000); return () => clearInterval(t); }, [loadList]);
+  // Si llegamos desde el Embudo con ?s=<sessionKey>, abrimos ese chat.
+  useEffect(() => {
+    try {
+      const s = new URL(window.location.href).searchParams.get('s');
+      if (s) setSel(s);
+    } catch { /* ignore */ }
+  }, []);
   useEffect(() => { if (sel) loadDetail(sel); }, [sel, loadDetail]);
   useEffect(() => {
     if (!sel) return;
@@ -197,9 +239,9 @@ export function ChatsClient() {
   // "Revisar" = necesita acción del operador sobre una imagen: mandó comprobante
   // (o está en validando) y todavía NO está acreditado/cerrado. Así no se cuentan
   // los ya resueltos que conservan la imagen en el historial.
-  const needsReview = (i: Item) => !i.archived && (i.step === 'validando' || i.hasComprobante) && i.step !== 'done' && i.step !== 'closed';
-  const noLeido = (i: Item) => !i.archived && i.lastFrom === 'user';
-  // "Requiere atención" = comprobante por revisar O cliente esperando respuesta.
+  const needsReview = (i: Item) => isActive(i) && (i.step === 'validando' || i.hasComprobante);
+  const noLeido = (i: Item) => isActive(i) && i.unread;
+  // "Requiere atención" = comprobante por revisar O mensaje sin leer (solo activos).
   const needsAttention = (i: Item) => needsReview(i) || noLeido(i);
   const ql = q.trim().toLowerCase();
   const shown = items.filter((i) => {
@@ -211,7 +253,7 @@ export function ChatsClient() {
     if (i.archived) return false; // el resto de tabs oculta archivados
     if (filter === 'revisar') return needsReview(i);
     if (filter === 'no_leidos') return noLeido(i);
-    if (filter === 'activos') return i.step !== 'done' && i.step !== 'closed' && i.step !== 'no_cargo';
+    if (filter === 'activos') return isActivoReciente(i);
     if (filter === 'acreditados') return i.step === 'done';
     if (filter === 'no_cargo') return i.step === 'no_cargo';
     return true;
@@ -221,9 +263,10 @@ export function ChatsClient() {
     atencion: items.filter(needsAttention).length,
     revisar: items.filter(needsReview).length,
     noLeidos: items.filter(noLeido).length,
-    activos: items.filter((i) => !i.archived && i.step !== 'done' && i.step !== 'closed' && i.step !== 'no_cargo').length,
-    acreditados: items.filter((i) => !i.archived && i.step === 'done').length,
-    no_cargo: items.filter((i) => !i.archived && i.step === 'no_cargo').length,
+    activos: items.filter(isActivoReciente).length,
+    // Acreditados / No cargó: de la BASE COMPLETA (stats) para que coincidan con Kommo.
+    acreditados: stats.filter((s) => s.step === 'done').length,
+    no_cargo: stats.filter((s) => s.step === 'no_cargo').length,
     archivadas: items.filter((i) => i.archived).length,
   };
 
@@ -246,12 +289,22 @@ export function ChatsClient() {
     revisar: stats.filter((i) => i.step === 'validando').length,
     acreditados: doneRange,
     conv: rangeStats.length ? Math.round((100 * doneRange) / rangeStats.length) : 0,
-    sinLeer: items.filter((i) => i.lastFrom === 'user').length, // sin-leer: solo recientes (necesita mensajes)
+    sinLeer: items.filter((i) => isActive(i) && i.unread).length, // pendientes de responder (recientes)
   };
+  // Botón de acción plano (sin brillo violeta). filled = sólido de color.
+  const abtn = (color?: string, filled?: boolean): React.CSSProperties => ({
+    display: 'inline-flex', alignItems: 'center', gap: '.3rem',
+    padding: '.42rem .7rem', fontSize: '.8rem', fontWeight: 600, borderRadius: 8, cursor: 'pointer',
+    border: `1px solid ${filled ? (color || 'var(--accent)') : 'var(--border)'}`,
+    background: filled ? (color || 'var(--accent)') : 'transparent',
+    color: filled ? '#fff' : (color || 'var(--text)'),
+    whiteSpace: 'nowrap',
+  });
+
   const KPI = ({ label, value, color }: { label: string; value: string | number; color?: string }) => (
-    <div style={{ flex: '1 1 0', minWidth: 90, padding: '.55rem .7rem', border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card, rgba(255,255,255,.02))' }}>
-      <div style={{ fontSize: '1.25rem', fontWeight: 800, color: color ?? 'var(--text)', lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: '.7rem', color: 'var(--muted,#94a3b8)', marginTop: '.25rem', textTransform: 'uppercase', letterSpacing: '.02em' }}>{label}</div>
+    <div style={{ flex: '1 1 0', minWidth: 86, padding: '.5rem .7rem', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg-2, rgba(255,255,255,.015))' }}>
+      <div style={{ fontSize: '1.05rem', fontWeight: 700, color: color ?? 'var(--text)', lineHeight: 1.05 }}>{value}</div>
+      <div style={{ fontSize: '.62rem', color: 'var(--muted-2,#5d6478)', marginTop: '.28rem', textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
     </div>
   );
 
@@ -263,13 +316,23 @@ export function ChatsClient() {
       ))}
       <div style={{ marginLeft: 'auto', display: 'flex', gap: '.4rem', alignItems: 'center' }}>
         {counts.atencion > 0 && (
-          <button onClick={() => setFilter('no_leidos')} className="btn" style={{ padding: '.3rem .8rem', fontSize: '.8rem', background: '#f59e0b', borderColor: '#f59e0b', color: '#1b1200' }}
-            title="Chats que requieren atención (comprobante por revisar o cliente esperando)">⚠️ Atención ({counts.atencion})</button>
+          <button onClick={() => setFilter('revisar')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem', padding: '.32rem .7rem', fontSize: '.76rem', fontWeight: 700, border: '1px solid #e8883855', borderRadius: 8, background: '#e888381a', color: '#e8a050', cursor: 'pointer' }}
+            title="Chats que requieren atención (comprobante por revisar o cliente esperando)">
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#e88838', boxShadow: '0 0 6px #e88838' }} /> Atención · {counts.atencion}
+          </button>
         )}
-        <button onClick={toggleSound} className={`btn ${soundOn ? '' : 'btn--ghost'}`} style={{ padding: '.3rem .6rem', fontSize: '.9rem' }}
-          title={soundOn ? 'Sonido de atención: activado' : 'Sonido de atención: apagado'}>{soundOn ? '🔔' : '🔕'}</button>
-        <button onClick={exportDone} className="btn" style={{ padding: '.3rem .8rem', fontSize: '.8rem', background: '#16a34a', borderColor: '#16a34a' }}
-          title="Descargar CSV con usuario + teléfono de los acreditados (para cruzar con la base de cargas)">⬇ Descargar acreditados</button>
+        <button onClick={toggleSound} aria-label="Sonido de atención"
+          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 8, border: '1px solid var(--border)', background: soundOn ? 'var(--accent-soft)' : 'transparent', color: soundOn ? 'var(--accent)' : 'var(--muted)', cursor: 'pointer' }}
+          title={soundOn ? 'Sonido de atención: activado' : 'Sonido de atención: apagado'}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            {!soundOn && <line x1="3" y1="3" x2="21" y2="21" />}
+          </svg>
+        </button>
+        <button onClick={exportDone}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem', padding: '.32rem .7rem', fontSize: '.76rem', fontWeight: 600, border: '1px solid #16a34a55', borderRadius: 8, background: '#16a34a1a', color: '#4ade80', cursor: 'pointer' }}
+          title="Descargar CSV con usuario + teléfono de los acreditados">⬇ Acreditados</button>
       </div>
     </div>
     <div style={{ display: 'flex', gap: '.6rem', marginBottom: '.8rem', flexWrap: 'wrap' }}>
@@ -280,63 +343,77 @@ export function ChatsClient() {
       <KPI label={`Conversión ${kpiRange === 'siempre' ? '' : kpiRange}`.trim()} value={`${kpis.conv}%`} color="var(--accent, #7c5cff)" />
       <KPI label="Sin leer" value={kpis.sinLeer} color={kpis.sinLeer ? '#22c55e' : undefined} />
     </div>
-    <div style={{ display: 'grid', gridTemplateColumns: '400px minmax(0,1fr)', gap: '1rem', alignItems: 'stretch', height: 'calc(100vh - 210px)', minHeight: 560 }}>
+    <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: `${listW}px 10px minmax(0,1fr)`, alignItems: 'stretch', height: 'calc(100vh - 155px)', minHeight: 560 }}>
       {/* LISTA */}
       <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <div style={{ padding: '.7rem .7rem .3rem', flexShrink: 0 }}>
-          <input className="input" placeholder="🔍 Buscar por nombre, usuario, teléfono o campaña…" value={q}
-            onChange={(e) => setQ(e.target.value)} style={{ width: '100%', fontSize: '.85rem' }} />
+        <div style={{ padding: '.6rem .6rem .35rem', flexShrink: 0 }}>
+          <input className="input" placeholder="Buscar nombre, usuario, teléfono…" value={q}
+            onChange={(e) => setQ(e.target.value)} style={{ width: '100%', fontSize: '.8rem', padding: '.4rem .6rem' }} />
         </div>
-        <div style={{ display: 'flex', gap: '.35rem', padding: '.3rem .7rem .7rem', borderBottom: '1px solid var(--border)', flexShrink: 0, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '.3rem', padding: '0 .6rem .6rem', borderBottom: '1px solid var(--border)', flexShrink: 0, flexWrap: 'wrap' }}>
           {([
-            ['todos', 'Todos', null],
-            ['no_leidos', `📨 No leídos`, counts.noLeidos],
-            ['revisar', `🔎 Revisar`, counts.revisar],
-            ['activos', `Activos`, counts.activos],
-            ['acreditados', `✅ Acreditados`, counts.acreditados],
-            ['no_cargo', `🚫 No cargó`, counts.no_cargo],
-            ['archivadas', `🗂 Archivadas`, counts.archivadas],
-          ] as const).map(([f, label, n]) => (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`btn ${filter === f ? '' : 'btn--ghost'}`}
-              style={{ padding: '.32rem .6rem', fontSize: '.78rem' }}>
-              {label}{n ? ` (${n})` : ''}
-            </button>
-          ))}
+            ['todos', 'Todos', null, '#8b93a9'],
+            ['no_leidos', 'No leídos', counts.noLeidos, '#22c55e'],
+            ['revisar', 'Revisar', counts.revisar, '#f97316'],
+            ['activos', 'Activos', counts.activos, '#8b93a9'],
+            ['acreditados', 'Acreditados', counts.acreditados, '#22c55e'],
+            ['no_cargo', 'No cargó', counts.no_cargo, '#ef4444'],
+            ['archivadas', 'Archivadas', counts.archivadas, '#8b93a9'],
+          ] as const).map(([f, label, n, c]) => {
+            const on = filter === f;
+            return (
+              <button key={f} onClick={() => setFilter(f)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem', padding: '.28rem .55rem', fontSize: '.72rem', fontWeight: on ? 700 : 500, borderRadius: 7, cursor: 'pointer', border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`, background: on ? 'var(--accent-soft)' : 'transparent', color: on ? 'var(--accent)' : 'var(--muted)' }}>
+                {label}{n ? <span style={{ fontWeight: 700, color: on ? 'var(--accent)' : c }}>{n}</span> : ''}
+              </button>
+            );
+          })}
         </div>
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
           {shown.length === 0 && <div className="empty" style={{ padding: '2rem' }}>Sin chats.</div>}
           {shown.map((i) => {
             const si = stepInfo(i.step);
+            const selected = sel === i.sessionKey;
+            const attn = needsAttention(i);
+            const edge = selected ? 'var(--accent)' : attn ? '#e88838' : 'transparent';
             return (
               <button key={i.sessionKey} onClick={() => setSel(i.sessionKey)}
                 style={{
-                  display: 'block', width: '100%', textAlign: 'left', padding: '.7rem .85rem',
-                  border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer',
-                  background: sel === i.sessionKey ? 'var(--bg-2, rgba(120,120,120,.12))' : 'transparent',
+                  display: 'block', width: '100%', textAlign: 'left', padding: '.55rem .7rem .55rem calc(.7rem - 3px)',
+                  border: 'none', borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${edge}`, cursor: 'pointer',
+                  background: selected ? 'var(--accent-soft)' : attn ? 'rgba(232,136,56,.07)' : 'transparent',
                 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '.4rem', minWidth: 0 }}>
-                    {i.lastFrom === 'user' && <span title="Mensaje nuevo del cliente" style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', flexShrink: 0, boxShadow: '0 0 0 2px rgba(34,197,94,.25)' }} />}
-                    <strong style={{ fontSize: '.92rem', fontWeight: i.lastFrom === 'user' ? 800 : 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{i.name || i.phone || 'Sin nombre'}</strong>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '.35rem', minWidth: 0 }}>
+                    {attn && <span title="Requiere atención" style={{ width: 7, height: 7, borderRadius: '50%', background: '#e88838', flexShrink: 0 }} />}
+                    <strong style={{ fontSize: '.85rem', fontWeight: attn ? 750 : 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{i.name || i.phone || 'Sin nombre'}</strong>
+                    {i.username && <span title="Usuario del portal" style={{ fontSize: '.7rem', fontWeight: 600, color: 'var(--accent)', whiteSpace: 'nowrap' }}>@{i.username}</span>}
                   </span>
-                  <span style={{ fontSize: '.7rem', color: 'var(--muted, #94a3b8)', flexShrink: 0 }}>{timeAgo(i.updatedAt)}</span>
+                  <span style={{ fontSize: '.66rem', color: 'var(--muted-2, #5d6478)', flexShrink: 0 }}>{timeAgo(i.updatedAt)}</span>
                 </div>
-                <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', margin: '.3rem 0' }}>
-                  <span style={{ fontSize: '.68rem', fontWeight: 700, color: '#fff', background: si.color, padding: '.1rem .45rem', borderRadius: 20 }}>{si.label}</span>
+                <div style={{ display: 'flex', gap: '.35rem', alignItems: 'center', margin: '.28rem 0' }}>
+                  <span style={{ fontSize: '.62rem', fontWeight: 700, color: '#fff', background: si.color, padding: '.05rem .4rem', borderRadius: 5 }}>{si.label}</span>
                   {i.hasComprobante && i.step !== 'done' && i.step !== 'closed' && (
-                    <span title="Envió comprobante — requiere revisión" style={{ fontSize: '.66rem', fontWeight: 700, color: '#fff', background: '#16a34a', padding: '.1rem .45rem', borderRadius: 20 }}>🧾 Comprobante</span>
+                    <span title="Envió comprobante — requiere revisión" style={{ fontSize: '.6rem', fontWeight: 700, color: '#4ade80' }}>🧾 comprob.</span>
                   )}
-                  {i.username && <span title="Usuario del portal" style={{ fontSize: '.68rem', fontWeight: 700, color: 'var(--accent,#7c5cff)' }}>@{i.username}</span>}
-                  {i.campaign && <span style={{ fontSize: '.68rem', color: 'var(--muted,#94a3b8)' }}>{i.campaign}</span>}
+                  {i.blocked && <span title="Bloqueado" style={{ fontSize: '.6rem', fontWeight: 700, color: '#fff', background: '#b91c1c', padding: '.05rem .4rem', borderRadius: 5 }}>🚫 Bloqueado</span>}
+                  {i.campaign && <span style={{ fontSize: '.62rem', color: 'var(--muted-2,#5d6478)' }}>{i.campaign}</span>}
                 </div>
-                <div style={{ fontSize: '.78rem', color: 'var(--muted,#94a3b8)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: '.72rem', color: i.unread && isActive(i) ? 'var(--text)' : 'var(--muted,#8b93a9)', fontWeight: i.unread && isActive(i) ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {i.lastFrom === 'user' ? '👤 ' : ''}{i.lastText}
                 </div>
               </button>
             );
           })}
         </div>
+      </div>
+
+      {/* BARRA DIVISORA arrastrable */}
+      <div onMouseDown={startDrag} onDoubleClick={resetDrag} title="Arrastrar para ajustar · doble clic para restablecer"
+        style={{ cursor: 'col-resize', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: 3, height: 46, borderRadius: 3, background: 'var(--border-2)', transition: 'background .15s' }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--accent)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--border-2)')} />
       </div>
 
       {/* DETALLE */}
@@ -371,6 +448,16 @@ export function ChatsClient() {
                     title="Copiar teléfono" style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', color: 'var(--muted,#94a3b8)', fontSize: '.7rem', padding: '.05rem .35rem' }}>⧉ copiar</button>
                 )}
                 <span>{detail.kommoLeadId ? `· Kommo #${detail.kommoLeadId}` : '· sin lead Kommo'}</span>
+                {(() => {
+                  const blk = items.find((i) => i.sessionKey === sel)?.blocked;
+                  return (
+                    <button className="tt tt--down tt--right" data-tt={blk ? 'Podrá volver a escribir' : 'No podrá seguir en el chat; se archiva'} disabled={busy}
+                      onClick={() => act(blk ? 'unblock' : 'block')}
+                      style={{ marginLeft: '.3rem', background: blk ? '#ef4444' : 'transparent', border: `1px solid ${blk ? '#ef4444' : '#b91c1c'}`, color: blk ? '#fff' : '#f87171', borderRadius: 6, cursor: 'pointer', fontSize: '.7rem', fontWeight: 600, padding: '.1rem .45rem' }}>
+                      {blk ? '🔓 Desbloquear' : '🚫 Bloquear'}
+                    </button>
+                  );
+                })()}
               </div>
             </div>
 
@@ -404,37 +491,34 @@ export function ChatsClient() {
             </div>
 
             {/* ACCIONES */}
-            <div style={{ borderTop: '1px solid var(--border)', padding: '.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '.55rem', background: 'var(--card, rgba(255,255,255,.02))', flexShrink: 0 }}>
-              <div style={{ fontSize: '.7rem', fontWeight: 700, color: 'var(--muted,#94a3b8)', textTransform: 'uppercase', letterSpacing: '.03em' }}>Comprobante</div>
-              <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
-                <button disabled={busy} onClick={() => act('approve')} className="btn" style={{ background: '#22c55e', borderColor: '#22c55e' }}>✅ Aprobar</button>
-                <button disabled={busy} onClick={() => act('pending')} className="btn btn--ghost">⏳ Pendiente</button>
-                <button disabled={busy} onClick={() => act('reject')} className="btn btn--ghost" style={{ color: '#ef4444' }}>⚠️ Erróneo</button>
-                <button disabled={busy} onClick={() => act('set_step', undefined, 'no_cargo')} className="btn btn--ghost" style={{ color: '#ef4444', borderColor: '#ef4444' }}>🚫 No cargó</button>
-              </div>
-              <div style={{ fontSize: '.7rem', fontWeight: 700, color: 'var(--muted,#94a3b8)', textTransform: 'uppercase', letterSpacing: '.03em', marginTop: '.2rem' }}>Entregar en el chat</div>
-              <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
-                <button disabled={busy} onClick={() => act('support')} className="btn btn--ghost">🙋 Soporte (walink)</button>
-                <button disabled={busy} onClick={() => act('deposit')} className="btn btn--ghost">💰 Cargar</button>
-                <button disabled={busy} onClick={() => act('withdraw')} className="btn btn--ghost">💸 Retirar</button>
-                <button disabled={busy} onClick={() => act('forgot_user')} className="btn btn--ghost">🔐 Reenviar datos</button>
-              </div>
-              <div style={{ display: 'flex', gap: '.4rem', marginTop: '.2rem', alignItems: 'center' }}>
-                {(() => {
-                  const cur = items.find((i) => i.sessionKey === sel);
-                  const isArch = cur?.archived;
-                  return (
-                    <button disabled={busy} onClick={() => act(isArch ? 'unarchive' : 'archive')} className="btn btn--ghost" style={{ fontSize: '.82rem' }}
-                      title={isArch ? 'Desarchivar' : 'Archivar (se reabre solo si el cliente escribe)'}>{isArch ? '📤 Desarchivar' : '🗂 Archivar'}</button>
-                  );
-                })()}
-              </div>
-              <div style={{ display: 'flex', gap: '.4rem', marginTop: '.2rem' }}>
+            <div style={{ borderTop: '1px solid var(--border)', padding: '.7rem .9rem', display: 'flex', flexDirection: 'column', gap: '.5rem', background: 'var(--bg-2, rgba(255,255,255,.012))', flexShrink: 0 }}>
+              {(() => {
+                const cur = items.find((i) => i.sessionKey === sel);
+                const isArch = cur?.archived;
+                return (
+                  <>
+                    <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span style={{ fontSize: '.6rem', fontWeight: 700, color: 'var(--muted-2,#5d6478)', textTransform: 'uppercase', letterSpacing: '.04em', marginRight: '.15rem' }}>Comprob.</span>
+                      <button className="tt" data-tt="Comprobante válido → acredita y pasa a Cargo$ (dispara la conversión a Meta)" disabled={busy} onClick={() => act('approve')} style={abtn('#16a34a', true)}>✅ Aprobar</button>
+                      <button className="tt" data-tt="En revisión — le avisa que estamos validando" disabled={busy} onClick={() => act('pending')} style={abtn()}>⏳ Pendiente</button>
+                      <button className="tt" data-tt="Comprobante ilegible/incompleto — le pide reenviarlo" disabled={busy} onClick={() => act('reject')} style={abtn('#ef4444')}>⚠️ Erróneo</button>
+                      <button className="tt" data-tt="No depositó — lo pasa a No Cargo (sale de atención)" disabled={busy} onClick={() => act('set_step', undefined, 'no_cargo')} style={abtn('#ef4444')}>🚫 No cargó</button>
+                      <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 .1rem' }} />
+                      <button className="tt" data-tt="Le pasa el WhatsApp de soporte (walink)" disabled={busy} onClick={() => act('support')} style={abtn()}>🙋 Soporte</button>
+                      <button className="tt" data-tt="Le manda cómo cargar saldo" disabled={busy} onClick={() => act('deposit')} style={abtn()}>💰 Cargar</button>
+                      <button className="tt" data-tt="Le manda cómo retirar" disabled={busy} onClick={() => act('withdraw')} style={abtn()}>💸 Retirar</button>
+                      <button className="tt" data-tt="Le reenvía usuario y contraseña" disabled={busy} onClick={() => act('forgot_user')} style={abtn()}>🔐 Datos</button>
+                      <button className="tt" data-tt={isArch ? 'Volver a la bandeja' : 'Sacar de la bandeja; vuelve solo si el cliente escribe'} disabled={busy} onClick={() => act(isArch ? 'unarchive' : 'archive')} style={abtn()}>{isArch ? '📤 Desarch.' : '🗂 Archivar'}</button>
+                    </div>
+                  </>
+                );
+              })()}
+              <div style={{ display: 'flex', gap: '.4rem', marginTop: '.1rem' }}>
                 <input className="input" placeholder="Mensaje libre al cliente…" value={custom}
                   onChange={(e) => setCustom(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && custom.trim()) { act('custom', custom); setCustom(''); } }}
-                  style={{ flex: 1 }} />
-                <button disabled={busy || !custom.trim()} onClick={() => { act('custom', custom); setCustom(''); }} className="btn">Enviar</button>
+                  style={{ flex: 1, padding: '.5rem .7rem', fontSize: '.85rem' }} />
+                <button disabled={busy || !custom.trim()} onClick={() => { act('custom', custom); setCustom(''); }} style={abtn('var(--accent)', true)}>Enviar</button>
               </div>
             </div>
           </>

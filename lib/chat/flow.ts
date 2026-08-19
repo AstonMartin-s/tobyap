@@ -121,7 +121,7 @@ export function comprobantePendingMessages(): BotMsg[] {
 
 export function comprobanteRejectedMessages(): BotMsg[] {
   return [
-    { from: 'bot', delayMs: 500, at: now(), text: '⚠️ No pudimos validar el comprobante que enviaste. Revisá que se vea *completo y legible* (fecha, importe y destino) y reenvialo por acá 📸' },
+    { from: 'bot', delayMs: 500, at: now(), text: '⚠️ No pudimos validar el comprobante. Reenvialo por acá 📸 pero que se vea *completo y legible*:\n\n• *Nombre de quien envía* (titular de la cuenta)\n• *Nombre de quien recibe* (destinatario)\n• *Fecha* e *importe*\n\nAsí lo acreditamos al toque 🎁' },
   ];
 }
 
@@ -169,11 +169,30 @@ export function postActionMessages(action: string, data: Record<string, unknown>
   }
 }
 
-export function onFreeText(step: string): BotMsg[] {
+// Detecta si el cliente está pidiendo ayuda / confundido / consulta que el flujo
+// no resuelve → lo mandamos directo al soporte de WhatsApp.
+const HELP_RE = /(ayuda|no entiendo|no comprendo|no puedo|no me (anda|funciona|sale)|problema|c[oó]mo hago|como funciona|no s[eé]|duda|consulta|hablar con|una persona|un humano|asesor|operador|reclamo|estafa|no me lleg|error)/i;
+function supportReply(): BotMsg[] {
+  return [{ from: 'bot', delayMs: 600, at: now(), text: `🙋 Para ayudarte mejor, escribinos por WhatsApp y te atendemos al toque, 24hs 👇\n${SUPPORT_URL}` }];
+}
+
+// Palabras que indican un problema real (no solo confusión con el paso de la
+// app) — esas SÍ van directo a soporte incluso durante app_onboarding.
+const REAL_ISSUE_RE = /(problema|reclamo|estafa|error|no me lleg|no anda|no funciona)/i;
+
+export function onFreeText(step: string, text?: string): BotMsg[] {
+  // Confusión con "la app" durante el gate: la causa más común de que alguien se
+  // quede trabado es no entender qué es "instalar la app" (PWA). En vez de
+  // mandarlo a WhatsApp (fricción extra), le damos la salida DENTRO del chat:
+  // puede saltear el paso y mandar el comprobante igual.
+  if (step === 'app_onboarding' && !(text && REAL_ISSUE_RE.test(text))) {
+    return [{ from: 'bot', delayMs: 600, at: now(), text: '📲 No hace falta instalar nada ahora, es opcional. Tocá *"Enviar mi comprobante"* ahí abajo y seguimos con tu acreditación 🎁' }];
+  }
+  // Si pide ayuda en cualquier paso → soporte (no lo dejamos dando vueltas).
+  if (text && HELP_RE.test(text)) return supportReply();
   if (step === 'welcome') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Tocá el botón *Quiero mi cuenta 🎁* para empezar 👇' }];
   if (step === 'credenciales') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Cuando quieras cargar, tocá *Quiero el CBU 💳* 👇' }];
   if (step === 'comprobante') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Cuando tengas el comprobante de la transferencia, mandámelo por acá 📸' }];
-  // Regla: NUNCA dejar al cliente sin una salida. Cualquier texto libre para el que
-  // no tengamos respuesta scripteada siempre ofrece un camino (soporte por WhatsApp).
-  return [{ from: 'bot', delayMs: 700, at: now(), text: `Te leemos 🙌 Para ayudarte al toque, escribinos por WhatsApp y te respondemos ya 👇\n${SUPPORT_URL}` }];
+  // Fallback: nunca dejar al cliente sin salida → soporte.
+  return supportReply();
 }

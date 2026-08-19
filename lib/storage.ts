@@ -39,6 +39,18 @@ export async function saveComprobante(sessionKey: string, buf: Buffer, mime: str
   return rel;
 }
 
+// Borra un comprobante del disco por su ruta relativa (limpieza a las 48h).
+export async function deleteComprobante(rel: string): Promise<void> {
+  if (!storageEnabled() || !rel) return;
+  try {
+    const full = path.resolve(DIR, rel);
+    if (!full.startsWith(path.resolve(DIR))) return;
+    await fs.unlink(full);
+  } catch {
+    /* ya no existe / best-effort */
+  }
+}
+
 // Lee un comprobante por su ruta relativa. Null si no existe / storage off.
 export async function readComprobante(rel: string): Promise<Buffer | null> {
   if (!storageEnabled() || !rel) return null;

@@ -26,6 +26,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const [s] = await db.select().from(chatSessions).where(and(eq(chatSessions.tenantId, tenant.id), eq(chatSessions.sessionKey, sessionKey)));
   if (!s) return NextResponse.json({ error: 'sesión desconocida' }, { status: 404 });
+  if ((s.data as Record<string, unknown> | null)?.blocked) return NextResponse.json({ ok: true, messages: [], blocked: true });
 
   const buf = Buffer.from(await file.arrayBuffer());
   const mime = file.type || 'image/jpeg';
@@ -47,10 +48,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     data: {
       ...(s.data ?? {}),
       archived: false, // mandó comprobante → activo, se reabre si estaba archivado
+      unread: true, // comprobante nuevo → pendiente de revisar
       // En disco: guardamos la ruta y NADA de base64 (DB liviana). En fallback: base64.
       ...(storedPath ? { comprobantePath: storedPath, comprobante: undefined } : { comprobante: buf.toString('base64') }),
       comprobanteMime: mime,
       comprobanteName: file.name,
+      comprobanteAt: Date.now(), // para la limpieza automática a las 48h
     },
     updatedAt: new Date(),
   }).where(eq(chatSessions.id, s.id));

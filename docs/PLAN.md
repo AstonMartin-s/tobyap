@@ -1,8 +1,13 @@
 # TOBYAP — Plan de desarrollo (sistema propio de tracking)
 
-> Objetivo del MVP: **trackear conversaciones y clientes convertidos desde Kommo y
-> enviarlos a Meta (Pixel + Conversions API) con deduplicación por `event_id`.**
-> Stack: **Next.js (App Router) + Vercel + Postgres**. Compra (`CargoCRM`) se marca **manual**.
+> **Prod (2026-08):** Railway `tobyap-production.up.railway.app` (ya no Vercel).
+> Objetivo: tracking Meta (Pixel + CAPI) + chat Adaptador B + panel ops para
+> clientes tipo Kommo+empleados. **No** automatiza dinero (GATE/PAM); operario humano siempre.
+> `CargoCRM` se dispara por bot CARGO (`/api/conversion-event`), webhook etapa Cargo$,
+> panel `/api/convert` y `lib/cargo/emit.ts` (Fase 1, incl. panel approve).
+>
+> Plan vivo: `docs/00_PLAN_MEJORAS_2026-08-19.md` · bitácora: `docs/00_CONTEXTO_MAESTRO.md`.
+> Este archivo queda como diseño histórico del MVP; no es la fuente de verdad operativa.
 
 ---
 
