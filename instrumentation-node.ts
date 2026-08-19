@@ -7,6 +7,16 @@ import { autoCloseStale } from '@/lib/chat/autoclose';
 import { purgeDeadNoCargo } from '@/lib/chat/purge';
 import { cleanupOldComprobantes } from '@/lib/chat/cleanupComprobantes';
 
+if (process.env.NODE_ENV === 'production' && !process.env.RESOLVE_API_KEY) {
+  console.warn('[boot] RESOLVE_API_KEY ausente en prod (Fase 2.1). No se falla el boot hasta REQUIRE_RESOLVE_API_KEY=1.');
+}
+if (process.env.REQUIRE_RESOLVE_API_KEY === '1' && !process.env.RESOLVE_API_KEY) {
+  throw new Error('RESOLVE_API_KEY requerida (REQUIRE_RESOLVE_API_KEY=1)');
+}
+if (process.env.NODE_ENV === 'production' && !process.env.CRON_SECRET) {
+  console.warn('[boot] CRON_SECRET ausente en prod (Fase 2.5). El in-process retry sigue; /api/cron/retry queda abierto.');
+}
+
 if (process.env.DISABLE_RETRY_SCHEDULER !== '1') {
   const everyMs = Number(process.env.RETRY_INTERVAL_MS ?? 10 * 60_000); // 10 min
 

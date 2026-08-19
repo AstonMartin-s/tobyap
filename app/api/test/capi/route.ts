@@ -6,6 +6,9 @@ import { sendCapiEvent } from '@/lib/meta';
 // Manda un evento de prueba a Meta para validar contra Events Manager.
 // Si META_TEST_EVENT_CODE está en .env, aparece en "Eventos de prueba".
 export async function POST(req: NextRequest) {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_TEST_CAPI !== '1') {
+    return NextResponse.json({ error: 'no encontrado' }, { status: 404 });
+  }
   const slug = new URL(req.url).searchParams.get('tenant');
   if (!slug) return NextResponse.json({ error: 'tenant requerido' }, { status: 400 });
 

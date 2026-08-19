@@ -21,6 +21,12 @@ const I = {
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
   ),
+  live: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  ),
   funnel: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 4h18l-7 8v6l-4 2v-8z" />
@@ -122,6 +128,7 @@ export function Nav({ slug, role = 'client' }: { slug: string; role?: string }) 
             {NavLink('/reportes', 'Reportes', I.report)}
             {NavLink('/chats', 'Chats web', I.chat)}
             {NavLink('/embudo', 'Embudo', I.funnel)}
+            {NavLink('/livechat', 'Livechat', I.live)}
             {NavLink('/config', 'Configuración', I.config)}
           </>
         )}

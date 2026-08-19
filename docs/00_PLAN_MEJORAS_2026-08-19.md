@@ -8,13 +8,13 @@
 
 ## División de instancias (PTM)
 
-| Instancia | Carpeta | Tag | Responsabilidad |
-|-----------|---------|-----|-----------------|
-| **Cursor TOBYAP** (nueva) | `~/Projects/TOBYAP/tobyap` | `[TOB]` | Auditoría, hardening, `emitCargo`, CI/smokes, índices, retención, docs maestro, backend |
-| **Claude TOBYAP** (existente) | misma carpeta / clone según convención equipo | `[TOB]` | Correcciones de clientes, front/panel, copy, ajustes diarios, temas “blandos” |
-| **CRM Main** | `~/Projects/CRM` | `[CRM]` | Consume `/api/v1/resolve` — avisar cambios de contrato |
+| Instancia | Carpeta | Rama | Tag | Responsabilidad |
+|-----------|---------|------|-----|-----------------|
+| **Cursor TOBYAP** | `~/Projects/TOBYAP/tobyap-cursor` (worktree) | `feat/tob/*` | `[TOB]` | Auditoría, hardening, `emitCargo`, CI/smokes, índices, retención, docs maestro, backend |
+| **Claude TOBYAP** | `~/Projects/TOBYAP/tobyap` | `main` | `[TOB]` | Correcciones de clientes, front/panel, copy, ajustes diarios, temas “blandos” |
+| Consumidor resolve | otro programa (orquesta Aston) | — | — | Llama `/api/v1/resolve`. **No es carpeta de Cursor TOBYAP.** |
 
-**Protocolo:** rama `main` protegida en prod. Cursor TOBYAP abre PR o commit en rama `feat/tob/*` → review → merge → deploy Railway manual con checklist.
+**Protocolo (confirmado MSG-TOB-20260819-2):** no compartir working tree. Claude commitea en `main` de `tobyap`. Cursor commitea en `feat/tob/*` del worktree `tobyap-cursor`. Merge a `main` = paso explícito + review. Un deploy por fase. Nunca `git add -A` en la carpeta del otro.
 
 ---
 
@@ -93,7 +93,7 @@ lib/cargo/emit.ts
 | 2.6 | Comprobante `/file`: token HMAC corta vida | URLs viejas en Kommo siguen con sessionKey 14 días |
 | 2.7 | Rate limit básico en `track/redirect` y `chat/start` | Por IP, soft 429 |
 
-**Coordinación CRM:** avisar R1 a CRM Main antes de 2.1 y 2.2 (contrato resolve).
+**Coordinación resolve:** Aston avisa al consumidor antes de 2.1 y 2.2. Cursor TOBYAP no trabaja ese repo.
 
 ---
 

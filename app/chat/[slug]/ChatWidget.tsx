@@ -25,7 +25,7 @@ function renderText(text: string) {
   });
 }
 
-export default function ChatWidget({ slug, token, campaign, ccpp, brand }: { slug: string; token: string; campaign: string; ccpp: string; brand: string }) {
+export default function ChatWidget({ slug, token, campaign, ccpp, brand, primaryColor, avatarUrl }: { slug: string; token: string; campaign: string; ccpp: string; brand: string; primaryColor?: string; avatarUrl?: string | null }) {
   const [phase, setPhase] = useState<'form' | 'chat'>('form');
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
@@ -156,7 +156,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand }: { slu
           if (d.step) setStep(d.step);
           if ('Notification' in window && Notification.permission === 'granted') {
             const body = d.step === 'done' ? '✅ ¡Tu carga fue acreditada con éxito!' : (fresh[fresh.length - 1]?.text?.slice(0, 90) ?? 'Tenés un mensaje nuevo 🎁');
-            try { new Notification('King 🎰', { body }); } catch { /* sin permiso */ }
+            try { new Notification(`${brand} 🎰`, { body }); } catch { /* sin permiso */ }
           }
         }
       } catch { /* siguiente intento */ }
@@ -296,7 +296,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand }: { slu
       const p = await Notification.requestPermission(); // ← dispara el diálogo real
       if (p === 'granted') {
         setAppNotif(true);
-        try { new Notification('King 🎰', { body: '¡Notificaciones activadas! Te avisamos de tus bonos.' }); } catch {}
+        try { new Notification(`${brand} 🎰`, { body: '¡Notificaciones activadas! Te avisamos de tus bonos.' }); } catch {}
         setMsgs((x) => [...x, { from: 'bot', text: '✓ ¡Notificaciones activadas! 🔔 Vas a recibir tus bonos y avisos al instante.' }]);
       } else {
         // No concedido: no marcamos el paso, lo tiene que aceptar.
@@ -328,7 +328,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand }: { slu
       setIosGuided(true);
       setMsgs((p) => [
         ...p,
-        { from: 'bot', text: '📲 *Guardá King en tu iPhone (30 seg):*' },
+        { from: 'bot', text: `📲 *Guardá ${brand} en tu iPhone (30 seg):*` },
         { from: 'bot', image: '/ios-install-guide.svg' },
         { from: 'bot', text: '1️⃣ Tocá el botón *Compartir* (el cuadradito con la flecha ↑, abajo en el centro).\n2️⃣ Deslizá y elegí *"Agregar a inicio"*.\n3️⃣ Tocá *"Agregar"* arriba a la derecha.\n\nCuando lo hagas, tocá *"Ya la agregué"* acá abajo 👇' },
       ]);
@@ -350,12 +350,18 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand }: { slu
     navigator.clipboard?.writeText(value).then(() => { setCopied(value); setTimeout(() => setCopied(null), 1600); }).catch(() => {});
   }
 
+  const header = primaryColor || C.header;
   const initial = (brand || 'K').charAt(0).toUpperCase();
 
   return (
     <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif', background: C.bg }}>
-      <div style={{ background: C.header, color: '#fff', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 1px 3px rgba(0,0,0,.2)' }}>
-        <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#25D366', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 18 }}>{initial}</div>
+      <div style={{ background: header, color: '#fff', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 1px 3px rgba(0,0,0,.2)' }}>
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={avatarUrl} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', background: '#25D366' }} />
+        ) : (
+          <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#25D366', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 18 }}>{initial}</div>
+        )}
         <div style={{ lineHeight: 1.15 }}>
           <div style={{ fontWeight: 600, fontSize: 16 }}>{brand}</div>
           <div style={{ fontSize: 12, opacity: 0.85 }}>{typing ? 'escribiendo…' : 'en línea'}</div>

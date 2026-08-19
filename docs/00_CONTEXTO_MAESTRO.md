@@ -8,18 +8,19 @@
 
 ## Instancias (PTM)
 
-| Instancia | Responsabilidad | No pisar |
-|-----------|-----------------|----------|
-| **Cursor TOBYAP** `[TOB]` (esta) | hardening, `emitCargo`, CI/smokes, índices, retención `lead_summary`, docs maestro, backend | front/panel/copy de Claude |
-| **Claude TOBYAP** `[TOB]` | correcciones clientes, front/panel, copy, ajustes diarios | `lib/cargo/**`, CI, resolve auth |
-| **CRM Main** `[CRM]` | consume `GET /api/v1/resolve` | avisar R1 antes de cambiar auth/tenant |
+| Instancia | Carpeta | Rama | Responsabilidad | No pisar |
+|-----------|---------|------|-----------------|----------|
+| **Cursor TOBYAP** `[TOB]` (esta) | `~/Projects/TOBYAP/tobyap-cursor` | `feat/tob/*` | hardening, `emitCargo`, CI/smokes, índices, retención `lead_summary`, docs maestro, backend | front/panel/copy de Claude; **no abre otros repos** |
+| **Claude TOBYAP** `[TOB]` | `~/Projects/TOBYAP/tobyap` | `main` | correcciones clientes, front/panel, copy, ajustes diarios | `lib/cargo/**`, CI, resolve auth |
+| Consumidor resolve | — (otro programa) | — | llama `GET /api/v1/resolve` | esta instancia **no** trabaja esa carpeta ni ese repo |
 
-**Rama:** `feat/tob/*` → review → merge `main` → deploy Railway manual. Un deploy por fase.
-**WIP ajeno (2026-08-19):** Claude tiene cambios locales en chat/panel (`ChatsClient`, `Nav`, `embudo`, `purge`, `flow`, `panel/chats` GET unread/block). Cursor no revierte esos diffs.
+**Esta instancia = solo `tobyap-cursor`.** CRM sirvió para orquestar el plan (Aston); no es workspace ni destino de R1 emitido desde acá. Si hay que avisar un cambio de contrato resolve, se lo pasa a Aston y Aston habla con CRM Main.
+
+**Protocolo (MSG-TOB-20260819-2, confirmado):** worktree separado. Cursor nunca hace checkout en `tobyap/` (eso le cambia el árbol a Claude). Claude no `git add -A` sobre archivos de Cursor. Merge `feat/tob/*` → `main` es explícito + review. Un deploy por fase.
 
 ## Contrato aguas abajo
 
-- **CRM Main** → `GET /api/v1/resolve` (`RESOLVE_API_KEY`, filtro `?client=`). Fase 2.1/2.2 = R1 a CRM **antes** de endurecer.
+- **Resolve** (`GET /api/v1/resolve`): superficie que consume otro programa. Endurecer auth/tenant (`REQUIRE_RESOLVE_*`) = Aston avisa al consumidor **antes**. Esta instancia no edita ni abre ese repo.
 - **Pagoda:** solo `create-portal-account`. No ampliar.
 - **Kommo:** webhook + bots CARGO/CBU. `webhook_secret` es opt-in (Fase 2.3).
 
@@ -35,20 +36,57 @@
   - Bot CARGO **no** mueve el lead a Cargo$ (el bot sigue a Clientes regulares). `skipKommoStatus` en webhook/bot/convert.
 - Overlap Claude: `app/api/panel/chats/route.ts` — solo se agregó el call `emitCargo` en `approve`; no se tocó unread/block/archive.
 - `npm run typecheck` verde.
-- **No deploy todavía.** Falta smoke King + Events Manager (criterio de cierre Fase 1).
+- **Mezcla (MSG-TOB-20260819-2):** Claude pusheó `5a7f704` a `origin/main` con `git add -A` y se llevó Fase 1 (`lib/cargo/emit.ts` + webhook/convert/panel approve) junto con front/embudo. Prod sync. El bug de approve→CAPI quedó resuelto en main. Viola “un deploy por fase” en el historial, no en runtime.
 - **No se tocó** `/api/v1/resolve`.
+
+### 2026-08-19 — Protocolo de carpetas (respuesta MSG-TOB-20260819-2)
+
+- **Confirmado.** Ramas distintas en la misma carpeta no bastan: un `checkout` mueve el working tree del otro.
+- Worktree Cursor: `~/Projects/TOBYAP/tobyap-cursor` en `feat/tob/hardening` (parte de `origin/main` @ `5a7f704`). `.env` symlink al de `tobyap/` (no se copia ni se commitea).
+- Claude sigue en `~/Projects/TOBYAP/tobyap` / `main`.
+- Fase 1 ya está en `main`; no se reabre `feat/tob/emitCargo`. Siguiente trabajo Cursor = Fase 2 en `feat/tob/hardening` (o rama nueva `feat/tob/<fase>`).
+
+### 2026-08-19 — Loop deploy Claude (MSG-TOB-20260819-2 cierre)
+
+- Claude deploya con `railway up` desde `tobyap/` (working tree local, no CI). **Pull de `main` antes de cada deploy.**
+- Cursor **avisa** cuando mergea `feat/tob/*` → `main` (Fase 2+).
+- Overlap: si Claude toca `app/api/panel`, `lib/meta`, `lib/chat/release` o webhooks → R1 antes de mergear. Cursor toca webhooks/`upload`/`file`/`resolve` en esta rama: el merge avisado es el R1 inverso.
+
+### 2026-08-19 — Fase 2 hardening opt-in (rama `feat/tob/hardening`, NO mergeada)
+
+- 2.4 `/api/test/capi` → 404 en production (`ALLOW_TEST_CAPI=1` emergencia).
+- 2.5 `CRON_SECRET`: si está seteado sigue exigiendo header; prod sin secret = warning. Cierre: `REQUIRE_CRON_SECRET=1`.
+- 2.3 `KOMMO_WEBHOOK_SECRET_<SLUG>` opt-in + `?secret=` (GET Kommo sigue abierto). Mismo gate en conversion-event.
+- 2.6 HMAC en notas Kommo; sessionKey solo 14 días; panel autenticado siempre.
+- 2.7 rate limit `track/redirect` (60/min IP) y `chat/start` (20/min IP). `RATE_LIMIT=0` apaga.
+- 2.1/2.2 **no exigidos.** Warning en boot/logs. Si el caller manda `?client=` se filtra; si no, el comportamiento sigue igual. Flags `REQUIRE_RESOLVE_API_KEY` / `REQUIRE_RESOLVE_CLIENT` default 0. Prenderlos = Aston coordina con el consumidor; no se toca otro repo desde acá.
+
+### 2026-08-19 — Fase 3 arranque: smoke de cableado (sin deploy)
+
+- `scripts/smoke-wiring.ts` + `npm run smoke` (= typecheck + smoke:wiring). Lógica **pura**, no toca DB/prod/Meta.
+- Cubre: `cargoEventId` (idempotencia lead/sesión), token HMAC del comprobante (firma/verifica/expira/legacy), rate limit (límite + kill switch).
+- Resultado: **VERDE** (14/14). Es el gate local antes de cada paso. No requiere coordinar con Claude (archivos nuevos, sin overlap).
+
+### 2026-08-19 — smoke:db (lectura, tenant no-King)
+
+- `scripts/smoke-db.ts`: DB real + handler de resolve de ESTA rama. No escribe. No llama `emitCargo` (no pega Meta). No pega Railway.
+- Tenant usado: `ClienteA1` (había cargas; se evitó King).
+- Cargo: cero `event_id` duplicados; `eventExistsAny` ve uno sent y rechaza un lead inventado.
+- Resolve (código nuevo, flags off): 401 sin key, 404 code inexistente, 200 con `?client=` correcto, 404 si el client no coincide, 200 sin `?client=` (compat).
+- Resultado: **VERDE**. `npm run smoke` = typecheck + wiring + db.
 
 ## Estado
 
 | Fase | Estado |
 |------|--------|
 | 0 Documentación | en curso (0.1–0.3 hechos; 0.4 vive en el plan) |
-| 1 `emitCargo` | código listo, pendiente smoke King / deploy |
-| 2 Hardening | no empezada |
-| 3 CI/smokes | no empezada |
+| 1 `emitCargo` | **en main** (`5a7f704`, mezclado con panel). Pendiente smoke King / Events Manager |
+| 2 Hardening | **código opt-in en `feat/tob/hardening`** — no mergeado, no deploy |
+| 4 Livechat piel | en curso en rama: pestaña `/livechat` (nombre/color/foto). **No** se tocó el guion (`flow.ts`). Merge pide `db:push` de `client_settings.chat_config`. Sin deploy. |
 
 ## Próximo paso
 
-1. Smoke King: mismo `kommoLeadId` desde webhook + bot + panel approve → 1 fila `meta_events` status `sent` y 1 CargoCRM en Events Manager.
-2. Commit aislado en `feat/tob/emit-cargo` (no incluir WIP de Claude).
-3. Deploy Fase 1 único. Luego Fase 2 con R1 a CRM Main antes de 2.1/2.2.
+1. Review + merge Fase 2 cuando Aston/Claude den OK → **avisar a Claude para pull + railway up**.
+2. Antes de prender `REQUIRE_RESOLVE_API_KEY` / `REQUIRE_RESOLVE_CLIENT`: Aston avisa al consumidor de resolve (esta instancia no emite R1 ni abre ese repo).
+3. King: opcional `KOMMO_WEBHOOK_SECRET_KING` + `?secret=` en Kommo (webhook + bot CARGO).
+4. Livechat (piel): avisar a Claude — `Nav.tsx` + props aditivas en `ChatWidget`. No se tocó `flow.ts` / Chats / Embudo.

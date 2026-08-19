@@ -6,6 +6,7 @@ import { getTenantBySlug } from '@/lib/tenants';
 import { onComprobante } from '@/lib/chat/flow';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { saveComprobante } from '@/lib/storage';
+import { signFilePath } from '@/lib/chat/fileToken';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const buf = Buffer.from(await file.arrayBuffer());
   const mime = file.type || 'image/jpeg';
-  const fileUrl = `/api/chat/${params.slug}/file?sessionKey=${sessionKey}`;
+  const fileUrl = signFilePath(params.slug, sessionKey);
 
   // Guardamos en el volumen si está configurado (barato, fuera de la DB). Si no,
   // caemos a base64 en la sesión (comportamiento anterior).

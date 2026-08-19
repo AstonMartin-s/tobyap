@@ -9,9 +9,13 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
-  if (secret) {
+  const mustGate = !!secret || process.env.REQUIRE_CRON_SECRET === '1';
+  if (!secret && process.env.NODE_ENV === 'production') {
+    console.warn('[cron] CRON_SECRET ausente en prod (Fase 2.5). Setear + REQUIRE_CRON_SECRET=1 para cerrar.');
+  }
+  if (mustGate) {
     const auth = req.headers.get('authorization');
-    if (auth !== `Bearer ${secret}`) {
+    if (!secret || auth !== `Bearer ${secret}`) {
       return NextResponse.json({ error: 'no autorizado' }, { status: 401 });
     }
   }

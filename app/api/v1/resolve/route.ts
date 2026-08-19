@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { desc, eq, inArray, sql } from 'drizzle-orm';
+import { desc, eq, inArray, sql, and } from 'drizzle-orm';
 import { db } from '@/db';
 import { attributions, sendList, tenants } from '@/db/schema';
 import { DEFAULT_BONO_MAP } from '@/lib/attribution';
@@ -34,10 +34,21 @@ export async function OPTIONS() {
 
 function authorized(req: NextRequest): boolean {
   const key = process.env.RESOLVE_API_KEY;
-  if (!key) return true; // sin key configurada: abierto (setear en prod)
+  if (!key) {
+    if (process.env.REQUIRE_RESOLVE_API_KEY === '1') return false;
+    return true; // sin key: abierto (Fase 2.1 lo cierra con REQUIRE_RESOLVE_API_KEY=1)
+  }
   const bearer = req.headers.get('authorization');
   const apiKey = req.headers.get('x-api-key');
   return bearer === `Bearer ${key}` || apiKey === key;
+}
+
+let lastClientWarn = 0;
+function warnMissingClient(kind: 'code' | 'phone') {
+  const now = Date.now();
+  if (now - lastClientWarn < 60_000) return;
+  lastClientWarn = now;
+  console.warn(`[resolve] ${kind} sin ?client= — Fase 2.2 warning, no se filtra (REQUIRE_RESOLVE_CLIENT=0).`);
 }
 
 export async function GET(req: NextRequest) {
@@ -45,9 +56,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'no autorizado' }, { status: 401, headers: CORS });
   }
 
+  const clientSlug = req.nextUrl.searchParams.get('client')?.trim() || null;
+  if (!clientSlug) {
+    if (process.env.REQUIRE_RESOLVE_CLIENT === '1') {
+      return NextResponse.json({ error: 'client requerido' }, { status: 400, headers: CORS });
+    }
+  }
+
   // --- Fallback por teléfono (lista de envío) -----------------------------
   const phoneParam = req.nextUrl.searchParams.get('phone');
   if (phoneParam != null) {
+    if (!clientSlug) warnMissingClient('phone');
     const candidates = phoneCandidates(phoneParam);
     if (!candidates.length) {
       return NextResponse.json({ error: 'phone inválido' }, { status: 400, headers: CORS });
@@ -66,8 +85,12 @@ export async function GET(req: NextRequest) {
       })
       .from(sendList)
       .leftJoin(tenants, eq(tenants.id, sendList.tenantId))
-      .where(inArray(sendList.phoneKey, candidates)) // tolera el 9 móvil AR
-      .orderBy(desc(tsExpr)) // latest-wins si hubo varios envíos
+      .where(
+        clientSlug
+          ? and(inArray(sendList.phoneKey, candidates), eq(tenants.slug, clientSlug))
+          : inArray(sendList.phoneKey, candidates),
+      )
+      .orderBy(desc(tsExpr))
       .limit(1);
 
     if (!row) {
@@ -92,6 +115,7 @@ export async function GET(req: NextRequest) {
   if (!code) {
     return NextResponse.json({ error: 'code o phone requerido' }, { status: 400, headers: CORS });
   }
+  if (!clientSlug) warnMissingClient('code');
 
   const [row] = await db
     .select({
@@ -112,7 +136,7 @@ export async function GET(req: NextRequest) {
     })
     .from(attributions)
     .leftJoin(tenants, eq(tenants.id, attributions.tenantId))
-    .where(eq(attributions.code, code))
+    .where(clientSlug ? and(eq(attributions.code, code), eq(tenants.slug, clientSlug)) : eq(attributions.code, code))
     .limit(1);
 
   if (!row) {

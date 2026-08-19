@@ -9,6 +9,7 @@ import { applyAttributionByCode, CODE_REGEX } from '@/lib/attribution';
 import { fetchKommoLead, fetchContactPhone, readLeadField, readPhone, contactId, updateLeadFields, type KommoLead } from '@/lib/kommo';
 import type { ResolvedTenant } from '@/lib/types';
 import { syncChatStepFromKommo } from '@/lib/chat/release';
+import { assertKommoWebhookSecret } from '@/lib/kommoWebhookAuth';
 
 // CBU robusto: escribe el CBU/Titular del panel en el lead (sin depender del bot).
 // Idempotente; solo escribe si el tenant tiene los campos mapeados.
@@ -131,6 +132,8 @@ export async function GET(_req: NextRequest, { params }: { params: { slug: strin
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const tenant = await getTenantBySlug(params.slug);
   if (!tenant) return NextResponse.json({ error: 'tenant desconocido' }, { status: 404 });
+  const denied = assertKommoWebhookSecret(req, params.slug);
+  if (denied) return denied;
 
   const raw = await req.text();
   const form = new URLSearchParams(raw);

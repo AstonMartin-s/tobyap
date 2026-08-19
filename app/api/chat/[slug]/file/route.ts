@@ -4,11 +4,13 @@ import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { readComprobante } from '@/lib/storage';
+import { getSession } from '@/lib/session';
+import { verifyFileToken, withinLegacyWindow } from '@/lib/chat/fileToken';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/chat/[slug]/file?sessionKey=... — sirve el comprobante de la sesión
-// (lo usa el widget para mostrarlo y el operador desde la nota en Kommo).
+// GET /api/chat/[slug]/file?sessionKey=...[&e=&t=]
+// HMAC corta vida (notas Kommo). Panel autenticado siempre. sessionKey solo: 14 días.
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
   const tenant = await getTenantBySlug(params.slug);
   if (!tenant) return NextResponse.json({ error: 'tenant desconocido' }, { status: 404 });
@@ -16,10 +18,21 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   if (!sessionKey) return NextResponse.json({ error: 'sessionKey requerido' }, { status: 400 });
 
   const [s] = await db.select().from(chatSessions).where(and(eq(chatSessions.tenantId, tenant.id), eq(chatSessions.sessionKey, sessionKey)));
-  const data = (s?.data as Record<string, unknown> | null) ?? {};
+  if (!s) return NextResponse.json({ error: 'sesión desconocida' }, { status: 404 });
+
+  const signed = verifyFileToken(params.slug, sessionKey, req.nextUrl.searchParams.get('e'), req.nextUrl.searchParams.get('t'));
+  const panel = await getSession();
+  const panelOk = panel?.slug === params.slug || panel?.role === 'admin';
+  const data = (s.data as Record<string, unknown> | null) ?? {};
+  const comprobanteAt = typeof data.comprobanteAt === 'number' ? data.comprobanteAt : s.updatedAt?.getTime();
+  const legacyOk = withinLegacyWindow(comprobanteAt);
+
+  if (!signed && !panelOk && !legacyOk) {
+    return NextResponse.json({ error: 'no autorizado' }, { status: 401 });
+  }
+
   const mime = (data.comprobanteMime as string) || 'image/jpeg';
 
-  // 1) Volumen (nuevo, barato). 2) base64 en DB (viejo).
   const relPath = data.comprobantePath as string | undefined;
   if (relPath) {
     const buf = await readComprobante(relPath);

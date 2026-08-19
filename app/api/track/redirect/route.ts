@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { metaEvents, attributions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { generateCode, resolveBono } from '@/lib/attribution';
+import { clientIp, rateLimit } from '@/lib/rateLimit';
 
 // ---------------------------------------------------------------------------
 // POST /api/track/redirect
@@ -28,6 +29,15 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
+  const limit = Number(process.env.RATE_LIMIT_REDIRECT ?? 60);
+  const rl = rateLimit(`redirect:${clientIp(req)}`, limit, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'rate limit' },
+      { status: 429, headers: { ...CORS, 'Retry-After': String(rl.retryAfterSec) } },
+    );
+  }
+
   let b: Record<string, string | undefined>;
   try {
     b = await req.json();

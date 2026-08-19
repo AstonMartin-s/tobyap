@@ -3,6 +3,7 @@ import { db } from '@/db';
 import { kommoWebhookLog } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { emitCargo } from '@/lib/cargo/emit';
+import { assertKommoWebhookSecret } from '@/lib/kommoWebhookAuth';
 
 // ---------------------------------------------------------------------------
 // POST /api/conversion-event/[slug]
@@ -42,6 +43,8 @@ function extractLeadIds(raw: string, url: URL): number[] {
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const tenant = await getTenantBySlug(params.slug);
   if (!tenant) return NextResponse.json({ error: 'tenant desconocido' }, { status: 404 });
+  const denied = assertKommoWebhookSecret(req, params.slug);
+  if (denied) return denied;
 
   const raw = await req.text();
   db.insert(kommoWebhookLog)

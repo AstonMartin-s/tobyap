@@ -111,6 +111,8 @@ export const clientSettings = pgTable('client_settings', {
   message: text('message'), // mensaje/bono de bienvenida
   regularMessage: text('regular_message'),
   walink: text('walink'), // número base del link de WhatsApp
+  // Piel del chat web (Fase 4): nombre, color, foto. Vacío = fallback tenant.name + verde WA.
+  chatConfig: jsonb('chat_config').$type<Record<string, unknown>>().default({}),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 

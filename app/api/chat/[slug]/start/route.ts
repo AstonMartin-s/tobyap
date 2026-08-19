@@ -8,11 +8,18 @@ import { checkWhatsApp } from '@/lib/chat/wachecker';
 import { welcomeStep } from '@/lib/chat/flow';
 import { createChatLead, addLeadNote } from '@/lib/chat/kommoMirror';
 import { sendCapiEvent, CAPI_VALUE } from '@/lib/meta';
+import { clientIp, rateLimit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
 // POST /api/chat/[slug]/start  { phone, name?, token?, campaign?, ccpp? }
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
+  const limit = Number(process.env.RATE_LIMIT_CHAT_START ?? 20);
+  const rl = rateLimit(`chat-start:${params.slug}:${clientIp(req)}`, limit, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json({ error: 'rate limit' }, { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } });
+  }
+
   const tenant = await getTenantBySlug(params.slug);
   if (!tenant) return NextResponse.json({ error: 'tenant desconocido' }, { status: 404 });
 

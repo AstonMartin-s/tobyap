@@ -39,6 +39,15 @@ export async function saveComprobante(sessionKey: string, buf: Buffer, mime: str
   return rel;
 }
 
+export async function saveBrandAvatar(tenantId: string, buf: Buffer, mime: string): Promise<string | null> {
+  if (!storageEnabled()) return null;
+  const rel = path.join('brand', `${tenantId}.${extFromMime(mime)}`);
+  const full = path.join(DIR, rel);
+  await fs.mkdir(path.dirname(full), { recursive: true });
+  await fs.writeFile(full, buf);
+  return rel;
+}
+
 // Borra un comprobante del disco por su ruta relativa (limpieza a las 48h).
 export async function deleteComprobante(rel: string): Promise<void> {
   if (!storageEnabled() || !rel) return;
