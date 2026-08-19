@@ -3,8 +3,9 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
-import { onFreeText } from '@/lib/chat/flow';
+import { onFreeText, accountStep, WANT_ACCOUNT_RE } from '@/lib/chat/flow';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
+import { updateLeadFields, updateLeadName } from '@/lib/kommo';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,11 +21,37 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // Bloqueado: ignoramos el mensaje (no se guarda, no reabre la bandeja).
   if ((s.data as Record<string, unknown> | null)?.blocked) return NextResponse.json({ ok: true, messages: [], blocked: true });
 
+  const userMsg = { from: 'user' as const, text: b.text, at: Date.now() };
+  const sdata = (s.data ?? {}) as Record<string, unknown>;
+
+  // El cliente tipeó la intención de "quiero mi cuenta" en vez de tocar el botón
+  // (muy común en mobile) — si lo dejamos pasar por onFreeText queda trabado en
+  // 'welcome' para siempre, sin usuario/contraseña creados. Disparamos el mismo
+  // camino que el botón 'want_account' del panel de acciones.
+  if ((s.step ?? 'welcome') === 'welcome' && WANT_ACCOUNT_RE.test(b.text)) {
+    const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name });
+    const history = [...(s.messages ?? []), userMsg, ...r.messages.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }))];
+    const patch: Record<string, unknown> = { step: r.step, data: { ...sdata, ...r.data, unread: true, archived: false }, messages: history, updatedAt: new Date() };
+    await db.update(chatSessions).set(patch).where(eq(chatSessions.id, s.id));
+    if (s.kommoLeadId && r.data.username) {
+      const fields: Array<{ fieldId: number; value: string }> = [];
+      const uF = tenant.customFields['portal_url_field'];
+      const usF = tenant.customFields['portal_user_field'];
+      const pF = tenant.customFields['portal_pass_field'];
+      if (uF && r.data.loginUrl) fields.push({ fieldId: uF, value: String(r.data.loginUrl) });
+      if (usF) fields.push({ fieldId: usF, value: String(r.data.username) });
+      if (pF && r.data.password) fields.push({ fieldId: pF, value: String(r.data.password) });
+      if (fields.length) updateLeadFields(tenant, s.kommoLeadId, fields).catch(() => {});
+      updateLeadName(tenant, s.kommoLeadId, String(r.data.username)).catch(() => {});
+      addLeadNote(tenant, s.kommoLeadId, `👤 Usuario Pagoda ${r.data.existing ? '(existente, recordado)' : 'creado'} (por texto): ${r.data.username}`);
+    }
+    return NextResponse.json({ ok: true, messages: r.messages, buttons: r.buttons, step: r.step, total: history.length });
+  }
+
   const replies = onFreeText(s.step ?? 'comprobante', b.text);
-  const history = [...(s.messages ?? []), { from: 'user' as const, text: b.text, at: Date.now() }, ...replies.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }))];
+  const history = [...(s.messages ?? []), userMsg, ...replies.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }))];
   // Inbound del cliente → marca NO LEÍDO (pendiente de responder) y, si estaba
   // archivado, se reabre solo (vuelve a la bandeja).
-  const sdata = (s.data ?? {}) as Record<string, unknown>;
   const patch: Record<string, unknown> = { messages: history, updatedAt: new Date(), data: { ...sdata, unread: true, archived: false } };
   await db.update(chatSessions).set(patch).where(eq(chatSessions.id, s.id));
 

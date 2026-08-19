@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
-import { accreditedMessages } from '@/lib/chat/flow';
+import { acreditarChat } from '@/lib/chat/release';
 import { fetchKommoLead } from '@/lib/kommo';
 
 export const dynamic = 'force-dynamic';
@@ -37,10 +37,12 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       dbg.cargoId = tenant.statusCargoId;
       dbg.match = lead.status_id === tenant.statusCargoId;
       if (lead.status_id === tenant.statusCargoId) {
-        const acc = accreditedMessages((s.data as Record<string, unknown> | null)?.loginUrl as string | undefined);
-        messages = [...messages, ...acc.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }))];
-        step = 'done';
-        await db.update(chatSessions).set({ messages, step, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+        // Acreditación idempotente (candado atómico) — NO agrega el mensaje si ya
+        // lo mandó el webhook u otra fuente. Releemos para devolver lo actualizado.
+        await acreditarChat(tenant, { sessionKey, requireComprobanteStep: true });
+        const [fresh] = await db.select({ messages: chatSessions.messages, step: chatSessions.step }).from(chatSessions).where(and(eq(chatSessions.tenantId, tenant.id), eq(chatSessions.sessionKey, sessionKey)));
+        messages = fresh?.messages ?? messages;
+        step = fresh?.step ?? 'done';
       }
     } catch (e) {
       dbg.error = String(e);
