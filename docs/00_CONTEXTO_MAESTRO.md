@@ -48,11 +48,21 @@
 
 ### 2026-08-19 — Loop deploy Claude (MSG-TOB-20260819-2 cierre)
 
-- Claude deploya con `railway up` desde `tobyap/` (working tree local, no CI). **Pull de `main` antes de cada deploy.**
+- Claude deploya con `railway up` desde `tobyap/` (working tree local). **Pull de `main` antes de cada deploy.**
+- Push a `origin/main` también dispara auto-deploy en Railway (visto el 2026-08-19 con `5a102b5`).
 - Cursor **avisa** cuando mergea `feat/tob/*` → `main` (Fase 2+).
 - Overlap: si Claude toca `app/api/panel`, `lib/meta`, `lib/chat/release` o webhooks → R1 antes de mergear. Cursor toca webhooks/`upload`/`file`/`resolve` en esta rama: el merge avisado es el R1 inverso.
 
-### 2026-08-19 — Fase 2 hardening opt-in (rama `feat/tob/hardening`, NO mergeada)
+### 2026-08-19 — Merge + deploy Livechat + hardening opt-in (`5a102b5`)
+
+- Traje `origin/main` de Claude (`c022208`: acreditación duplicada, bono 30%, install-prompt nativo) a `feat/tob/hardening`. Fast-forward, sin conflicto de lógica. Panel chats sigue con `acreditarChat` + `emitCargo`.
+- Merge a `main` vía worktree `tobyap/` (Cursor no hace checkout de `main`). Push `origin/main` `c022208..5a102b5`.
+- Railway auto-deployó el commit (`4dc5b57c`, SUCCESS). No hizo falta `railway up` aparte.
+- Columna `client_settings.chat_config` (jsonb, default `{}`): **no** se usó `drizzle-kit push` (iba a pedir truncar `landings` por un unique constraint viejo). Solo `ALTER TABLE … ADD COLUMN IF NOT EXISTS`.
+- Ventana ~22:31 UTC: `/l/king/go` 500 por columna faltante. Tras el ALTER, `/l/king` y `/l/king/go` 200. `/livechat` redirige a `/login` (esperable sin sesión; entrar como **cliente**, no admin).
+- **Aviso Claude:** `git pull` en `tobyap/` antes del próximo `railway up`, para no pisar este deploy con un working tree viejo.
+
+### 2026-08-19 — Fase 2 hardening opt-in (luego en main `5a102b5`; flags siguen OFF)
 
 - 2.4 `/api/test/capi` → 404 en production (`ALLOW_TEST_CAPI=1` emergencia).
 - 2.5 `CRON_SECRET`: si está seteado sigue exigiendo header; prod sin secret = warning. Cierre: `REQUIRE_CRON_SECRET=1`.
@@ -81,12 +91,12 @@
 |------|--------|
 | 0 Documentación | en curso (0.1–0.3 hechos; 0.4 vive en el plan) |
 | 1 `emitCargo` | **en main** (`5a7f704`, mezclado con panel). Pendiente smoke King / Events Manager |
-| 2 Hardening | **código opt-in en `feat/tob/hardening`** — no mergeado, no deploy |
-| 4 Livechat piel | en curso en rama: pestaña `/livechat` (nombre/color/foto). **No** se tocó el guion (`flow.ts`). Merge pide `db:push` de `client_settings.chat_config`. Sin deploy. |
+| 2 Hardening | **en main/prod** (`5a102b5`). Flags default OFF. No prender `REQUIRE_RESOLVE_*` sin Aston. |
+| 4 Livechat piel | **en main/prod**. Pestaña `/livechat` (nombre/color/foto). `flow.ts` intacto. Columna `chat_config` aplicada. |
 
 ## Próximo paso
 
-1. Review + merge Fase 2 cuando Aston/Claude den OK → **avisar a Claude para pull + railway up**.
+1. Claude: `git pull` en `tobyap/` antes del próximo `railway up`.
 2. Antes de prender `REQUIRE_RESOLVE_API_KEY` / `REQUIRE_RESOLVE_CLIENT`: Aston avisa al consumidor de resolve (esta instancia no emite R1 ni abre ese repo).
 3. King: opcional `KOMMO_WEBHOOK_SECRET_KING` + `?secret=` en Kommo (webhook + bot CARGO).
-4. Livechat (piel): avisar a Claude — `Nav.tsx` + props aditivas en `ChatWidget`. No se tocó `flow.ts` / Chats / Embudo.
+4. Fase 4 restante: copy/URLs del bot siguen en `flow.ts` (esto fue solo piel).
