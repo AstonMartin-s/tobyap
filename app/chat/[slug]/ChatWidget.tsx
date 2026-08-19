@@ -51,6 +51,19 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   const fileRef = useRef<HTMLInputElement>(null);
   const pollBase = useRef<number | null>(null);
   const autoPromptedRef = useRef(false); // instalador nativo auto-disparado — solo 1 vez
+  const [skin, setSkin] = useState({ brand, primaryColor, avatarUrl });
+
+  // La PWA puede tener HTML viejo cacheado: el nombre/color/foto se refrescan de la API.
+  useEffect(() => {
+    fetch(`/api/chat/${slug}/brand`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d?.brand) return;
+        setSkin({ brand: d.brand.brandName, primaryColor: d.brand.primaryColor, avatarUrl: d.brand.avatarUrl });
+        if (d.brand.brandName) document.title = `${d.brand.brandName} — Soporte`;
+      })
+      .catch(() => {});
+  }, [slug]);
 
   // PWA: registrar el service worker + capturar el instalador nativo (Android/Chrome).
   useEffect(() => {
@@ -170,7 +183,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
           if (d.step) setStep(d.step);
           if ('Notification' in window && Notification.permission === 'granted') {
             const body = d.step === 'done' ? '✅ ¡Tu carga fue acreditada con éxito!' : (fresh[fresh.length - 1]?.text?.slice(0, 90) ?? 'Tenés un mensaje nuevo 🎁');
-            try { new Notification(`${brand} 🎰`, { body }); } catch { /* sin permiso */ }
+            try { new Notification(`${skin.brand} 🎰`, { body }); } catch { /* sin permiso */ }
           }
         }
       } catch { /* siguiente intento */ }
@@ -311,7 +324,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
       const p = await Notification.requestPermission(); // ← dispara el diálogo real
       if (p === 'granted') {
         setAppNotif(true);
-        try { new Notification(`${brand} 🎰`, { body: '¡Notificaciones activadas! Te avisamos de tus bonos.' }); } catch {}
+        try { new Notification(`${skin.brand} 🎰`, { body: '¡Notificaciones activadas! Te avisamos de tus bonos.' }); } catch {}
         setMsgs((x) => [...x, { from: 'bot', text: '✓ ¡Notificaciones activadas! 🔔 Vas a recibir tus bonos y avisos al instante.' }]);
       } else {
         // No concedido: no marcamos el paso, lo tiene que aceptar.
@@ -343,7 +356,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
       setIosGuided(true);
       setMsgs((p) => [
         ...p,
-        { from: 'bot', text: `📲 *Guardá ${brand} en tu iPhone (30 seg):*` },
+        { from: 'bot', text: `📲 *Guardá ${skin.brand} en tu iPhone (30 seg):*` },
         { from: 'bot', image: '/ios-install-guide.svg' },
         { from: 'bot', text: '1️⃣ Tocá el botón *Compartir* (el cuadradito con la flecha ↑, abajo en el centro).\n2️⃣ Deslizá y elegí *"Agregar a inicio"*.\n3️⃣ Tocá *"Agregar"* arriba a la derecha.\n\nCuando lo hagas, tocá *"Ya la agregué"* acá abajo 👇' },
       ]);
@@ -365,20 +378,20 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     navigator.clipboard?.writeText(value).then(() => { setCopied(value); setTimeout(() => setCopied(null), 1600); }).catch(() => {});
   }
 
-  const header = primaryColor || C.header;
-  const initial = (brand || 'K').charAt(0).toUpperCase();
+  const header = skin.primaryColor || primaryColor || C.header;
+  const initial = (skin.brand || brand || 'K').charAt(0).toUpperCase();
 
   return (
     <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif', background: C.bg }}>
       <div style={{ background: header, color: '#fff', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 1px 3px rgba(0,0,0,.2)' }}>
-        {avatarUrl ? (
+        {(skin.avatarUrl || avatarUrl) ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatarUrl} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', background: '#25D366' }} />
+          <img src={skin.avatarUrl || avatarUrl || ''} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', background: '#25D366' }} />
         ) : (
           <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#25D366', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 18 }}>{initial}</div>
         )}
         <div style={{ lineHeight: 1.15 }}>
-          <div style={{ fontWeight: 600, fontSize: 16 }}>{brand}</div>
+          <div style={{ fontWeight: 600, fontSize: 16 }}>{skin.brand}</div>
           <div style={{ fontSize: 12, opacity: 0.85 }}>{typing ? 'escribiendo…' : 'en línea'}</div>
         </div>
       </div>
@@ -464,13 +477,13 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)', display: 'grid', placeItems: 'center', padding: 16 }}>
           <div style={{ background: '#fff', borderRadius: 14, padding: 22, width: '100%', maxWidth: 380, boxShadow: '0 10px 40px rgba(0,0,0,.3)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-              {avatarUrl ? (
+              {(skin.avatarUrl || avatarUrl) ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={avatarUrl} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', background: '#25D366' }} />
+                <img src={skin.avatarUrl || avatarUrl || ''} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', background: '#25D366' }} />
               ) : (
                 <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#25D366', display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 700 }}>{initial}</div>
               )}
-              <div style={{ fontWeight: 700, fontSize: 18, color: C.ink }}>{brand}</div>
+              <div style={{ fontWeight: 700, fontSize: 18, color: C.ink }}>{skin.brand}</div>
             </div>
             <p style={{ color: C.sub, fontSize: 14, margin: '4px 0 16px' }}>Dejanos tu número para crear tu usuario y darte tu bonificación 🎁</p>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre o apodo" style={inputStyle} />

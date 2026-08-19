@@ -74,6 +74,7 @@ export function LivechatClient() {
           <div className="field">
             <label>Nombre que ve el lead</label>
             <input className="input" value={brand.brandName} onChange={(e) => setBrand({ ...brand, brandName: e.target.value })} placeholder="King" />
+            <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '6px 0 0' }}>Si la app ya está en el celular, el nombre de la pantalla de inicio no se actualiza solo. Borrá el ícono y volvé a “Agregar a inicio”.</p>
           </div>
           <div className="field">
             <label>Color de cabecera</label>

@@ -62,6 +62,12 @@
 - Ventana ~22:31 UTC: `/l/king/go` 500 por columna faltante. Tras el ALTER, `/l/king` y `/l/king/go` 200. `/livechat` redirige a `/login` (esperable sin sesión; entrar como **cliente**, no admin).
 - **Aviso Claude:** `git pull` en `tobyap/` antes del próximo `railway up`, para no pisar este deploy con un working tree viejo.
 
+### 2026-08-19 — Livechat: nombre PWA (Marceneitor vs King)
+
+- Cuenta tenant `name=Marceneitor`; piel guardada `brandName=King`. El HTML/manifiesto ya servían King.
+- El ícono de inicio en el celu queda pegado al nombre de cuando se instaló (iOS no lo actualiza). Hay que borrar y volver a agregar.
+- Patch: chat refresca piel vía `/brand`; SW no cachea HTML/manifiesto; nota en el panel Livechat.
+
 ### 2026-08-19 — Fase 2 hardening opt-in (luego en main `5a102b5`; flags siguen OFF)
 
 - 2.4 `/api/test/capi` → 404 en production (`ALLOW_TEST_CAPI=1` emergencia).

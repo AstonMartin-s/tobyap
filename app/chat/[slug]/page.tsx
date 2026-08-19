@@ -36,7 +36,7 @@ export default async function ChatPage({
 }) {
   const tenant = await getTenantBySlug(params.slug);
   const cfg = tenant ? await loadChatBrand(tenant.id, tenant.slug, tenant.name) : { brandName: 'Soporte', primaryColor: DEFAULT_HEADER, avatarUrl: null };
-  const brand = searchParams.brand || cfg.brandName;
+  const brand = cfg.brandName;
   return (
     <>
       <script dangerouslySetInnerHTML={{ __html: "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__bipEvent=e;});" }} />
