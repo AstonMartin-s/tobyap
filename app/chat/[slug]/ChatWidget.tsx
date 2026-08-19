@@ -464,7 +464,12 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)', display: 'grid', placeItems: 'center', padding: 16 }}>
           <div style={{ background: '#fff', borderRadius: 14, padding: 22, width: '100%', maxWidth: 380, boxShadow: '0 10px 40px rgba(0,0,0,.3)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#25D366', display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 700 }}>{initial}</div>
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', background: '#25D366' }} />
+              ) : (
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#25D366', display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 700 }}>{initial}</div>
+              )}
               <div style={{ fontWeight: 700, fontSize: 18, color: C.ink }}>{brand}</div>
             </div>
             <p style={{ color: C.sub, fontSize: 14, margin: '4px 0 16px' }}>Dejanos tu número para crear tu usuario y darte tu bonificación 🎁</p>
