@@ -397,53 +397,74 @@ export function ChatsClient() {
   });
 
   const KPI = ({ label, value, color }: { label: string; value: string | number; color?: string }) => (
-    <div style={{ padding: '.5rem .85rem', flex: '1 1 auto', minWidth: 90 }}>
-      <div style={{ fontSize: '1.2rem', fontWeight: 700, color: color ?? 'var(--text)', lineHeight: 1.1 }}>{value}</div>
-      <div style={{ fontSize: '.62rem', color: 'var(--muted-2,#5d6478)', marginTop: '.25rem', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' }}>{label}</div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+      <div style={{ fontSize: '.75rem', color: 'var(--muted)', fontWeight: 500, whiteSpace: 'nowrap' }}>{label}</div>
+      <div style={{ fontSize: '1.25rem', fontWeight: 700, color: color ?? 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{value}</div>
     </div>
   );
 
+  const rangeText = kpiRange === 'siempre' ? 'total' : kpiRange;
+
   return (
     <>
-    <div style={{ display: 'flex', gap: '1rem', marginBottom: '.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
-      <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
-        {([['hoy', 'Hoy'], ['ayer', 'Ayer'], ['siempre', 'Desde siempre']] as const).map(([r, label]) => (
-          <button key={r} onClick={() => setKpiRange(r)} className={`btn ${kpiRange === r ? '' : 'btn--ghost'}`} style={{ padding: '.3rem .8rem', fontSize: '.8rem' }}>{label}</button>
-        ))}
+    <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1rem', alignItems: 'center', flexWrap: 'wrap', background: 'var(--bg-2)', padding: '.75rem 1rem', borderRadius: 12, border: '1px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+      {/* 1. Selector de fechas (Segmented Control) */}
+      <div style={{ display: 'flex', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: 3, gap: 2 }}>
+        {([['hoy', 'Hoy'], ['ayer', 'Ayer'], ['siempre', 'Histórico']] as const).map(([r, label]) => {
+          const active = kpiRange === r;
+          return (
+            <button key={r} onClick={() => setKpiRange(r)}
+              style={{
+                border: 'none', background: active ? 'var(--card)' : 'transparent',
+                color: active ? 'var(--text)' : 'var(--muted)',
+                fontWeight: active ? 600 : 500,
+                padding: '.35rem .75rem', fontSize: '.78rem', borderRadius: 6,
+                cursor: 'pointer', transition: 'all .2s',
+                boxShadow: active ? '0 2px 6px rgba(0,0,0,0.2)' : 'none'
+              }}>
+              {label}
+            </button>
+          );
+        })}
       </div>
 
-      <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg-2, rgba(255,255,255,.015))', overflow: 'hidden' }}>
-        <KPI label={`Chats ${kpiRange === 'siempre' ? 'total' : kpiRange}`} value={kpis.chats} />
-        <div style={{ width: 1, background: 'var(--border)' }} />
-        <KPI label="Esperando pago" value={kpis.esperando} color="#3b82f6" />
-        <div style={{ width: 1, background: 'var(--border)' }} />
-        <KPI label="Revisar imagen" value={kpis.revisar} color="#f97316" />
-        <div style={{ width: 1, background: 'var(--border)' }} />
-        <KPI label={`Acreditados ${kpiRange === 'siempre' ? 'total' : kpiRange}`} value={kpis.acreditados} color="#22c55e" />
-        <div style={{ width: 1, background: 'var(--border)' }} />
-        <KPI label={`Conversión ${kpiRange === 'siempre' ? '' : kpiRange}`.trim()} value={`${kpis.conv}%`} color="var(--accent, #7c5cff)" />
-        <div style={{ width: 1, background: 'var(--border)' }} />
-        <KPI label="Sin leer" value={kpis.sinLeer} color={kpis.sinLeer ? '#22c55e' : undefined} />
+      <div style={{ width: 1, height: 28, background: 'var(--border)' }} />
+
+      {/* 2. Métricas del rango seleccionado */}
+      <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+        <KPI label={`Chats ${rangeText}`} value={kpis.chats} />
+        <KPI label={`Acreditados ${rangeText}`} value={kpis.acreditados} color="var(--success)" />
+        <KPI label={`Conversión ${rangeText}`} value={`${kpis.conv}%`} color="var(--accent)" />
       </div>
 
-      <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', marginLeft: 'auto' }}>
+      <div style={{ width: 1, height: 28, background: 'var(--border)' }} />
+
+      {/* 3. Colas en tiempo real */}
+      <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+        <KPI label="Esperando pago" value={kpis.esperando} color="var(--blue)" />
+        <KPI label="Revisar imagen" value={kpis.revisar} color="var(--warn)" />
+        <KPI label="Sin leer" value={kpis.sinLeer} color={kpis.sinLeer ? 'var(--success)' : undefined} />
+      </div>
+
+      {/* 4. Acciones */}
+      <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', marginLeft: 'auto' }}>
         {counts.atencion > 0 && (
           <button onClick={() => setFilter('revisar')}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem', padding: '.32rem .7rem', fontSize: '.76rem', fontWeight: 700, border: '1px solid #e8883855', borderRadius: 8, background: '#e888381a', color: '#e8a050', cursor: 'pointer' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem', padding: '.4rem .8rem', fontSize: '.76rem', fontWeight: 700, border: '1px solid #e8883855', borderRadius: 8, background: '#e888381a', color: '#e8a050', cursor: 'pointer', transition: 'all .2s' }}
             title="Chats que requieren atención (comprobante por revisar o cliente esperando)">
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#e88838', boxShadow: '0 0 6px #e88838' }} /> Atención · {counts.atencion}
           </button>
         )}
         <button onClick={toggleSound} aria-label="Sonido de atención"
-          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 8, border: '1px solid var(--border)', background: soundOn ? 'var(--accent-soft)' : 'transparent', color: soundOn ? 'var(--accent)' : 'var(--muted)', cursor: 'pointer' }}
+          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 8, border: '1px solid var(--border)', background: soundOn ? 'var(--accent-soft)' : 'transparent', color: soundOn ? 'var(--accent)' : 'var(--muted)', cursor: 'pointer', transition: 'all .2s' }}
           title={soundOn ? 'Sonido de atención: activado' : 'Sonido de atención: apagado'}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
             {!soundOn && <line x1="3" y1="3" x2="21" y2="21" />}
           </svg>
         </button>
         <button onClick={openExport}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem', padding: '.32rem .7rem', fontSize: '.76rem', fontWeight: 600, border: '1px solid #16a34a55', borderRadius: 8, background: '#16a34a1a', color: '#4ade80', cursor: 'pointer' }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', padding: '.4rem .8rem', fontSize: '.76rem', fontWeight: 600, border: '1px solid rgba(52,210,122,0.3)', borderRadius: 8, background: 'rgba(52,210,122,0.1)', color: 'var(--success)', cursor: 'pointer', transition: 'all .2s' }}
           title="Exportar CSV: rango de fechas, filtro por estado, usuario y teléfono separados">⬇ Exportar</button>
       </div>
     </div>
