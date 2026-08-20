@@ -8,12 +8,11 @@ const C = { header: '#008069', bg: '#ECE5DD', botBubble: '#FFFFFF', userBubble: 
 
 // Menú fijo post-acreditación.
 const POST_MENU = [
-  { id: 'deposit', label: '💰 Quiero depositar' },
-  { id: 'withdraw', label: '💸 Quiero retirar' },
-  { id: 'download_app', label: '📲 Descargar la app' },
-  { id: 'support', label: '🙋 Soporte' },
-  { id: 'forgot_user', label: '😵 Olvidé mi usuario' },
-  { id: 'cancel', label: '✖️ Cerrar consulta' },
+  { id: 'deposit', label: 'Depositar' },
+  { id: 'withdraw', label: 'Retirar' },
+  { id: 'download_app', label: 'Instalar app' },
+  { id: 'support', label: 'Soporte' },
+  { id: 'forgot_user', label: 'Olvidé mis datos' },
 ];
 
 function renderText(text: string) {
@@ -74,7 +73,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     const pre = (window as any).__bipEvent;
     if (pre) setDeferredPrompt(pre);
     const onPrompt = (e: Event) => { e.preventDefault(); setDeferredPrompt(e); };
-    const onInstalled = () => { setAppInstall(true); setMsgs((p) => [...p, { from: 'bot', text: '✓ ¡App instalada! 🎉 Ya nos tenés en tu pantalla de inicio.' }]); };
+    const onInstalled = () => { setAppInstall(true); setMsgs((p) => [...p, { from: 'bot', text: 'App instalada. Ya nos tenés en tu pantalla de inicio.' }]); };
     window.addEventListener('beforeinstallprompt', onPrompt);
     window.addEventListener('appinstalled', onInstalled);
     // Si ya está instalada (abierta en modo app), damos el paso 1 por cumplido.
@@ -103,8 +102,8 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         setMsgs(d.messages ?? []);
         pollBase.current = d.total;
         setStep(d.step ?? 'done');
-        if (d.step === 'welcome') setButtons([{ id: 'want_account', label: 'Quiero mi cuenta 🎁' }]);
-        else if (d.step === 'credenciales') setButtons([{ id: 'want_cbu', label: 'Quiero el CBU 💳' }]);
+        if (d.step === 'welcome') setButtons([{ id: 'want_account', label: 'Quiero mi cuenta' }]);
+        else if (d.step === 'credenciales') setButtons([{ id: 'want_cbu', label: 'Quiero el CBU' }]);
       } catch { /* sin resume */ }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,7 +122,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
       const pend: string[] = [];
       if (!appInstall) pend.push('*Paso 1: Instalar app*');
       if (!appNotif) pend.push('*Paso 2: Activar notificaciones*');
-      if (pend.length) setMsgs((p) => [...p, { from: 'bot', text: `¿Pudiste con ${pend.join(' y ')}? 🤔\nSi te complicó, no te preocupes: ya podés *enviar tu comprobante igual* 👇\n(Pero con la app recibís tus bonos más rápido cada semana 🎁)` }]);
+      if (pend.length) setMsgs((p) => [...p, { from: 'bot', text: `¿Pudiste con ${pend.join(' y ')}?\n\nNo te preocupes si te complicó, ya está habilitado el botón para enviar tu comprobante abajo.` }]);
     }, 20000);
     return () => { clearInterval(iv); clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -182,8 +181,8 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
           await play(fresh, []);
           if (d.step) setStep(d.step);
           if ('Notification' in window && Notification.permission === 'granted') {
-            const body = d.step === 'done' ? '✅ ¡Tu carga fue acreditada con éxito!' : (fresh[fresh.length - 1]?.text?.slice(0, 90) ?? 'Tenés un mensaje nuevo 🎁');
-            try { new Notification(`${skin.brand} 🎰`, { body }); } catch { /* sin permiso */ }
+            const body = d.step === 'done' ? 'Tu carga fue acreditada con éxito' : (fresh[fresh.length - 1]?.text?.slice(0, 90) ?? 'Tenés un mensaje nuevo');
+            try { new Notification(`${skin.brand}`, { body }); } catch { /* sin permiso */ }
           }
         }
       } catch { /* siguiente intento */ }
@@ -258,7 +257,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     // "Descargar la app": lo resolvemos EN EL CLIENTE (guía/instalador nativo),
     // no en el server. Nunca debe derivar a "un asesor te responde".
     if (id === 'download_app') {
-      setMsgs((p) => [...p, { from: 'bot', text: '¡Genial! 📲 Te ayudo a instalar la app en tu teléfono, es rápido 👇' }]);
+      setMsgs((p) => [...p, { from: 'bot', text: 'Te ayudo a instalar la app en tu teléfono.' }]);
       await installApp();
       return;
     }
@@ -311,12 +310,12 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   // (limitación de Apple) → se guía y se da por hecho para no bloquear.
   async function enableNotifs() {
     if (isIos() && !isStandalone()) {
-      setMsgs((p) => [...p, { from: 'bot', text: '📲 En iPhone las notificaciones se activan al *abrir la app instalada*. Con el Paso 1 ya queda listo, ahí adentro te llegan tus bonos 🔔' }]);
+      setMsgs((p) => [...p, { from: 'bot', text: 'En iPhone las notificaciones se activan al *abrir la app instalada*. Con el Paso 1 ya queda listo, ahí adentro te llegan tus avisos.' }]);
       setAppNotif(true);
       return;
     }
     if (!('Notification' in window)) {
-      setMsgs((p) => [...p, { from: 'bot', text: 'Igual te avisamos por acá 👍' }]);
+      setMsgs((p) => [...p, { from: 'bot', text: 'Igual te avisamos por acá' }]);
       setAppNotif(true);
       return;
     }
@@ -324,14 +323,14 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
       const p = await Notification.requestPermission(); // ← dispara el diálogo real
       if (p === 'granted') {
         setAppNotif(true);
-        try { new Notification(`${skin.brand} 🎰`, { body: '¡Notificaciones activadas! Te avisamos de tus bonos.' }); } catch {}
-        setMsgs((x) => [...x, { from: 'bot', text: '✓ ¡Notificaciones activadas! 🔔 Vas a recibir tus bonos y avisos al instante.' }]);
+        try { new Notification(`${skin.brand}`, { body: 'Notificaciones activadas. Te avisamos de tus bonos.' }); } catch {}
+        setMsgs((x) => [...x, { from: 'bot', text: 'Notificaciones activadas.' }]);
       } else {
         // No concedido: no marcamos el paso, lo tiene que aceptar.
-        setMsgs((x) => [...x, { from: 'bot', text: '⚠️ Tenés que *permitir* las notificaciones para poder enviar tu comprobante. Tocá de nuevo el Paso 2 y elegí *Permitir* 🙏' }]);
+        setMsgs((x) => [...x, { from: 'bot', text: '⚠️ Tenés que *permitir* las notificaciones para poder enviar tu comprobante. Tocá de nuevo el Paso 2 y elegí *Permitir*.' }]);
       }
     } catch {
-      setMsgs((x) => [...x, { from: 'bot', text: 'Tocá de nuevo el Paso 2 y aceptá el permiso 🙏' }]);
+      setMsgs((x) => [...x, { from: 'bot', text: 'Tocá de nuevo el Paso 2 y aceptá el permiso.' }]);
     }
   }
 
@@ -345,9 +344,9 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
       setDeferredPrompt(null);
       if (r.outcome === 'accepted') {
         setAppInstall(true); // (appinstalled también lo confirma)
-        setMsgs((p) => [...p, { from: 'bot', text: '✓ ¡Instalada! 🎉' }]);
+        setMsgs((p) => [...p, { from: 'bot', text: 'Instalada.' }]);
       } else {
-        setMsgs((p) => [...p, { from: 'bot', text: '👆 Tocá de nuevo *Paso 1* y elegí *Instalar* para agregarla.' }]);
+        setMsgs((p) => [...p, { from: 'bot', text: 'Tocá de nuevo *Paso 1* y elegí *Instalar* para agregarla.' }]);
       }
       return;
     }
@@ -356,22 +355,22 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
       setIosGuided(true);
       setMsgs((p) => [
         ...p,
-        { from: 'bot', text: `📲 *Guardá ${skin.brand} en tu iPhone (30 seg):*` },
+        { from: 'bot', text: `*Guardá ${skin.brand} en tu iPhone:*` },
         { from: 'bot', image: '/ios-install-guide.svg' },
-        { from: 'bot', text: '1️⃣ Tocá el botón *Compartir* (el cuadradito con la flecha ↑, abajo en el centro).\n2️⃣ Deslizá y elegí *"Agregar a inicio"*.\n3️⃣ Tocá *"Agregar"* arriba a la derecha.\n\nCuando lo hagas, tocá *"Ya la agregué"* acá abajo 👇' },
+        { from: 'bot', text: '1. Tocá el botón *Compartir* (el cuadradito con la flecha ↑, abajo en el centro).\n2. Deslizá y elegí *"Agregar a inicio"*.\n3. Tocá *"Agregar"* arriba a la derecha.\n\nCuando lo hagas, tocá *"Ya la agregué"* acá abajo.' },
       ]);
       return;
     }
     // Desktop / otros sin instalador nativo → guía + tolerancia (no bloqueamos).
     setAppInstall(true);
-    setMsgs((p) => [...p, { from: 'bot', text: '📲 En tu navegador: menú (⋮) → *Instalar app*. ¡Seguimos! 👍' }]);
+    setMsgs((p) => [...p, { from: 'bot', text: 'En tu navegador: menú (⋮) → *Instalar app*.' }]);
   }
 
   // Tolerancia iOS: el usuario confirma que agregó la app (o sigue igual). No la
   // podemos verificar por código en iPhone, así que lo dejamos avanzar.
   function iosConfirm() {
     setAppInstall(true);
-    setMsgs((p) => [...p, { from: 'bot', text: '✓ ¡Genial! Sigamos 🙌' }]);
+    setMsgs((p) => [...p, { from: 'bot', text: 'Listo, sigamos.' }]);
   }
 
   function copyCbu(value: string) {
@@ -405,7 +404,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
                   <div>
                     <div style={{ fontSize: 17, fontWeight: 600, letterSpacing: 0.3, fontFamily: 'ui-monospace, Menlo, monospace' }}>{m.text}</div>
                     <button onClick={() => copyCbu(m.copy!)} style={{ marginTop: 6, background: copied === m.copy ? '#25D366' : '#EAF7EF', color: copied === m.copy ? '#fff' : C.send, border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%' }}>
-                      {copied === m.copy ? '¡Copiado! ✓' : '📋 Copiar CBU'}
+                      {copied === m.copy ? 'Copiado' : 'Copiar CBU'}
                     </button>
                   </div>
                 ) : renderText(m.text ?? '')
@@ -424,7 +423,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         {buttons.length > 0 && !typing && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
             {buttons.map((b) => (
-              <button key={b.id} onClick={() => tapButton(b)} style={{ background: '#fff', color: C.send, border: `1.5px solid ${C.send}`, borderRadius: 20, padding: '9px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,.1)' }}>{b.label}</button>
+              <button key={b.id} onClick={() => tapButton(b)} style={{ background: '#fff', color: C.send, border: `1px solid ${C.send}`, borderRadius: 12, padding: '9px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,.05)' }}>{b.label}</button>
             ))}
           </div>
         )}
@@ -432,7 +431,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         {step === 'done' && !typing && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end', marginTop: 4 }}>
             {POST_MENU.map((m) => (
-              <button key={m.id} onClick={() => tapMenu(m.id, m.label)} style={{ background: '#fff', color: C.send, border: `1.5px solid ${C.send}`, borderRadius: 22, padding: '11px 18px', fontSize: 15, fontWeight: 700, cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,.1)', minWidth: 220, textAlign: 'center' }}>{m.label}</button>
+              <button key={m.id} onClick={() => tapMenu(m.id, m.label)} style={{ background: '#fff', color: '#111827', border: `1px solid #D1D7DB`, borderRadius: 12, padding: '10px 16px', fontSize: 14, fontWeight: 500, cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,.05)', minWidth: 200, textAlign: 'center' }}>{m.label}</button>
             ))}
           </div>
         )}
@@ -440,23 +439,22 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         {step === 'app_onboarding' && !typing && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end', marginTop: 4 }}>
             {appInstall ? (
-              <button disabled style={{ background: '#EAF7EF', color: C.send, border: `1.5px solid ${C.send}`, borderRadius: 22, padding: '11px 18px', fontSize: 15, fontWeight: 700, minWidth: 250, textAlign: 'center', opacity: 0.85 }}>✓ Paso 1: App instalada</button>
+              <button disabled style={{ background: '#EAF7EF', color: C.send, border: `1px solid ${C.send}`, borderRadius: 12, padding: '11px 18px', fontSize: 14, fontWeight: 600, minWidth: 230, textAlign: 'center', opacity: 0.85 }}>App instalada</button>
             ) : iosGuided ? (
-              <button onClick={iosConfirm} style={{ background: C.send, color: '#fff', border: 'none', borderRadius: 22, padding: '11px 18px', fontSize: 15, fontWeight: 700, cursor: 'pointer', minWidth: 250, textAlign: 'center' }}>✓ Ya la agregué / Continuar</button>
+              <button onClick={iosConfirm} style={{ background: C.send, color: '#fff', border: 'none', borderRadius: 12, padding: '11px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer', minWidth: 230, textAlign: 'center' }}>Ya la agregué</button>
             ) : (
-              <button onClick={installApp} style={{ background: '#fff', color: C.send, border: `1.5px solid ${C.send}`, borderRadius: 22, padding: '11px 18px', fontSize: 15, fontWeight: 700, cursor: 'pointer', minWidth: 250, textAlign: 'center' }}>📲 Paso 1: Instalar app</button>
+              <button onClick={installApp} style={{ background: '#fff', color: C.send, border: `1px solid ${C.send}`, borderRadius: 12, padding: '11px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer', minWidth: 230, textAlign: 'center' }}>Paso 1: Instalar app</button>
             )}
-            <button onClick={enableNotifs} disabled={appNotif} style={{ background: appNotif ? '#EAF7EF' : '#fff', color: C.send, border: `1.5px solid ${C.send}`, borderRadius: 22, padding: '11px 18px', fontSize: 15, fontWeight: 700, cursor: appNotif ? 'default' : 'pointer', minWidth: 250, textAlign: 'center', opacity: appNotif ? 0.85 : 1 }}>{appNotif ? '✓ Paso 2: Notificaciones activas' : '🔔 Paso 2: Activar notificaciones'}</button>
+            <button onClick={enableNotifs} disabled={appNotif} style={{ background: appNotif ? '#EAF7EF' : '#fff', color: C.send, border: `1px solid ${C.send}`, borderRadius: 12, padding: '11px 18px', fontSize: 14, fontWeight: 600, cursor: appNotif ? 'default' : 'pointer', minWidth: 230, textAlign: 'center', opacity: appNotif ? 0.85 : 1 }}>{appNotif ? 'Notificaciones activas' : 'Paso 2: Activar notificaciones'}</button>
             {(() => {
               const done = appInstall && appNotif;
               const canSend = done || canSkip15;
               return (
                 <>
-                  <button onClick={() => canSend && tapMenu('finish_upload', done ? '✅ Terminé, enviar comprobante' : 'Enviar mi comprobante')} disabled={!canSend} style={{ background: canSend ? C.send : '#cfd8d3', color: '#fff', border: 'none', borderRadius: 22, padding: '13px 18px', fontSize: 15, fontWeight: 800, cursor: canSend ? 'pointer' : 'not-allowed', minWidth: 250, textAlign: 'center' }}>
-                    {done ? '✅ Enviar mi comprobante' : canSkip15 ? 'Enviar mi comprobante ➡️' : '✅ Enviar mi comprobante'}
+                  <button onClick={() => canSend && tapMenu('finish_upload', 'Enviar mi comprobante')} disabled={!canSend} style={{ background: canSend ? C.send : '#cfd8d3', color: '#fff', border: 'none', borderRadius: 12, padding: '13px 18px', fontSize: 14, fontWeight: 700, cursor: canSend ? 'pointer' : 'not-allowed', minWidth: 230, textAlign: 'center' }}>
+                    Enviar mi comprobante
                   </button>
-                  {!canSend && <div style={{ fontSize: 12, color: C.sub, textAlign: 'right', maxWidth: 250 }}>Completá los pasos para reclamar tu bono… o podés enviar en <b>{secsLeft}s</b></div>}
-                  {canSkip15 && !done && <div style={{ fontSize: 12, color: C.sub, textAlign: 'right', maxWidth: 250 }}>Con la app recibís tus bonos más rápido 🎁</div>}
+                  {!canSend && <div style={{ fontSize: 12, color: C.sub, textAlign: 'right', maxWidth: 230 }}>Completá los pasos o esperá <b>{secsLeft}s</b> para enviar directo.</div>}
                 </>
               );
             })()}
@@ -466,13 +464,13 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
 
       {phase === 'chat' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#F0F2F5' }}>
-          <button onClick={() => fileRef.current?.click()} title="Adjuntar comprobante" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#54656F', display: 'flex', alignItems: 'center' }}>
-            <svg viewBox="0 0 24 24" width="24" height="24" preserveAspectRatio="xMidYMid meet" fill="currentColor"><path d="M11.83,6.11 L7.46,10.47 C6.24,11.7 6.24,13.68 7.46,14.91 L13.9,21.36 C16.29,23.75 20.17,23.75 22.56,21.36 C24.95,18.97 24.95,15.09 22.56,12.7 L14.77,4.92 C13.06,3.21 10.3,3.21 8.59,4.92 C6.88,6.63 6.88,9.39 8.59,11.1 L14.19,16.7 C14.93,17.43 16.12,17.43 16.86,16.7 C17.59,15.96 17.59,14.77 16.86,14.03 L11.83,9.01 L13.25,7.59 L18.27,12.61 C20.15,14.49 20.15,17.54 18.27,19.42 C16.39,21.3 13.34,21.3 11.46,19.42 L5.02,12.97 C2.68,10.63 2.68,6.84 5.02,4.5 C7.36,2.16 11.15,2.16 13.49,4.5 L21.28,12.28 C22.9,13.9 22.9,16.53 21.28,18.15 C19.66,19.78 17.03,19.78 15.41,18.15 L8.97,11.71 C8.4,11.14 8.4,10.22 8.97,9.65 L13.34,5.29 L11.83,6.11 Z"></path></svg>
+          <button onClick={() => fileRef.current?.click()} title="Adjuntar comprobante" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#54656F', display: 'flex', alignItems: 'center', padding: '4px' }}>
+            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path></svg>
           </button>
           <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.currentTarget.value = ''; }} />
-          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send(); }} placeholder="Escribí un mensaje" style={{ flex: 1, border: 'none', borderRadius: 20, padding: '10px 14px', fontSize: 15, outline: 'none', background: '#fff', color: '#111827' }} />
-          <button onClick={send} style={{ background: C.send, color: '#fff', border: 'none', width: 42, height: 42, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingRight: 3 }}>
-            <svg viewBox="0 0 24 24" width="24" height="24" preserveAspectRatio="xMidYMid meet" fill="currentColor"><path d="M1.101,21.757 L23.8,12.028 L1.101,2.3 L1.101,9.858 L16.852,12.028 L1.101,14.198 L1.101,21.757 Z"></path></svg>
+          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send(); }} placeholder="Escribe un mensaje" style={{ flex: 1, border: 'none', borderRadius: 20, padding: '10px 14px', fontSize: 15, outline: 'none', background: '#fff', color: '#111827' }} />
+          <button onClick={send} style={{ background: C.send, color: '#fff', border: 'none', width: 42, height: 42, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingRight: 2, flexShrink: 0 }}>
+            <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
           </button>
         </div>
       )}
@@ -489,7 +487,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
               )}
               <div style={{ fontWeight: 700, fontSize: 18, color: '#111827' }}>{skin.brand}</div>
             </div>
-            <p style={{ color: '#54656F', fontSize: 14, margin: '4px 0 16px' }}>Dejanos tu número para crear tu usuario y darte tu bonificación 🎁</p>
+            <p style={{ color: '#54656F', fontSize: 14, margin: '4px 0 16px' }}>Dejanos tu número para crear tu usuario y darte tu bonificación</p>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre o apodo" style={inputStyle} />
             <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="Tu WhatsApp (ej: 11 2345 6789)" style={inputStyle} />
             <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, color: '#111827', margin: '6px 0 14px', cursor: 'pointer' }}>
@@ -497,7 +495,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
               <span>Confirmo que este es <b>mi número</b>. Si no lo es, no podré recibir mi bonificación.</span>
             </label>
             {formErr && <div style={{ color: '#C0392B', fontSize: 13, marginBottom: 10 }}>{formErr}</div>}
-            <button onClick={start} disabled={starting} style={{ width: '100%', background: C.send, color: '#fff', border: 'none', borderRadius: 24, padding: '13px', fontSize: 16, fontWeight: 600, cursor: 'pointer', opacity: starting ? 0.7 : 1 }}>{starting ? 'Verificando…' : 'Comenzar 🚀'}</button>
+            <button onClick={start} disabled={starting} style={{ width: '100%', background: C.send, color: '#fff', border: 'none', borderRadius: 24, padding: '13px', fontSize: 16, fontWeight: 600, cursor: 'pointer', opacity: starting ? 0.7 : 1 }}>{starting ? 'Verificando…' : 'Comenzar'}</button>
           </div>
         </div>
       )}
