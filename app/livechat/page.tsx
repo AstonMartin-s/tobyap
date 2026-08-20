@@ -14,7 +14,10 @@ export default async function LivechatPage() {
     <>
       <Nav slug={session.slug} role={session.role} />
       <main className="shell shell--wide" style={{ paddingTop: '1.2rem' }}>
-        <LivechatClient slug={session.slug} />
+        <LivechatClient
+          slug={session.slug}
+          landingOrigin={process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : ''}
+        />
       </main>
     </>
   );

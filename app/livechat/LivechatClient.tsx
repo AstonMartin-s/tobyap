@@ -64,7 +64,7 @@ const BONO_LINK_OPTS: Array<{ label: string; code: string }> = [
   { label: 'Fichas gratis', code: 'F1' },
 ];
 
-export function LivechatClient({ slug }: { slug: string }) {
+export function LivechatClient({ slug, landingOrigin }: { slug: string; landingOrigin?: string }) {
   const [tab, setTab] = useState<TabId>('identidad');
   const [brand, setBrand] = useState<Brand>({ brandName: '', primaryColor: '#008069', avatarUrl: null });
   const [runtime, setRuntime] = useState<ChatRuntimeConfig>(DEFAULT_RUNTIME);
@@ -75,7 +75,9 @@ export function LivechatClient({ slug }: { slug: string }) {
   const [copied, setCopied] = useState(false);
 
   const genLink = (() => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    // Dominio público del landing (go.fichaslibres.online), no la URL cruda de
+    // Railway con la que el operador pudo haber abierto el panel.
+    const origin = landingOrigin || (typeof window !== 'undefined' ? window.location.origin : '');
     const cid = linkCampaign.trim();
     const qs = `ccpp=${linkBono}${cid ? `&campaign=${cid}` : ''}`;
     return `${origin}/l/${slug}/go?${qs}`;
