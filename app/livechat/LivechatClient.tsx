@@ -132,28 +132,30 @@ export function LivechatClient() {
           <h1>Ajustes de chat</h1>
           <p>Piel del widget + guion configurable (oferta y links). Sin config guardada = valores actuales de King.</p>
         </div>
-        <button className="btn" disabled={busy} onClick={save}>Guardar todo</button>
       </div>
 
       {msg && <p style={{ color: 'var(--accent)', fontSize: '.85rem', margin: '0 0 .8rem' }}>{msg}</p>}
 
-      <div style={{ display: 'inline-flex', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 8, padding: 3, gap: 2, marginBottom: '.9rem' }}>
-        {TABS.map((t) => {
-          const active = tab === t.id;
-          return (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              style={{
-                border: 'none', background: active ? 'var(--card-2)' : 'transparent',
-                color: active ? 'var(--text)' : 'var(--muted)',
-                fontWeight: active ? 600 : 500,
-                padding: '.35rem .85rem', fontSize: '.78rem', borderRadius: 6,
-                cursor: 'pointer', transition: 'all 0.15s ease',
-                boxShadow: active ? '0 1px 3px rgba(0,0,0,0.2)' : 'none'
-              }}>
-              {t.label}
-            </button>
-          );
-        })}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', marginBottom: '.9rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'inline-flex', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 8, padding: 3, gap: 2 }}>
+          {TABS.map((t) => {
+            const active = tab === t.id;
+            return (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                style={{
+                  border: 'none', background: active ? 'var(--card-2)' : 'transparent',
+                  color: active ? 'var(--text)' : 'var(--muted)',
+                  fontWeight: active ? 600 : 500,
+                  padding: '.35rem .85rem', fontSize: '.78rem', borderRadius: 6,
+                  cursor: 'pointer', transition: 'all 0.15s ease',
+                  boxShadow: active ? '0 1px 3px rgba(0,0,0,0.2)' : 'none'
+                }}>
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+        <button className="btn" disabled={busy} onClick={save} style={{ flexShrink: 0 }}>Guardar todo</button>
       </div>
 
       <div style={{
