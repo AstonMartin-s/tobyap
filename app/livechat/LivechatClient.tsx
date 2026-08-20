@@ -127,7 +127,15 @@ export function LivechatClient() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: tab === 'preview' ? '1fr' : 'minmax(280px, 1fr) minmax(300px, 420px)', gap: '1.2rem', alignItems: 'start' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: tab === 'preview'
+          ? 'minmax(220px, 280px) minmax(0, 1fr)'
+          : 'minmax(280px, 1fr) minmax(300px, 420px)',
+        gap: '1.2rem',
+        alignItems: 'start',
+        width: '100%',
+      }}>
         {tab === 'identidad' && (
           <section className="card">
             <div className="card__title">Identidad visual</div>
@@ -238,31 +246,86 @@ export function LivechatClient() {
         )}
 
         {tab === 'preview' && (
-          <section className="card" style={{ maxWidth: 520 }}>
-            <div className="card__title">Conversación modelo</div>
-            <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '0 0 .8rem' }}>
-              Ejemplo del guion completo. Los links en <span style={{ color: '#2563eb', fontWeight: 600 }}>azul</span> salen de la pestaña Links.
-            </p>
-            <div style={{ background: '#ECE5DD', borderRadius: 12, padding: '12px 10px', maxHeight: 520, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {preview.map((b: PreviewBubble, i: number) => (
-                <div key={i} style={{ alignSelf: b.who === 'user' ? 'flex-end' : 'flex-start', maxWidth: '88%' }}>
-                  <div style={{ fontSize: '.62rem', color: '#667', marginBottom: 2, textTransform: 'uppercase' }}>{b.step}</div>
+          <>
+            <section className="card" style={{ alignSelf: 'stretch' }}>
+              <div className="card__title">Dónde va cada link</div>
+              <p style={{ color: 'var(--muted)', fontSize: '.76rem', margin: '0 0 .7rem', lineHeight: 1.45 }}>
+                Los links en <span style={{ color: '#2563eb', fontWeight: 600 }}>azul</span> en la preview salen de la pestaña Links.
+              </p>
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
+                {LINK_SLOTS.map((s) => (
+                  <li key={s.id} style={{ fontSize: '.78rem', lineHeight: 1.35, padding: '.45rem .55rem', borderRadius: 8, background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
+                    <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{s.label}</div>
+                    <div style={{ color: 'var(--muted-2)', fontSize: '.7rem', wordBreak: 'break-all' }}>
+                      {s.field === 'supportUrl' ? runtime.supportUrl : runtime.portalUrl}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <div style={{ marginTop: '.8rem', padding: '.5rem .55rem', borderRadius: 8, background: 'var(--accent-soft)', fontSize: '.72rem', color: 'var(--muted)' }}>
+                Oferta actual: {runtime.offerType === 'bonus' ? `${runtime.offerValue}% bono` : `${runtime.offerValue} fichas`} · mín. ${runtime.minDeposit.toLocaleString('es-AR')}
+              </div>
+            </section>
+
+            <section className="card" style={{ minWidth: 0 }}>
+              <div className="card__title">Conversación modelo</div>
+              <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '0 0 1rem' }}>
+                Así ve el lead el guion completo (ejemplo con Martín).
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '0 .5rem' }}>
+                <div style={{
+                  width: '100%',
+                  maxWidth: 400,
+                  borderRadius: 14,
+                  overflow: 'hidden',
+                  border: '1px solid var(--border)',
+                  boxShadow: '0 12px 40px rgba(0,0,0,.22)',
+                  fontFamily: 'system-ui, sans-serif',
+                }}>
+                  <div style={{ background: brand.primaryColor || '#008069', color: '#fff', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {brand.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={brand.avatarUrl} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', background: '#25D366' }} />
+                    ) : (
+                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#25D366', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 14 }}>{initial}</div>
+                    )}
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 15 }}>{brand.brandName || runtime.brandName}</div>
+                      <div style={{ fontSize: 11, opacity: 0.9 }}>en línea</div>
+                    </div>
+                  </div>
                   <div style={{
-                    padding: '8px 10px', borderRadius: 10, fontSize: '.82rem', lineHeight: 1.4, whiteSpace: 'pre-wrap',
-                    background: b.who === 'user' ? '#DCF8C6' : '#fff',
-                    boxShadow: '0 1px 1px rgba(0,0,0,.12)',
+                    background: '#ECE5DD',
+                    padding: '12px 10px',
+                    minHeight: 420,
+                    maxHeight: 'min(62vh, 560px)',
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
                   }}>
-                    {highlightLinks(b.text, runtime, b.linkField).map((p, j) => (
-                      <span key={j} style={p.link ? { color: '#2563eb', fontWeight: 600, textDecoration: 'underline' } : undefined}>{p.t}</span>
+                    {preview.map((b: PreviewBubble, i: number) => (
+                      <div key={i} style={{ alignSelf: b.who === 'user' ? 'flex-end' : 'flex-start', maxWidth: '92%' }}>
+                        <div style={{ fontSize: '.58rem', color: '#667', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '.03em' }}>{b.step}</div>
+                        <div style={{
+                          padding: '7px 10px', borderRadius: 10, fontSize: '.8rem', lineHeight: 1.42, whiteSpace: 'pre-wrap',
+                          background: b.who === 'user' ? '#DCF8C6' : '#fff',
+                          boxShadow: '0 1px 1px rgba(0,0,0,.1)',
+                        }}>
+                          {highlightLinks(b.text, runtime, b.linkField).map((p, j) => (
+                            <span key={j} style={p.link ? { color: '#2563eb', fontWeight: 600, textDecoration: 'underline', wordBreak: 'break-all' } : undefined}>{p.t}</span>
+                          ))}
+                        </div>
+                        {b.linkField && (
+                          <div style={{ fontSize: '.62rem', color: '#2563eb', marginTop: 2 }}>↗ {b.linkField === 'supportUrl' ? 'Link soporte' : 'Link portal'}</div>
+                        )}
+                      </div>
                     ))}
                   </div>
-                  {b.linkField && (
-                    <div style={{ fontSize: '.65rem', color: '#2563eb', marginTop: 2 }}>↗ {b.linkField === 'supportUrl' ? 'Soporte' : 'Portal'}</div>
-                  )}
                 </div>
-              ))}
-            </div>
-          </section>
+              </div>
+            </section>
+          </>
         )}
       </div>
     </>

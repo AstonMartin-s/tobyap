@@ -13,7 +13,7 @@ export default async function LivechatPage() {
   return (
     <>
       <Nav slug={session.slug} role={session.role} />
-      <main className="shell" style={{ paddingTop: '1.2rem' }}>
+      <main className="shell shell--wide" style={{ paddingTop: '1.2rem' }}>
         <LivechatClient />
       </main>
     </>
