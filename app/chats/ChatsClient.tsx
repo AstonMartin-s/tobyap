@@ -521,14 +521,15 @@ export function ChatsClient() {
             return (
               <button key={i.sessionKey} onClick={() => setSel(i.sessionKey)}
                 style={{
-                  display: 'block', width: '100%', textAlign: 'left', padding: '.55rem .7rem .55rem calc(.7rem - 3px)',
+                  display: 'block', width: '100%', textAlign: 'left', padding: '.65rem .7rem .65rem calc(.7rem - 3px)',
                   border: 'none', borderBottom: '1px solid var(--border)', borderLeft: `3px solid ${edge}`, cursor: 'pointer',
-                  background: selected ? 'var(--accent-soft)' : attn ? 'rgba(232,136,56,.07)' : 'transparent',
+                  background: selected ? 'rgba(124, 92, 255, 0.05)' : attn ? 'rgba(232,136,56,.07)' : 'transparent',
+                  transition: 'background 0.2s ease',
                 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '.35rem', minWidth: 0 }}>
                     {needsReview(i) && <span title="Comprobante por revisar" style={{ width: 7, height: 7, borderRadius: '50%', background: '#e88838', flexShrink: 0 }} />}
-                    <strong style={{ fontSize: '.85rem', fontWeight: attn ? 750 : 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: i.unread && isOpen(i) ? '#fff' : 'inherit' }}>{i.name || i.phone || 'Sin nombre'}</strong>
+                    <strong style={{ fontSize: '.85rem', fontWeight: attn ? 750 : 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: (i.unread && isOpen(i)) || selected ? '#fff' : 'inherit' }}>{i.name || i.phone || 'Sin nombre'}</strong>
                     {i.username && <span title="Usuario del portal" style={{ fontSize: '.7rem', fontWeight: 600, color: 'var(--accent)', whiteSpace: 'nowrap' }}>@{i.username}</span>}
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.45rem', flexShrink: 0 }}>
@@ -578,7 +579,7 @@ export function ChatsClient() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', minWidth: 0, justifyContent: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap' }}>
                     <strong style={{ fontSize: '1.05rem', whiteSpace: 'nowrap' }}>{detail.name || detail.phone}</strong>
-                    {detail.username && <span title="Usuario del portal" style={{ fontSize: '.78rem', fontWeight: 700, color: 'var(--accent,#7c5cff)', whiteSpace: 'nowrap' }}>@{detail.username}</span>}
+                    {detail.username && <span title="Usuario del portal" style={{ fontSize: '.78rem', fontWeight: 700, color: 'var(--accent,#7c5cff)', whiteSpace: 'nowrap', background: 'rgba(124, 92, 255, 0.1)', padding: '0.1rem 0.4rem', borderRadius: 4 }}>@{detail.username}</span>}
                     <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }} title="Cambiar estado">
                       <select
                         value={detail.step ?? ''}
@@ -642,7 +643,7 @@ export function ChatsClient() {
                 const mine = m.from === 'bot';
                 // Distinguimos automático (BOT) de lo enviado por el operador desde el panel.
                 const who = mine ? (m.op ? 'Operador' : 'Bot') : (detail.name || detail.phone || 'Cliente');
-                const accent = mine && m.op ? 'var(--accent, #7c5cff)' : mine ? '#8b93a3' : 'var(--muted,#8b93a3)';
+                const accent = mine && m.op ? 'var(--accent, #7c5cff)' : mine ? 'var(--accent)' : 'var(--muted,#8b93a3)';
                 return (
                   <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: mine ? 'flex-end' : 'flex-start', maxWidth: '74%', alignSelf: mine ? 'flex-end' : 'flex-start' }}>
                     <div style={{ fontSize: '.66rem', fontWeight: 700, letterSpacing: '.02em', color: mine ? accent : 'var(--muted,#8b93a3)', margin: mine ? '0 .35rem .18rem 0' : '0 0 .18rem .35rem', textTransform: 'uppercase' }}>
@@ -650,10 +651,11 @@ export function ChatsClient() {
                     </div>
                     <div style={{
                       padding: m.image ? '.4rem' : '.6rem .8rem', borderRadius: 16, fontSize: '.9rem', lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                      boxShadow: '0 1px 3px rgba(0,0,0,.08)',
-                      background: mine ? 'var(--card-2)' : 'var(--card-3)',
+                      boxShadow: mine ? '0 4px 12px -2px rgba(124, 92, 255, 0.15)' : '0 2px 8px -2px rgba(0,0,0,.15)',
+                      background: mine ? 'rgba(124, 92, 255, 0.03)' : 'var(--card-3)',
                       color: 'var(--text)',
-                      border: mine ? `1px solid color-mix(in srgb, ${accent} 45%, transparent)` : '1px solid var(--border)',
+                      border: mine ? `1px solid rgba(124, 92, 255, 0.2)` : '1px solid var(--border)',
+                      borderBottom: mine ? '2px solid rgba(124, 92, 255, 0.6)' : '1px solid var(--border)',
                       borderBottomRightRadius: mine ? 4 : 16,
                       borderBottomLeftRadius: mine ? 16 : 4,
                     }}>
