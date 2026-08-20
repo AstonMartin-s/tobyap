@@ -167,20 +167,20 @@ export function LivechatClient() {
                 const v = e.target.value;
                 setBrand({ ...brand, brandName: v });
                 setRuntime({ ...runtime, brandName: v });
-              }} placeholder="King" />
+              }} placeholder="King" style={{ maxWidth: 320 }} />
               <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '6px 0 0' }}>Si la PWA ya está instalada, borrá el ícono y volvé a “Agregar a inicio” para actualizar el nombre.</p>
             </div>
             <div className="field">
               <label>Color de cabecera</label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input type="color" value={brand.primaryColor} onChange={(e) => setBrand({ ...brand, primaryColor: e.target.value })} style={{ width: 44, height: 36, border: '1px solid var(--border)', borderRadius: 8, padding: 0, background: 'transparent' }} />
-                <input className="input" value={brand.primaryColor} onChange={(e) => setBrand({ ...brand, primaryColor: e.target.value })} style={{ flex: 1 }} />
+                <input className="input" value={brand.primaryColor} onChange={(e) => setBrand({ ...brand, primaryColor: e.target.value })} style={{ width: 140 }} />
               </div>
             </div>
             <div className="field">
               <label>Foto de perfil</label>
-              <input className="input" value={brand.avatarUrl ?? ''} onChange={(e) => setBrand({ ...brand, avatarUrl: e.target.value || null })} placeholder="https://… o subí un archivo" />
-              <input type="file" accept="image/*" disabled={busy} onChange={(e) => onFile(e.target.files?.[0] ?? null)} style={{ marginTop: 8, fontSize: '.8rem' }} />
+              <input className="input" value={brand.avatarUrl ?? ''} onChange={(e) => setBrand({ ...brand, avatarUrl: e.target.value || null })} placeholder="https://… o subí un archivo" style={{ maxWidth: 400 }} />
+              <input type="file" accept="image/*" disabled={busy} onChange={(e) => onFile(e.target.files?.[0] ?? null)} style={{ marginTop: 8, fontSize: '.8rem', display: 'block' }} />
             </div>
           </section>
         )}
@@ -204,13 +204,15 @@ export function LivechatClient() {
               <label>{runtime.offerType === 'bonus' ? 'Porcentaje de bono (%)' : 'Cantidad de fichas'}</label>
               <input className="input" type="number" min={1} max={999999}
                 value={runtime.offerValue}
-                onChange={(e) => setRuntime({ ...runtime, offerValue: Number(e.target.value) || 1 })} />
+                onChange={(e) => setRuntime({ ...runtime, offerValue: Number(e.target.value) || 1 })} 
+                style={{ maxWidth: 160 }} />
             </div>
             <div className="field">
               <label>Mínimo de carga ($)</label>
               <input className="input" type="number" min={100} step={100}
                 value={runtime.minDeposit}
-                onChange={(e) => setRuntime({ ...runtime, minDeposit: Number(e.target.value) || 1000 })} />
+                onChange={(e) => setRuntime({ ...runtime, minDeposit: Number(e.target.value) || 1000 })} 
+                style={{ maxWidth: 160 }} />
             </div>
             <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: 0 }}>
               Aparece en el mensaje de bienvenida y al pedir el CBU. No afecta la lógica de acreditación en Kommo.
@@ -219,7 +221,7 @@ export function LivechatClient() {
         )}
 
         {tab === 'links' && (
-          <section className="card">
+          <section className="card" style={{ maxWidth: 860 }}>
             <div className="card__title">Links por mensaje</div>
             <div style={{ marginBottom: '.9rem', padding: '.55rem .65rem', borderRadius: 8, background: 'var(--blue-soft)', border: '1px solid var(--border)', fontSize: '.74rem', lineHeight: 1.45, color: 'var(--muted)' }}>
               <strong style={{ color: 'var(--text)' }}>Cómo funciona en King:</strong>
