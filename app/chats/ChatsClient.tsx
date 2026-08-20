@@ -106,6 +106,7 @@ function isoDateLocal(d: Date) {
 }
 
 export function ChatsClient() {
+  const [showKpis, setShowKpis] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [sel, setSel] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ messages: Msg[]; phone: string | null; name: string | null; username: string | null; step: string | null; kommoLeadId: number | null } | null>(null);
