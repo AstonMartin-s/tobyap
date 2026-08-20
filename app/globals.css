@@ -93,11 +93,11 @@ body {
 a { color: inherit; }
 
 /* ---------- Layout (sidebar + content) ---------- */
-:root { --sidebar-w: 244px; }
+:root { --sidebar-w: 200px; }
 /* Sidebar colapsado (solo iconos) — estilo Black Dragon. Una sola variable
    maneja el ancho del sidebar y el margen del contenido. */
-:root[data-sidebar="collapsed"] { --sidebar-w: 74px; }
-:root[data-sidebar="collapsed"] .sidebar { padding-left: 0.5rem; padding-right: 0.5rem; }
+:root[data-sidebar="collapsed"] { --sidebar-w: 68px; }
+:root[data-sidebar="collapsed"] .sidebar { padding-left: 0.45rem; padding-right: 0.45rem; }
 :root[data-sidebar="collapsed"] .sidebar__name,
 :root[data-sidebar="collapsed"] .sidebar__tag,
 :root[data-sidebar="collapsed"] .sidebar__brand > span:last-child,
@@ -140,11 +140,12 @@ a { color: inherit; }
 .sidebar {
   position: fixed; top: 0; left: 0; bottom: 0; width: var(--sidebar-w); z-index: 50;
   display: flex; flex-direction: column;
-  padding: 1.25rem 0.9rem 1rem;
+  padding: 1.1rem 0.55rem 0.85rem;
   background: linear-gradient(180deg, var(--bg-2), var(--bg));
   border-right: 1px solid var(--border);
+  box-sizing: border-box;
 }
-.sidebar__brand { display: flex; align-items: center; gap: 0.7rem; padding: 0.35rem 0.5rem 1.4rem; }
+.sidebar__brand { display: flex; align-items: center; gap: 0.55rem; padding: 0.25rem 0.35rem 1.1rem; min-width: 0; }
 .sidebar__mark {
   width: 38px; height: 38px; border-radius: 11px; flex: 0 0 auto;
   display: grid; place-items: center; color: var(--on-accent);
@@ -154,11 +155,13 @@ a { color: inherit; }
 .sidebar__name { font-weight: 650; font-size: 1.05rem; letter-spacing: -0.02em; line-height: 1.1; }
 .sidebar__name b { color: var(--accent); }
 .sidebar__tag { color: var(--muted-2); font-size: 0.72rem; font-weight: 500; }
-.sidebar__nav { display: flex; flex-direction: column; gap: 0.18rem; }
+.sidebar__nav { display: flex; flex-direction: column; gap: 0.15rem; align-items: stretch; }
 .sidebar__link {
   position: relative;
-  display: flex; align-items: center; gap: 0.7rem;
-  padding: 0.6rem 0.7rem; border-radius: 11px; font-size: 0.9rem; font-weight: 550;
+  display: flex; align-items: center; gap: 0.55rem;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.52rem 0.55rem; border-radius: 10px; font-size: 0.86rem; font-weight: 550;
   color: var(--muted); text-decoration: none; transition: color 0.15s, background 0.15s;
 }
 .sidebar__link svg { width: 18px; height: 18px; flex: 0 0 auto; opacity: 0.85; }
@@ -166,26 +169,26 @@ a { color: inherit; }
 .sidebar__link.active { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
 .sidebar__link.active svg { color: var(--accent); opacity: 1; }
 .sidebar__link.active::before {
-  content: ''; position: absolute; left: -0.9rem; top: 50%; transform: translateY(-50%);
-  width: 4px; height: 20px; border-radius: 0 999px 999px 0; background: var(--accent);
+  content: ''; position: absolute; left: -0.55rem; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 18px; border-radius: 0 999px 999px 0; background: var(--accent);
 }
 .sidebar__spacer { margin-top: auto; }
 .sidebar__status {
-  display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 0.7rem; margin-bottom: 0.5rem;
-  font-size: 0.78rem; color: var(--muted);
+  display: flex; align-items: center; gap: 0.45rem; padding: 0.5rem 0.55rem; margin-bottom: 0.4rem;
+  font-size: 0.74rem; color: var(--muted);
 }
 .nav__dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); flex: 0 0 auto; }
 .sidebar__logout {
-  width: 100%; padding: 0.55rem 0.7rem; border-radius: 10px; font-size: 0.86rem; cursor: pointer;
+  width: 100%; box-sizing: border-box; padding: 0.5rem 0.55rem; border-radius: 9px; font-size: 0.82rem; cursor: pointer;
   background: transparent; border: 1px solid var(--border-2); color: var(--muted);
   display: flex; align-items: center; gap: 0.5rem; justify-content: flex-start; transition: all 0.15s;
 }
 .sidebar__logout svg { width: 17px; height: 17px; }
 .sidebar__logout:hover { color: var(--danger); border-color: var(--danger); }
 .sidebar__theme {
-  width: 100%; padding: 0.55rem 0.7rem; border-radius: 10px; font-size: 0.86rem; cursor: pointer;
+  width: 100%; box-sizing: border-box; padding: 0.5rem 0.55rem; border-radius: 9px; font-size: 0.82rem; cursor: pointer;
   background: transparent; border: 1px solid var(--border-2); color: var(--muted);
-  display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; transition: all 0.15s;
+  display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; transition: all 0.15s;
 }
 .sidebar__theme svg { width: 17px; height: 17px; }
 .sidebar__theme:hover { color: var(--accent); border-color: var(--accent); }
