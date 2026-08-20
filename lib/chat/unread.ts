@@ -1,6 +1,11 @@
-/** Merge de flags de no-leído con contador incremental (panel). */
-export function unreadDataMerge(prev: Record<string, unknown> | null | undefined): Record<string, unknown> {
-  const was = prev?.unread === true;
-  const prevN = typeof prev?.unreadCount === 'number' ? prev.unreadCount : 0;
-  return { unread: true, unreadCount: was ? prevN + 1 : 1, archived: false };
+import { sql, type SQL } from 'drizzle-orm';
+
+/** Incrementa unreadCount atómicamente sobre una expresión jsonb `data`. */
+export function applyUnreadIncrement(expr: SQL): SQL {
+  return sql`${expr} || jsonb_build_object(
+    'unread', true,
+    'archived', false,
+    'unreadCount',
+    coalesce((${expr} ->> 'unreadCount')::int, CASE WHEN (${expr} ->> 'unread') = 'true' THEN 1 ELSE 0 END) + 1
+  )`;
 }

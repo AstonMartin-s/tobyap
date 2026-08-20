@@ -252,7 +252,7 @@ export async function POST(req: NextRequest) {
   // upload lo rechazan). Además lo archivamos para sacarlo de la bandeja.
   if (b.op === 'block' || b.op === 'unblock') {
     const blocked = b.op === 'block';
-    await mergeChatData(s.id, { blocked, ...(blocked ? { archived: true, unread: false } : {}) });
+    await mergeChatData(s.id, { blocked, ...(blocked ? { archived: true, unread: false, unreadCount: 0 } : {}) });
     return NextResponse.json({ ok: true, blocked });
   }
 

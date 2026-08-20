@@ -5,7 +5,6 @@ import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { onComprobante } from '@/lib/chat/flow';
 import { appendChatMessages } from '@/lib/chat/mutations';
-import { unreadDataMerge } from '@/lib/chat/unread';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { saveComprobante } from '@/lib/storage';
 import { signFilePath } from '@/lib/chat/fileToken';
@@ -50,8 +49,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // Append atómico + merge de data (no pisa mensajes ni flags concurrentes).
   await appendChatMessages(s.id, newMsgs, {
     step: 'app_onboarding', // primero instala app + notificaciones, luego entra a revisión
+    markUnread: true,
     dataMerge: {
-      ...unreadDataMerge(s.data as Record<string, unknown> | null),
       ...(storedPath ? { comprobantePath: storedPath } : { comprobante: buf.toString('base64') }),
       comprobanteMime: mime,
       comprobanteName: file.name,

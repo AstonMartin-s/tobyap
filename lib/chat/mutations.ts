@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { db } from '@/db';
+import { applyUnreadIncrement } from '@/lib/chat/unread';
 
 // Escrituras ATÓMICAS sobre chat_sessions. El patrón anterior (leer la fila en JS,
 // modificar el array/objeto y reescribirlo entero) sufre lost-update: si dos
@@ -16,9 +17,11 @@ interface AppendOpts {
   dataMerge?: Record<string, unknown>;
   /** Claves a eliminar de `data` (ej. limpiar el base64 del comprobante). */
   dataRemove?: string[];
+  /** Marca no leído e incrementa unreadCount en Postgres (sin race). */
+  markUnread?: boolean;
 }
 
-function dataExpr(merge?: Record<string, unknown>, remove?: string[]) {
+function dataExpr(merge?: Record<string, unknown>, remove?: string[], markUnread?: boolean) {
   let expr = sql`coalesce(data, '{}'::jsonb)`;
   if (merge && Object.keys(merge).length) {
     expr = sql`${expr} || ${JSON.stringify(merge)}::jsonb`;
@@ -26,6 +29,7 @@ function dataExpr(merge?: Record<string, unknown>, remove?: string[]) {
   for (const k of remove ?? []) {
     expr = sql`${expr} - ${k}`;
   }
+  if (markUnread) expr = applyUnreadIncrement(expr);
   return expr;
 }
 
@@ -40,8 +44,8 @@ export async function appendChatMessages(
     sql`updated_at = now()`,
   ];
   if (opts.step) parts.push(sql`step = ${opts.step}`);
-  if (opts.dataMerge || opts.dataRemove) {
-    parts.push(sql`data = ${dataExpr(opts.dataMerge, opts.dataRemove)}`);
+  if (opts.dataMerge || opts.dataRemove?.length || opts.markUnread) {
+    parts.push(sql`data = ${dataExpr(opts.dataMerge, opts.dataRemove, opts.markUnread)}`);
   }
   await db.execute(sql`UPDATE chat_sessions SET ${sql.join(parts, sql`, `)} WHERE id = ${sessionId}`);
 }

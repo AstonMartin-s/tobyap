@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { fmtChatTime } from '@/lib/datetime/ar';
 
 type Item = {
   sessionKey: string;
@@ -96,14 +97,7 @@ function playChime() {
     });
   } catch { /* sin audio */ }
 }
-const TZ_AR = 'America/Argentina/Buenos_Aires';
-const fmtTime = (at: number) => {
-  const d = new Date(at < 1e12 ? at * 1000 : at);
-  const today = new Date();
-  const sameDay = d.toLocaleDateString('es-AR', { timeZone: TZ_AR }) === today.toLocaleDateString('es-AR', { timeZone: TZ_AR });
-  const hh = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: TZ_AR });
-  return sameDay ? hh : `${d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', timeZone: TZ_AR })} ${hh}`;
-};
+const fmtTime = fmtChatTime;
 const timeAgo = (iso: string | null) => {
   if (!iso) return '';
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
