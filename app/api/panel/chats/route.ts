@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getSession } from '@/lib/session';
@@ -20,16 +20,32 @@ export const dynamic = 'force-dynamic';
 type Msg = { from: 'bot' | 'user'; text?: string; image?: string; at: number; op?: boolean };
 
 // GET /api/panel/chats  → lista de sesiones del tenant logueado (panel operador).
-export async function GET() {
+// Por defecto devuelve las 200 más recientes (bandeja de trabajo). Las pestañas
+// terminales (Acreditados / No cargó / Archivadas) son estados viejos que caen
+// fuera de esas 200, así que se piden aparte con ?view= para que la lista no
+// quede vacía aunque el contador (calculado sobre toda la base) diga que hay.
+export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'no autorizado' }, { status: 401 });
+
+  const view = new URL(req.url).searchParams.get('view');
+  const base = eq(chatSessions.tenantId, session.tenantId);
+  let where = base;
+  let limit = 200;
+  if (view === 'done' || view === 'no_cargo') {
+    where = and(base, eq(chatSessions.step, view))!;
+    limit = 500;
+  } else if (view === 'archived') {
+    where = and(base, sql`(${chatSessions.data} ->> 'archived') = 'true'`)!;
+    limit = 500;
+  }
 
   const rows = await db
     .select()
     .from(chatSessions)
-    .where(eq(chatSessions.tenantId, session.tenantId))
+    .where(where)
     .orderBy(desc(chatSessions.updatedAt))
-    .limit(200);
+    .limit(limit);
 
   // Stats sobre TODA la base (solo step + fecha, liviano) para que los KPIs no
   // queden capados por el límite de 200 de la lista.

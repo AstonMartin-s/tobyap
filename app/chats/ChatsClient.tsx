@@ -168,6 +168,23 @@ export function ChatsClient() {
     setStats(r.stats ?? []);
   }, []);
 
+  // Pestañas terminales (Acreditados / No cargó / Archivadas): son estados viejos
+  // que quedan fuera de las 200 recientes, así que se piden aparte al server.
+  const [termItems, setTermItems] = useState<Item[]>([]);
+  const termView = filter === 'acreditados' ? 'done' : filter === 'no_cargo' ? 'no_cargo' : filter === 'archivadas' ? 'archived' : '';
+  const loadTerm = useCallback(async (view: string) => {
+    if (!view) return;
+    const r = await fetch(`/api/panel/chats?view=${view}`).then((x) => x.json()).catch(() => null);
+    if (!r?.ok) return;
+    setTermItems(r.items as Item[]);
+  }, []);
+  useEffect(() => {
+    if (!termView) { setTermItems([]); return; }
+    loadTerm(termView);
+    const t = setInterval(() => loadTerm(termView), 8000);
+    return () => clearInterval(t);
+  }, [termView, loadTerm]);
+
   const loadDetail = useCallback(async (key: string) => {
     const r = await fetch('/api/panel/chats', {
       method: 'POST',
@@ -244,18 +261,23 @@ export function ChatsClient() {
   // "Requiere atención" = comprobante por revisar O mensaje sin leer (solo activos).
   const needsAttention = (i: Item) => needsReview(i) || noLeido(i);
   const ql = q.trim().toLowerCase();
-  const shown = items.filter((i) => {
+  // En pestañas terminales la fuente es la lista dedicada del server (no las 200
+  // recientes), así que no quedan vacías aunque el estado sea viejo.
+  const source = termView ? termItems : items;
+  const shown = source.filter((i) => {
     if (ql) {
       const hay = `${i.name ?? ''} ${i.username ?? ''} ${i.phone ?? ''} ${i.campaign ?? ''}`.toLowerCase();
       if (!hay.includes(ql)) return false;
     }
     if (filter === 'archivadas') return i.archived;
-    if (i.archived) return false; // el resto de tabs oculta archivados
+    // Pestañas terminales (report/export): muestran TODO el estado, archivado o no,
+    // para que la lista coincida con el contador (calculado sobre toda la base).
+    if (filter === 'acreditados') return i.step === 'done';
+    if (filter === 'no_cargo') return i.step === 'no_cargo';
+    if (i.archived) return false; // el resto de tabs (bandeja) oculta archivados
     if (filter === 'revisar') return needsReview(i);
     if (filter === 'no_leidos') return noLeido(i);
     if (filter === 'activos') return isActivoReciente(i);
-    if (filter === 'acreditados') return i.step === 'done';
-    if (filter === 'no_cargo') return i.step === 'no_cargo';
     return true;
   });
 

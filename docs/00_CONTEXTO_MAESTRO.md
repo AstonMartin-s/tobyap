@@ -68,6 +68,14 @@
 - El ícono de inicio en el celu queda pegado al nombre de cuando se instaló (iOS no lo actualiza). Hay que borrar y volver a agregar.
 - Patch: chat refresca piel vía `/brand`; SW no cachea HTML/manifiesto; nota en el panel Livechat.
 
+### 2026-08-19 — Fix panel Chats: pestañas terminales vacías (King)
+
+- Síntoma: en King, pestaña **Acreditados** mostraba "Sin chats" con contador 52. Idem **No cargó** (468).
+- Causa: `GET /api/panel/chats` trae solo las 200 sesiones más recientes por `updatedAt`, pero los contadores salen de stats sobre TODA la base. Los acreditados/no_cargo de King son estados viejos (40/52 fuera de las 200) → la lista quedaba vacía. Además el filtro ocultaba archivados (17/52 done archivados).
+- Fix backend: `GET ?view=done|no_cargo|archived` (límite 500) para pedir la pestaña terminal aparte. Archivadas filtra por `data->>'archived'`.
+- Fix front (`ChatsClient.tsx`): las pestañas terminales usan esa lista dedicada y **no** ocultan archivados, así la lista coincide con el contador.
+- Overlap con Claude (`ChatsClient.tsx`, `panel/chats`): fix de incidente en vivo; avisar a Claude para pull antes de tocar esos archivos.
+
 ### 2026-08-19 — Fase 2 hardening opt-in (luego en main `5a102b5`; flags siguen OFF)
 
 - 2.4 `/api/test/capi` → 404 en production (`ALLOW_TEST_CAPI=1` emergencia).
