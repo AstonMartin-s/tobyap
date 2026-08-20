@@ -104,6 +104,11 @@ export async function GET(req: NextRequest) {
         if (msgs[i].from === 'user') { last = msgs[i]; break; }
       }
     }
+    const lastMsg = msgs[msgs.length - 1];
+    const lastAtMs = lastMsg?.at;
+    const lastAt = lastAtMs
+      ? new Date(lastAtMs < 1e12 ? lastAtMs * 1000 : lastAtMs).toISOString()
+      : s.updatedAt ? new Date(s.updatedAt).toISOString() : null;
     return {
       sessionKey: s.sessionKey,
       phone: s.phone,
@@ -120,6 +125,7 @@ export async function GET(req: NextRequest) {
       msgCount: msgs.length,
       lastText: last?.text ?? (last?.image ? '📷 imagen' : ''),
       lastFrom: last?.from ?? null,
+      lastAt,
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,
     };
@@ -225,7 +231,7 @@ export async function POST(req: NextRequest) {
   if (b.op === 'get') {
     const full = (s.data ?? {}) as Record<string, unknown>;
     // Abrir el chat = leerlo → limpia el "no leído" (best-effort, sin bloquear).
-    if (full.unread) mergeChatData(s.id, { unread: false }).catch(() => {});
+    if (full.unread) mergeChatData(s.id, { unread: false }, undefined, { touchUpdatedAt: false }).catch(() => {});
     const { comprobante, ...dataLite } = full;
     void comprobante;
     return NextResponse.json({ ok: true, session: { ...s, data: dataLite } });

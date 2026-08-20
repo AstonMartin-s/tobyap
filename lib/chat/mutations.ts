@@ -51,10 +51,9 @@ export async function mergeChatData(
   sessionId: string,
   merge: Record<string, unknown>,
   remove?: string[],
+  opts?: { touchUpdatedAt?: boolean },
 ): Promise<void> {
-  await db.execute(sql`
-    UPDATE chat_sessions
-    SET data = ${dataExpr(merge, remove)}, updated_at = now()
-    WHERE id = ${sessionId}
-  `);
+  const parts = [sql`data = ${dataExpr(merge, remove)}`];
+  if (opts?.touchUpdatedAt !== false) parts.push(sql`updated_at = now()`);
+  await db.execute(sql`UPDATE chat_sessions SET ${sql.join(parts, sql`, `)} WHERE id = ${sessionId}`);
 }

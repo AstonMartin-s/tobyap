@@ -18,6 +18,7 @@ type Item = {
   msgCount: number;
   lastText: string;
   lastFrom: 'bot' | 'user' | null;
+  lastAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -30,7 +31,7 @@ const STEP: Record<string, { label: string; color: string }> = {
   welcome: { label: 'Pidió Usuario', color: '#64748b' },
   credenciales: { label: 'Usuario Creado', color: '#0ea5e9' },
   cbu: { label: 'Pidió CBU', color: '#3b82f6' },
-  comprobante: { label: 'Pidió CBU', color: '#3b82f6' },
+  comprobante: { label: 'Espera comprob.', color: '#6366f1' },
   app_onboarding: { label: 'Instalando app', color: '#f59e0b' },
   validando: { label: 'Revisar imagen', color: '#f97316' },
   done: { label: 'Cargo$', color: '#22c55e' },
@@ -534,7 +535,7 @@ export function ChatsClient() {
                     {i.username && <span title="Usuario del portal" style={{ fontSize: '.7rem', fontWeight: 600, color: 'var(--accent)', whiteSpace: 'nowrap' }}>@{i.username}</span>}
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.45rem', flexShrink: 0 }}>
-                    <span style={{ fontSize: '.66rem', color: 'var(--muted-2, #5d6478)' }}>{timeAgo(i.updatedAt)}</span>
+                    <span style={{ fontSize: '.66rem', color: 'var(--muted-2, #5d6478)' }}>{timeAgo(i.lastAt ?? i.updatedAt)}</span>
                     {i.unread && (
                       <span title="Mensajes sin leer" style={{ width: 18, height: 18, borderRadius: '50%', background: '#e8a050', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '.62rem', fontWeight: 750, boxShadow: '0 0 6px rgba(232,160,80,0.4)' }}>1</span>
                     )}
@@ -705,7 +706,7 @@ export function ChatsClient() {
                       <span style={{ fontSize: '.6rem', fontWeight: 700, color: 'var(--muted-2,#5d6478)', textTransform: 'uppercase', letterSpacing: '.04em', marginRight: '.15rem' }}>Comprob.</span>
                       <button className="tt" data-tt="Comprobante válido → acredita y pasa a Cargo$ (dispara la conversión a Meta)" disabled={busy} onClick={() => act('approve')} style={abtn('#16a34a', true)}>✅ Aprobar</button>
                       <button className="tt" data-tt="En revisión — le avisa que estamos validando" disabled={busy} onClick={() => act('pending')} style={abtn()}>⏳ Pendiente</button>
-                      <button className="tt" data-tt="Comprobante ilegible/incompleto — le pide reenviarlo" disabled={busy} onClick={() => act('reject')} style={abtn('#ef4444')}>⚠️ Erróneo</button>
+                      <button className="tt" data-tt="Comprobante ilegible/incompleto — le pide reenviarlo" disabled={busy} onClick={() => act('reject')} style={abtn('#f59e0b')}>⚠️ Erróneo</button>
                       <button className="tt" data-tt="No depositó — lo pasa a No Cargo (sale de atención)" disabled={busy} onClick={() => act('set_step', undefined, 'no_cargo')} style={abtn('#ef4444')}>🚫 No cargó</button>
                       <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 .1rem' }} />
                       <button className="tt" data-tt="Le pasa el WhatsApp de soporte (walink)" disabled={busy} onClick={() => act('support')} style={abtn()}>🙋 Soporte</button>
