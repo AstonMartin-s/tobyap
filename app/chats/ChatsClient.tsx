@@ -523,8 +523,8 @@ export function ChatsClient() {
                     </div>
                     <div style={{
                       padding: m.image ? '.4rem' : '.6rem .8rem', borderRadius: 16, fontSize: '.9rem', lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                      boxShadow: '0 2px 6px rgba(0,0,0,.22)',
-                      background: mine ? 'var(--card-2, #232834)' : 'var(--card-3, #1b1f28)',
+                      boxShadow: '0 1px 3px rgba(0,0,0,.08)',
+                      background: mine ? 'var(--card-2)' : 'var(--card-3)',
                       color: 'var(--text)',
                       border: mine ? `1px solid color-mix(in srgb, ${accent} 45%, transparent)` : '1px solid var(--border)',
                       borderBottomRightRadius: mine ? 4 : 16,
