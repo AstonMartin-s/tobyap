@@ -630,7 +630,7 @@ export function ChatsClient() {
           <div className="empty" style={{ padding: '3rem', margin: 'auto' }}>Elegí un chat para ver la conversación.</div>
         ) : (
           <>
-            <div style={{ padding: '.8rem 1rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ padding: '.8rem 1rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap' }}>
               {/* IZQUIERDA: icono, nombre + selector de estado, y campaña */}
               <div style={{ display: 'flex', gap: '.7rem', minWidth: 0 }}>
                 <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--card-3)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', flexShrink: 0 }}>
@@ -673,41 +673,38 @@ export function ChatsClient() {
                   })()}
                 </div>
               </div>
-              {/* DERECHA: contacto + acciones supervisor */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.35rem', fontSize: '.76rem', color: 'var(--muted,#94a3b8)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem' }}>{ICONS.phone} {detail.phone || '—'}</span>
-                  {detail.phone && (
-                    <button onClick={() => { navigator.clipboard?.writeText(detail.phone!).then(() => { setToast('Teléfono copiado ✓'); setTimeout(() => setToast(null), 1500); }); }}
-                      title="Copiar teléfono" style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', color: 'var(--muted,#94a3b8)', fontSize: '.7rem', padding: '.05rem .35rem', display: 'inline-flex', alignItems: 'center', gap: '.25rem' }}>
-                      {ICONS.copy} copiar
-                    </button>
-                  )}
-                  <span>{detail.kommoLeadId ? `· Kommo #${detail.kommoLeadId}` : '· sin lead Kommo'}</span>
-                </div>
+              {/* DERECHA: contacto + acciones en una sola fila */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', flexWrap: 'wrap', justifyContent: 'flex-end', fontSize: '.76rem', color: 'var(--muted,#94a3b8)', flexShrink: 0 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', whiteSpace: 'nowrap' }}>{ICONS.phone} {detail.phone || '—'}</span>
+                {detail.phone && (
+                  <button onClick={() => { navigator.clipboard?.writeText(detail.phone!).then(() => { setToast('Teléfono copiado ✓'); setTimeout(() => setToast(null), 1500); }); }}
+                    title="Copiar teléfono" style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', color: 'var(--muted,#94a3b8)', fontSize: '.7rem', padding: '.05rem .35rem', display: 'inline-flex', alignItems: 'center', gap: '.25rem' }}>
+                    {ICONS.copy} copiar
+                  </button>
+                )}
+                <span style={{ whiteSpace: 'nowrap' }}>{detail.kommoLeadId ? `· Kommo #${detail.kommoLeadId}` : '· sin lead Kommo'}</span>
                 {(() => {
                   const blk = items.find((i) => i.sessionKey === sel)?.blocked;
-                  const hdrBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: '.3rem', borderRadius: 6, cursor: 'pointer', fontSize: '.7rem', fontWeight: 600, padding: '.18rem .5rem' };
+                  const hdrBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: '.3rem', borderRadius: 6, cursor: 'pointer', fontSize: '.7rem', fontWeight: 600, padding: '.18rem .5rem', whiteSpace: 'nowrap' };
                   return (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.3rem' }}>
+                    <>
+                      <span style={{ width: 1, height: 14, background: 'var(--border)', margin: '0 .1rem' }} aria-hidden />
                       <button className="tt tt--down tt--right" data-tt={blk ? 'Podrá volver a escribir' : 'No podrá seguir en el chat; se archiva'} disabled={busy}
                         onClick={() => act(blk ? 'unblock' : 'block')}
                         style={{ ...hdrBtn, background: blk ? '#ef4444' : 'transparent', border: `1px solid ${blk ? '#ef4444' : '#b91c1c'}`, color: blk ? '#fff' : '#f87171' }}>
                         {blk ? ICONS.unblock : ICONS.block}{blk ? 'Desbloquear' : 'Bloquear'}
                       </button>
-                      <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                        <button className="tt" data-tt="Supervisor: pasa a cola Revisar (validando) para que un operario lo atienda" disabled={busy}
-                          onClick={() => act('mark_revisar')}
-                          style={{ ...hdrBtn, background: 'rgba(249,115,22,.12)', border: '1px solid rgba(249,115,22,.45)', color: '#fb923c' }}>
-                          {ICONS.revisar} Revisar
-                        </button>
-                        <button className="tt" data-tt="Eliminar chat y opcionalmente el lead en Kommo" disabled={busy}
-                          onClick={() => { setDelChat(false); setDelLead(false); setDeleteOpen(true); }}
-                          style={{ ...hdrBtn, background: 'transparent', border: '1px solid #7f1d1d', color: '#fca5a5' }}>
-                          {ICONS.delete} Eliminar
-                        </button>
-                      </div>
-                    </div>
+                      <button className="tt" data-tt="Supervisor: pasa a cola Revisar (validando) para que un operario lo atienda" disabled={busy}
+                        onClick={() => act('mark_revisar')}
+                        style={{ ...hdrBtn, background: 'rgba(249,115,22,.12)', border: '1px solid rgba(249,115,22,.45)', color: '#fb923c' }}>
+                        {ICONS.revisar} Revisar
+                      </button>
+                      <button className="tt" data-tt="Eliminar chat y opcionalmente el lead en Kommo" disabled={busy}
+                        onClick={() => { setDelChat(false); setDelLead(false); setDeleteOpen(true); }}
+                        style={{ ...hdrBtn, background: 'transparent', border: '1px solid #7f1d1d', color: '#fca5a5' }}>
+                        {ICONS.delete} Eliminar
+                      </button>
+                    </>
                   );
                 })()}
               </div>
