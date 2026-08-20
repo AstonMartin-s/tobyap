@@ -10,6 +10,7 @@ import { updateLeadStatus } from '@/lib/kommo';
 import { kommoStatusFromPanelStep, acreditarChat } from '@/lib/chat/release';
 import { trimBandeja } from '@/lib/chat/bandeja';
 import { appendChatMessages, mergeChatData } from '@/lib/chat/mutations';
+import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { emitCargo, panelApproveEmitsCargo } from '@/lib/cargo/emit';
 import {
   comprobantePendingMessages,
@@ -229,6 +230,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, session: { ...s, data: dataLite } });
   }
 
+  const runtime = await loadChatRuntime(session.tenantId, session.slug);
+
   let newMsgs: Msg[] = [];
   let newStep: string | undefined;
   let note: string | null = null;
@@ -249,13 +252,13 @@ export async function POST(req: NextRequest) {
       note = '⚠️ Comprobante RECHAZADO desde el panel (se le pidió reenviar).';
       break;
     case 'support':
-      newMsgs = supportMessage().map((m) => ({ from: 'bot', text: m.text, at: m.at }));
+      newMsgs = supportMessage(runtime).map((m) => ({ from: 'bot', text: m.text, at: m.at }));
       note = '🙋 Se le pasó el link de soporte (walink) desde el panel.';
       break;
     case 'deposit':
     case 'withdraw':
     case 'forgot_user': {
-      const r = postActionMessages(b.op, data);
+      const r = postActionMessages(b.op, data, runtime);
       newMsgs = r.messages.map((m) => ({ from: 'bot', text: m.text, image: m.image, at: m.at }));
       break;
     }

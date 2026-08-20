@@ -68,6 +68,16 @@
 - El ícono de inicio en el celu queda pegado al nombre de cuando se instaló (iOS no lo actualiza). Hay que borrar y volver a agregar.
 - Patch: chat refresca piel vía `/brand`; SW no cachea HTML/manifiesto; nota en el panel Livechat.
 
+### 2026-08-20 — Ajustes de chat (Fase 4 parcial): oferta + links + preview
+
+- Panel `/livechat` → **Ajustes de chat** (4 pestañas): Identidad, Oferta, Links, Vista previa.
+- `chat_config` ampliado (sin migración): `offerType` (bonus|fichas), `offerValue`, `minDeposit`,
+  `portalUrl`, `supportUrl`. Sin guardar = defaults King (30%, $1000, greenbet, wa.link).
+- `lib/chat/runtime.ts` + `loadRuntime.ts`: parse + textos de promo + `buildConversationPreview`.
+- `flow.ts`: funciones aceptan `cfg?: ChatRuntimeConfig` con default `DEFAULT_RUNTIME` (aditivo).
+  Rutas start/action/message/panel/chats + `release.ts` cargan runtime por tenant.
+- Magic-link Pagoda al acreditar sigue dinámico; portal config es fallback.
+
 ### 2026-08-20 — Export CSV flexible (panel chats)
 
 - Botón «Exportar» con modal: rango de fechas (createdAt), filtro opcional por estado.

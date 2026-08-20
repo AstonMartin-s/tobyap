@@ -5,6 +5,7 @@ import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { onFreeText, accountStep, WANT_ACCOUNT_RE } from '@/lib/chat/flow';
 import { appendChatMessages } from '@/lib/chat/mutations';
+import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadFields, updateLeadName } from '@/lib/kommo';
 
@@ -22,14 +23,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // Bloqueado: ignoramos el mensaje (no se guarda, no reabre la bandeja).
   if ((s.data as Record<string, unknown> | null)?.blocked) return NextResponse.json({ ok: true, messages: [], blocked: true });
 
+  const runtime = await loadChatRuntime(tenant.id, tenant.name);
+
   const userMsg = { from: 'user' as const, text: b.text, at: Date.now() };
 
-  // El cliente tipeó la intención de "quiero mi cuenta" en vez de tocar el botón
-  // (muy común en mobile) — si lo dejamos pasar por onFreeText queda trabado en
-  // 'welcome' para siempre, sin usuario/contraseña creados. Disparamos el mismo
-  // camino que el botón 'want_account' del panel de acciones.
+  // El cliente tipeó "quiero mi cuenta" en vez de tocar el botón (muy común en mobile).
   if ((s.step ?? 'welcome') === 'welcome' && WANT_ACCOUNT_RE.test(b.text)) {
-    const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name });
+    const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name }, runtime);
     const botMsgs = r.messages.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }));
     await appendChatMessages(s.id, [userMsg, ...botMsgs], { step: r.step, dataMerge: { ...r.data, unread: true, archived: false } });
     const history = [...(s.messages ?? []), userMsg, ...botMsgs];
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ ok: true, messages: r.messages, buttons: r.buttons, step: r.step, total: history.length });
   }
 
-  let replies = onFreeText(s.step ?? 'comprobante', b.text);
+  let replies = onFreeText(s.step ?? 'comprobante', b.text, runtime);
   // ANTI-LOOP: no repetir el MISMO auto-mensaje si ya fue el último del bot. El
   // cliente sigue escribiendo ("no tengo plata", etc.) y no tiene sentido repetir
   // "mandame el comprobante" cada vez. Lo decimos una vez y esperamos.

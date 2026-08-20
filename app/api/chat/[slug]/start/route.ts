@@ -6,6 +6,7 @@ import { chatSessions, metaEvents, attributions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { checkWhatsApp } from '@/lib/chat/wachecker';
 import { welcomeStep } from '@/lib/chat/flow';
+import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { createChatLead, addLeadNote } from '@/lib/chat/kommoMirror';
 import { sendCapiEvent, CAPI_VALUE } from '@/lib/meta';
 import { clientIp, rateLimit } from '@/lib/rateLimit';
@@ -31,9 +32,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ ok: false, error: wa.reason === 'sin WhatsApp' ? 'Ese número no tiene WhatsApp. Poné el correcto para recibir tu bonificación.' : 'Número inválido. Revisá que esté completo.' }, { status: 422 });
   }
 
-  // DEDUPE POR TELÉFONO (nuestro ID principal): si ya existe una sesión con ese
-  // número, la reutilizamos en vez de crear un duplicado (mismo cliente que vuelve
-  // desde otro navegador / sin el sessionKey guardado). Así no se duplican leads.
+  const runtime = await loadChatRuntime(tenant.id, tenant.name);
+
+  // DEDUPE POR TELÉFONO
   const existing = await db.query.chatSessions.findFirst({
     where: and(eq(chatSessions.tenantId, tenant.id), eq(chatSessions.phone, wa.phone)),
     orderBy: [desc(chatSessions.updatedAt)],
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     const terminal = ['closed', 'no_cargo'].includes(existing.step ?? '');
     if (terminal) {
       // Vuelve tras cerrar/no-cargar: reabrimos EN LA MISMA fila con una bienvenida.
-      const w = welcomeStep(b.name ?? existing.name);
+      const w = welcomeStep(b.name ?? existing.name, runtime);
       const history = [...(existing.messages ?? []), ...w.messages.map(bot)];
       await db.update(chatSessions).set({ step: 'welcome', messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, existing.id));
       return NextResponse.json({ ok: true, resumed: true, sessionKey: existing.sessionKey, messages: history, buttons: w.buttons, step: 'welcome', total: history.length, leadId: existing.kommoLeadId ?? null });
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     console.error(`[chat start] ${tenant.slug}: no se pudo crear el lead en Kommo (tel ${wa.phone}). Igual medimos la conversión a Meta.`);
   }
 
-  const { messages, buttons } = welcomeStep(b.name);
+  const { messages, buttons } = welcomeStep(b.name, runtime);
 
   await db.insert(chatSessions).values({
     tenantId: tenant.id,

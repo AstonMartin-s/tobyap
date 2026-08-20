@@ -2,6 +2,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { accreditedMessages } from '@/lib/chat/flow';
+import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import type { ResolvedTenant } from '@/lib/types';
 
 // KOMMO MANDA: los empleados ordenan el embudo en Kommo, así que un cambio de
@@ -78,7 +79,8 @@ export async function acreditarChat(
     // approve del panel es explícito → pasa requireComprobanteStep=false.
     if (opts.requireComprobanteStep && !['comprobante', 'app_onboarding', 'validando'].includes(s.step ?? '')) return false;
 
-    const acc = accreditedMessages(data.loginUrl as string | undefined);
+    const cfg = await loadChatRuntime(tenant.id, tenant.name);
+    const acc = accreditedMessages(data.loginUrl as string | undefined, cfg);
     const accJson = JSON.stringify(acc.map((m) => ({ from: 'bot', text: m.text, at: m.at })));
     const now = Date.now();
 

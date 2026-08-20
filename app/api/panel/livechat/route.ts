@@ -4,6 +4,12 @@ import { db } from '@/db';
 import { clientSettings } from '@/db/schema';
 import { getSession } from '@/lib/session';
 import { parseChatConfig } from '@/lib/chat/brand';
+import {
+  buildConversationPreview,
+  LINK_SLOTS,
+  parseChatRuntime,
+  type OfferType,
+} from '@/lib/chat/runtime';
 import { saveBrandAvatar } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
@@ -19,12 +25,24 @@ export async function GET() {
   try {
     const row = await loadRow(session.tenantId);
     const brand = parseChatConfig(row?.chatConfig, session.slug, session.slug);
-    return NextResponse.json({ ok: true, brand, raw: row?.chatConfig ?? {} });
+    const runtime = parseChatRuntime(row?.chatConfig, brand.brandName);
+    return NextResponse.json({
+      ok: true,
+      brand,
+      runtime,
+      linkSlots: LINK_SLOTS,
+      preview: buildConversationPreview(runtime),
+    });
   } catch {
+    const brand = parseChatConfig({}, session.slug, session.slug);
+    const runtime = parseChatRuntime({}, brand.brandName);
     return NextResponse.json({
       ok: false,
       error: 'Falta columna chat_config (migración pendiente, no deploy)',
-      brand: parseChatConfig({}, session.slug, session.slug),
+      brand,
+      runtime,
+      linkSlots: LINK_SLOTS,
+      preview: buildConversationPreview(runtime),
     }, { status: 503 });
   }
 }
@@ -33,7 +51,16 @@ export async function PUT(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'no autenticado' }, { status: 401 });
 
-  const body = (await req.json().catch(() => ({}))) as { brandName?: string; primaryColor?: string; avatarUrl?: string | null };
+  const body = (await req.json().catch(() => ({}))) as {
+    brandName?: string;
+    primaryColor?: string;
+    avatarUrl?: string | null;
+    offerType?: OfferType;
+    offerValue?: number;
+    minDeposit?: number;
+    portalUrl?: string;
+    supportUrl?: string;
+  };
   const row = await loadRow(session.tenantId);
   const prev = (row?.chatConfig ?? {}) as Record<string, unknown>;
   const next = {
@@ -41,13 +68,25 @@ export async function PUT(req: NextRequest) {
     brandName: typeof body.brandName === 'string' ? body.brandName.trim() : prev.brandName,
     primaryColor: typeof body.primaryColor === 'string' ? body.primaryColor.trim() : prev.primaryColor,
     avatarUrl: body.avatarUrl === null ? null : typeof body.avatarUrl === 'string' ? body.avatarUrl.trim() : prev.avatarUrl,
+    offerType: body.offerType === 'fichas' || body.offerType === 'bonus' ? body.offerType : prev.offerType,
+    offerValue: typeof body.offerValue === 'number' ? body.offerValue : prev.offerValue,
+    minDeposit: typeof body.minDeposit === 'number' ? body.minDeposit : prev.minDeposit,
+    portalUrl: typeof body.portalUrl === 'string' ? body.portalUrl.trim() : prev.portalUrl,
+    supportUrl: typeof body.supportUrl === 'string' ? body.supportUrl.trim() : prev.supportUrl,
   };
   const [saved] = await db
     .insert(clientSettings)
     .values({ tenantId: session.tenantId, chatConfig: next })
     .onConflictDoUpdate({ target: clientSettings.tenantId, set: { chatConfig: next, updatedAt: new Date() } })
     .returning();
-  return NextResponse.json({ ok: true, brand: parseChatConfig(saved.chatConfig, session.slug, session.slug) });
+  const brand = parseChatConfig(saved.chatConfig, session.slug, session.slug);
+  const runtime = parseChatRuntime(saved.chatConfig, brand.brandName);
+  return NextResponse.json({
+    ok: true,
+    brand,
+    runtime,
+    preview: buildConversationPreview(runtime),
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -69,5 +108,7 @@ export async function POST(req: NextRequest) {
     .insert(clientSettings)
     .values({ tenantId: session.tenantId, chatConfig: next })
     .onConflictDoUpdate({ target: clientSettings.tenantId, set: { chatConfig: next, updatedAt: new Date() } });
-  return NextResponse.json({ ok: true, brand: parseChatConfig(next, session.slug, session.slug) });
+  const brand = parseChatConfig(next, session.slug, session.slug);
+  const runtime = parseChatRuntime(next, brand.brandName);
+  return NextResponse.json({ ok: true, brand, runtime, preview: buildConversationPreview(runtime) });
 }

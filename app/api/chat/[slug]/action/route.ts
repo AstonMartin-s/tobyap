@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { accountStep, cbuStep, postActionMessages, comprobanteReviewMessages } from '@/lib/chat/flow';
+import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadFields, updateLeadName, addLeadTags, updateLeadStatus } from '@/lib/kommo';
 
@@ -20,14 +21,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (!s) return NextResponse.json({ error: 'sesión desconocida' }, { status: 404 });
   if ((s.data as Record<string, unknown> | null)?.blocked) return NextResponse.json({ ok: true, messages: [], blocked: true });
 
-  // Persistimos el toque del cliente (la etiqueta del botón) como mensaje suyo,
-  // así el panel del operador ve la conversación completa (antes solo se guardaban
-  // las respuestas del bot y se veía "coja").
+  const runtime = await loadChatRuntime(tenant.id, tenant.name);
+
+  // Persistimos el toque del cliente
   const label = b.label?.trim();
   if (label) s.messages = [...(s.messages ?? []), { from: 'user', text: label, at: Date.now() }];
 
   if (b.action === 'want_account') {
-    const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name });
+    const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name }, runtime);
     const history = [...(s.messages ?? []), ...r.messages.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }))];
     await db.update(chatSessions).set({ step: r.step, data: { ...(s.data ?? {}), ...r.data }, messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
     // Espejo Kommo — MISMA paridad que el bot de WhatsApp: campos PORTAL_* +
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
 
   if (b.action === 'want_cbu') {
-    const r = await cbuStep(tenant);
+    const r = await cbuStep(tenant, runtime);
     const history = [...(s.messages ?? []), ...r.messages.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }))];
     // Persistimos cbu/titular en la sesión para poder re-enviarlos en los recordatorios.
     await db.update(chatSessions).set({ step: r.step, data: { ...(s.data ?? {}), ...r.data }, messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // Opciones POST-acreditación (depositar / retirar / soporte / olvidé usuario / cancelar).
   const POST_ACTIONS = ['deposit', 'withdraw', 'support', 'forgot_user', 'cancel'];
   if (POST_ACTIONS.includes(b.action)) {
-    const r = postActionMessages(b.action, (s.data ?? {}) as Record<string, unknown>);
+    const r = postActionMessages(b.action, (s.data ?? {}) as Record<string, unknown>, runtime);
     const history = [...(s.messages ?? []), ...r.messages.map((m) => ({ from: 'bot' as const, text: m.text, image: m.image, at: m.at }))];
     const patch: Record<string, unknown> = { messages: history, updatedAt: new Date() };
     if (r.step) patch.step = r.step;

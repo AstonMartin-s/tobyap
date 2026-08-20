@@ -128,7 +128,7 @@ export function Nav({ slug, role = 'client' }: { slug: string; role?: string }) 
             {NavLink('/reportes', 'Reportes', I.report)}
             {NavLink('/chats', 'Chats web', I.chat)}
             {NavLink('/embudo', 'Embudo', I.funnel)}
-            {NavLink('/livechat', 'Livechat', I.live)}
+            {NavLink('/livechat', 'Ajustes chat', I.live)}
             {NavLink('/config', 'Configuración', I.config)}
           </>
         )}
