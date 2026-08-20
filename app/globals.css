@@ -303,18 +303,17 @@ input[type='date']:hover::-webkit-calendar-picker-indicator { opacity: 0.9; }
 
 /* ---------- Buttons ---------- */
 .btn {
-  padding: 0.5rem 1rem; border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.05); cursor: pointer;
+  padding: 0.5rem 1rem; border-radius: var(--radius-sm); border: 1px solid transparent; cursor: pointer;
   font-size: 0.82rem; font-weight: 600; color: var(--on-accent);
-  background: linear-gradient(180deg, var(--accent-strong), var(--accent));
-  box-shadow: 0 4px 12px -4px var(--accent), inset 0 1px 0 rgba(255,255,255,0.2);
+  background: var(--accent);
   display: inline-flex; align-items: center; gap: 0.45rem; 
   transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
 }
-.btn:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 6px 16px -4px var(--accent), inset 0 1px 0 rgba(255,255,255,0.2); }
-.btn:active { transform: translateY(1px); box-shadow: 0 2px 6px -2px var(--accent); filter: brightness(0.95); }
-.btn:disabled { opacity: 0.55; cursor: default; transform: none; filter: none; box-shadow: none; }
-.btn--ghost { background: transparent; border: 1px solid var(--border-2); color: var(--text); box-shadow: none; }
-.btn--ghost:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); filter: none; box-shadow: none; }
+.btn:hover { background: var(--accent-strong); transform: translateY(-1px); }
+.btn:active { transform: translateY(1px); filter: brightness(0.95); }
+.btn:disabled { opacity: 0.55; cursor: default; transform: none; filter: none; }
+.btn--ghost { background: transparent; border: 1px solid var(--border-2); color: var(--text); }
+.btn--ghost:hover { border-color: var(--border); background: var(--card-3); color: var(--text); filter: none; }
 .btn--sm { padding: 0.4rem 0.8rem; font-size: 0.78rem; }
 
 /* Tooltip flotante (para que el operario aprenda qué hace cada botón). */

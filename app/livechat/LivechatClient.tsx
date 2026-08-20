@@ -137,14 +137,23 @@ export function LivechatClient() {
 
       {msg && <p style={{ color: 'var(--accent)', fontSize: '.85rem', margin: '0 0 .8rem' }}>{msg}</p>}
 
-      <div style={{ display: 'flex', gap: '.35rem', marginBottom: '.9rem', flexWrap: 'wrap' }}>
-        {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            className={`btn ${tab === t.id ? '' : 'btn--ghost'}`}
-            style={{ padding: '.32rem .75rem', fontSize: '.8rem' }}>
-            {t.label}
-          </button>
-        ))}
+      <div style={{ display: 'inline-flex', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 8, padding: 3, gap: 2, marginBottom: '.9rem' }}>
+        {TABS.map((t) => {
+          const active = tab === t.id;
+          return (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              style={{
+                border: 'none', background: active ? 'var(--card-2)' : 'transparent',
+                color: active ? 'var(--text)' : 'var(--muted)',
+                fontWeight: active ? 600 : 500,
+                padding: '.35rem .85rem', fontSize: '.78rem', borderRadius: 6,
+                cursor: 'pointer', transition: 'all 0.15s ease',
+                boxShadow: active ? '0 1px 3px rgba(0,0,0,0.2)' : 'none'
+              }}>
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       <div style={{
@@ -191,14 +200,23 @@ export function LivechatClient() {
             <div className="card__title">Oferta promocional</div>
             <div className="field">
               <label>Tipo de promo</label>
-              <div style={{ display: 'flex', gap: '.5rem' }}>
-                {(['bonus', 'fichas'] as OfferType[]).map((t) => (
-                  <button key={t} type="button" onClick={() => setRuntime({ ...runtime, offerType: t })}
-                    className={`btn ${runtime.offerType === t ? '' : 'btn--ghost'}`}
-                    style={{ padding: '.35rem .8rem', fontSize: '.8rem' }}>
-                    {t === 'bonus' ? '% Bono en carga' : 'Fichas gratis'}
-                  </button>
-                ))}
+              <div style={{ display: 'inline-flex', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 8, padding: 3, gap: 2 }}>
+                {(['bonus', 'fichas'] as OfferType[]).map((t) => {
+                  const active = runtime.offerType === t;
+                  return (
+                    <button key={t} type="button" onClick={() => setRuntime({ ...runtime, offerType: t })}
+                      style={{
+                        border: 'none', background: active ? 'var(--card-2)' : 'transparent',
+                        color: active ? 'var(--text)' : 'var(--muted)',
+                        fontWeight: active ? 600 : 500,
+                        padding: '.35rem .85rem', fontSize: '.78rem', borderRadius: 6,
+                        cursor: 'pointer', transition: 'all 0.15s ease',
+                        boxShadow: active ? '0 1px 3px rgba(0,0,0,0.2)' : 'none'
+                      }}>
+                      {t === 'bonus' ? '% Bono en carga' : 'Fichas gratis'}
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <div className="field">
