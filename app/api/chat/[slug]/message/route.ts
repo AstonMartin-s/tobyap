@@ -48,7 +48,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ ok: true, messages: r.messages, buttons: r.buttons, step: r.step, total: history.length });
   }
 
-  const replies = onFreeText(s.step ?? 'comprobante', b.text);
+  let replies = onFreeText(s.step ?? 'comprobante', b.text);
+  // ANTI-LOOP: no repetir el MISMO auto-mensaje si ya fue el último del bot. El
+  // cliente sigue escribiendo ("no tengo plata", etc.) y no tiene sentido repetir
+  // "mandame el comprobante" cada vez. Lo decimos una vez y esperamos.
+  const prevMsgs = (s.messages ?? []) as Array<{ from: string; text?: string }>;
+  const lastBot = [...prevMsgs].reverse().find((m) => m.from === 'bot');
+  if (replies.length === 1 && lastBot && (lastBot.text ?? '') === (replies[0].text ?? '')) {
+    replies = [];
+  }
   const history = [...(s.messages ?? []), userMsg, ...replies.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }))];
   // Inbound del cliente → marca NO LEÍDO (pendiente de responder) y, si estaba
   // archivado, se reabre solo (vuelve a la bandeja).

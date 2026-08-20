@@ -68,6 +68,11 @@
 - El ícono de inicio en el celu queda pegado al nombre de cuando se instaló (iOS no lo actualiza). Hay que borrar y volver a agregar.
 - Patch: chat refresca piel vía `/brand`; SW no cachea HTML/manifiesto; nota en el panel Livechat.
 
+### 2026-08-20 — Anti-loop de auto-respuestas del bot
+
+- Síntoma: el bot repetía "Cuando tengas el comprobante… mandámelo por acá" en cada texto del cliente (loop).
+- Fix (`app/api/chat/[slug]/message/route.ts`): si el auto-mensaje a enviar es idéntico al último mensaje del bot, no se reenvía (se dice una vez y espera). No se tocó `flow.ts`.
+
 ### 2026-08-20 — Bug reingreso PWA Android: form no pasaba (chunks viejos)
 
 - Síntoma: en Android, al reabrir la app instalada, el formulario se veía pero no avanzaba.
