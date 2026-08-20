@@ -68,6 +68,12 @@
 - El ícono de inicio en el celu queda pegado al nombre de cuando se instaló (iOS no lo actualiza). Hay que borrar y volver a agregar.
 - Patch: chat refresca piel vía `/brand`; SW no cachea HTML/manifiesto; nota en el panel Livechat.
 
+### 2026-08-20 — Burbujas cliente ilegibles en panel (tema claro)
+
+- Síntoma: mensajes del lead (izquierda) con fondo negro y texto invisible en Light Mode.
+- Causa: `--card-3` no existía en `globals.css`; fallback `#1b1f28` + `--text` oscuro en light.
+- Fix: `--card-3` en dark (`#1b1f28`) y light (`#eceef6`); burbujas usan tokens sin fallback hardcodeado.
+
 ### 2026-08-20 — Anti-loop de auto-respuestas del bot
 
 - Síntoma: el bot repetía "Cuando tengas el comprobante… mandámelo por acá" en cada texto del cliente (loop).
