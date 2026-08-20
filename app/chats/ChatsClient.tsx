@@ -151,6 +151,9 @@ export function ChatsClient() {
   const atBottomRef = useRef(true);
   const scrollSelRef = useRef<string | null>(null);
   const scrollCountRef = useRef(0);
+  // Forzar bajada SOLO cuando el operador manda algo (no cuando entra un mensaje
+  // por el poll: ahí no queremos mover al que está leyendo).
+  const forceScrollRef = useRef(false);
 
   const loadList = useCallback(async () => {
     const r = await fetch('/api/panel/chats').then((x) => x.json()).catch(() => null);
@@ -221,13 +224,15 @@ export function ChatsClient() {
     if (!el) return;
     const count = detail?.messages.length ?? 0;
     const changedChat = scrollSelRef.current !== sel;
-    const grew = count > scrollCountRef.current;
     scrollSelRef.current = sel;
     scrollCountRef.current = count;
-    // Baja al fondo si: se abrió otro chat, o llegaron mensajes nuevos y el
-    // operador ya estaba mirando el fondo. Nunca lo arrastra si está leyendo arriba.
-    if (changedChat) { el.scrollTop = el.scrollHeight; atBottomRef.current = true; return; }
-    if (grew && atBottomRef.current) el.scrollTop = el.scrollHeight;
+    // Baja al fondo SOLO al abrir otro chat o cuando el operador acaba de enviar.
+    // Los mensajes que llegan por el poll NO mueven el scroll.
+    if (changedChat || forceScrollRef.current) {
+      el.scrollTop = el.scrollHeight;
+      atBottomRef.current = true;
+      forceScrollRef.current = false;
+    }
   }, [detail, sel]);
 
   async function exportDone() {
@@ -262,6 +267,7 @@ export function ChatsClient() {
     if (r?.ok) {
       setToast('Enviado al chat ✓');
       setTimeout(() => setToast(null), 1800);
+      forceScrollRef.current = true; // el operador envió → mostramos el fondo
       await loadDetail(sel);
       await loadList();
     } else {
