@@ -48,13 +48,23 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Web Push (para cuando enchufemos el envío desde el server).
+// Web Push (Claude): título/cuerpo + url de destino en data.
 self.addEventListener('push', (event) => {
   let data = { title: 'King 🎰', body: 'Tenés una novedad' };
   try { data = event.data ? event.data.json() : data; } catch (_) {}
-  event.waitUntil(self.registration.showNotification(data.title, { body: data.body, icon: '/chat-icon-192.png', badge: '/chat-icon-192.png' }));
+  event.waitUntil(self.registration.showNotification(data.title, {
+    body: data.body,
+    icon: '/chat-icon-192.png',
+    badge: '/chat-icon-192.png',
+    data: { url: data.url || '/' },
+  }));
 });
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  event.waitUntil(self.clients.matchAll({ type: 'window' }).then((cs) => (cs[0] ? cs[0].focus() : self.clients.openWindow('/'))));
+  const target = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(self.clients.matchAll({ type: 'window' }).then((cs) => {
+    const c = cs.find((w) => 'focus' in w);
+    if (c) return c.focus();
+    return self.clients.openWindow(target);
+  }));
 });
