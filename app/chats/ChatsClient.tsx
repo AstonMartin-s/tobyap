@@ -330,7 +330,8 @@ export function ChatsClient() {
   // (o está en validando) y todavía NO está acreditado/cerrado. Así no se cuentan
   // los ya resueltos que conservan la imagen en el historial.
   const needsReview = (i: Item) => isOpen(i) && (i.step === 'validando' || i.hasComprobante);
-  const noLeido = (i: Item) => isOpen(i) && i.unread;
+  // Un mensaje nuevo debe marcarse como "no leído" sin importar en qué estado estaba (ej. No Cargo)
+  const noLeido = (i: Item) => i.unread;
   // "Requiere atención" = comprobante por revisar O mensaje sin leer (solo activos).
   const needsAttention = (i: Item) => needsReview(i) || noLeido(i);
   const ql = q.trim().toLowerCase();
@@ -529,12 +530,12 @@ export function ChatsClient() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '.35rem', minWidth: 0 }}>
                     {needsReview(i) && <span title="Comprobante por revisar" style={{ width: 7, height: 7, borderRadius: '50%', background: '#e88838', flexShrink: 0 }} />}
-                    <strong style={{ fontSize: '.85rem', fontWeight: attn ? 750 : 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: (i.unread && isOpen(i)) || selected ? '#fff' : 'inherit' }}>{i.name || i.phone || 'Sin nombre'}</strong>
+                    <strong style={{ fontSize: '.85rem', fontWeight: attn ? 750 : 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: i.unread || selected ? '#fff' : 'inherit' }}>{i.name || i.phone || 'Sin nombre'}</strong>
                     {i.username && <span title="Usuario del portal" style={{ fontSize: '.7rem', fontWeight: 600, color: 'var(--accent)', whiteSpace: 'nowrap' }}>@{i.username}</span>}
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.45rem', flexShrink: 0 }}>
                     <span style={{ fontSize: '.66rem', color: 'var(--muted-2, #5d6478)' }}>{timeAgo(i.updatedAt)}</span>
-                    {i.unread && isOpen(i) && (
+                    {i.unread && (
                       <span title="Mensajes sin leer" style={{ width: 18, height: 18, borderRadius: '50%', background: '#e8a050', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '.62rem', fontWeight: 750, boxShadow: '0 0 6px rgba(232,160,80,0.4)' }}>1</span>
                     )}
                   </div>
@@ -547,7 +548,7 @@ export function ChatsClient() {
                   {i.blocked && <span title="Bloqueado" style={{ fontSize: '.6rem', fontWeight: 700, color: '#fff', background: '#b91c1c', padding: '.05rem .4rem', borderRadius: 5 }}>🚫 Bloqueado</span>}
                   {i.campaign && <span style={{ fontSize: '.62rem', color: 'var(--muted-2,#5d6478)' }}>{i.campaign}</span>}
                 </div>
-                <div style={{ fontSize: '.72rem', color: i.unread && isOpen(i) ? 'var(--text)' : 'var(--muted,#8b93a9)', fontWeight: i.unread && isOpen(i) ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: '.72rem', color: i.unread ? 'var(--text)' : 'var(--muted,#8b93a9)', fontWeight: i.unread ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {i.lastFrom === 'user' ? '👤 ' : ''}{i.lastText}
                 </div>
               </button>
