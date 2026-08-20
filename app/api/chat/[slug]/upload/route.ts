@@ -8,6 +8,7 @@ import { appendChatMessages } from '@/lib/chat/mutations';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { saveComprobante } from '@/lib/storage';
 import { signFilePath } from '@/lib/chat/fileToken';
+import { normalizeUploadImage } from '@/lib/chat/image';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,8 +31,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (!s) return NextResponse.json({ error: 'sesión desconocida' }, { status: 404 });
   if ((s.data as Record<string, unknown> | null)?.blocked) return NextResponse.json({ ok: true, messages: [], blocked: true });
 
-  const buf = Buffer.from(await file.arrayBuffer());
-  const mime = file.type || 'image/jpeg';
+  const rawBuf = Buffer.from(await file.arrayBuffer());
+  // iPhone sube HEIC/HEIF (no lo renderizan los navegadores) → lo pasamos a JPEG
+  // para no "perder" comprobantes invisibles. El resto de formatos pasa igual.
+  const { buf, mime } = await normalizeUploadImage(rawBuf, file.type || '', file.name || '');
   const fileUrl = signFilePath(params.slug, sessionKey);
 
   // Guardamos en el volumen si está configurado (barato, fuera de la DB). Si no,

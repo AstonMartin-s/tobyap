@@ -666,7 +666,26 @@ export function ChatsClient() {
                           // para no mostrar un ícono roto que parece un comprobante.
                           <img src={m.image} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} style={{ maxWidth: 150, maxHeight: 150, borderRadius: 10, display: 'block', objectFit: 'cover' }} />
                         ) : (
-                          <a href={m.image} target="_blank" rel="noreferrer" title="Abrir imagen completa"><img src={m.image} alt="comprobante" style={{ maxWidth: 150, maxHeight: 150, borderRadius: 10, display: 'block', objectFit: 'cover', cursor: 'zoom-in' }} /></a>
+                          // Comprobante del cliente. Si el navegador no puede renderizar
+                          // el formato (ej. HEIC viejo de iPhone), mostramos un enlace
+                          // visible en vez de un ícono roto → nunca "perdemos" el archivo.
+                          <a href={m.image} target="_blank" rel="noreferrer" title="Abrir comprobante">
+                            <img
+                              src={m.image}
+                              alt="comprobante"
+                              onError={(e) => {
+                                const img = e.currentTarget as HTMLImageElement;
+                                img.style.display = 'none';
+                                const link = img.nextElementSibling as HTMLElement | null;
+                                if (link) link.style.display = 'inline-flex';
+                              }}
+                              style={{ maxWidth: 150, maxHeight: 150, borderRadius: 10, display: 'block', objectFit: 'cover', cursor: 'zoom-in' }}
+                            />
+                            <span style={{ display: 'none', alignItems: 'center', gap: '.4rem', padding: '.5rem .7rem', fontSize: '.8rem', fontWeight: 600, color: '#7c5cff', border: '1px solid rgba(124,92,255,.4)', borderRadius: 10, background: 'rgba(124,92,255,.08)' }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                              Abrir comprobante
+                            </span>
+                          </a>
                         )
                       ) : m.text}
                     </div>
