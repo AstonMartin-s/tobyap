@@ -81,16 +81,18 @@ const timeAgo = (iso: string | null) => {
   return `hace ${Math.floor(s / 86400)} d`;
 };
 
-// Un chat está "activo" si no está archivado ni en un estado terminal (acreditado,
-// no cargó, cerrado). Los terminales NO cuentan para atención / no leídos.
+// Un chat está "activo" en la bandeja (no archivado, no terminal).
 const isActive = (i: Item): boolean => !i.archived && i.step !== 'done' && i.step !== 'no_cargo' && i.step !== 'closed';
+// Abierto al trabajo del operador (ignora archivado — puede estar archivado por
+// antigüedad pero con comprobante o mensaje sin leer).
+const isOpen = (i: Item): boolean => !i.blocked && i.step !== 'done' && i.step !== 'no_cargo' && i.step !== 'closed';
 // "Activos" (bandeja) = activo Y con actividad en los últimos 30 min. Si pasa ese
 // tiempo sin movimiento, sale de Activos (sigue en su etapa / Todos).
 const within30 = (iso: string | null): boolean => !!iso && (Date.now() - new Date(iso).getTime()) <= 30 * 60000;
 const isActivoReciente = (i: Item): boolean => isActive(i) && within30(i.updatedAt);
 // Predicado a nivel módulo (para detectar atención nueva en el poll).
 const itemNeedsAttention = (i: Item): boolean => {
-  if (!isActive(i)) return false;
+  if (!isOpen(i)) return false;
   return i.step === 'validando' || i.hasComprobante || i.unread;
 };
 
@@ -279,8 +281,8 @@ export function ChatsClient() {
   // "Revisar" = necesita acción del operador sobre una imagen: mandó comprobante
   // (o está en validando) y todavía NO está acreditado/cerrado. Así no se cuentan
   // los ya resueltos que conservan la imagen en el historial.
-  const needsReview = (i: Item) => isActive(i) && (i.step === 'validando' || i.hasComprobante);
-  const noLeido = (i: Item) => isActive(i) && i.unread;
+  const needsReview = (i: Item) => isOpen(i) && (i.step === 'validando' || i.hasComprobante);
+  const noLeido = (i: Item) => isOpen(i) && i.unread;
   // "Requiere atención" = comprobante por revisar O mensaje sin leer (solo activos).
   const needsAttention = (i: Item) => needsReview(i) || noLeido(i);
   const ql = q.trim().toLowerCase();
@@ -297,10 +299,11 @@ export function ChatsClient() {
     // para que la lista coincida con el contador (calculado sobre toda la base).
     if (filter === 'acreditados') return i.step === 'done';
     if (filter === 'no_cargo') return i.step === 'no_cargo';
-    if (i.archived) return false; // el resto de tabs (bandeja) oculta archivados
+    // Revisar / No leídos: incluyen archivados auto (comprobante o mensaje pendiente).
     if (filter === 'revisar') return needsReview(i);
     if (filter === 'no_leidos') return noLeido(i);
     if (filter === 'activos') return isActivoReciente(i);
+    if (i.archived) return false; // Todos y Activos ocultan archivados
     return true;
   });
 
@@ -334,7 +337,7 @@ export function ChatsClient() {
     revisar: stats.filter((i) => i.step === 'validando').length,
     acreditados: doneRange,
     conv: rangeStats.length ? Math.round((100 * doneRange) / rangeStats.length) : 0,
-    sinLeer: items.filter((i) => isActive(i) && i.unread).length, // pendientes de responder (recientes)
+    sinLeer: items.filter((i) => isOpen(i) && i.unread).length,
   };
   // Botón de acción plano (sin brillo violeta). filled = sólido de color.
   const abtn = (color?: string, filled?: boolean): React.CSSProperties => ({
@@ -444,7 +447,7 @@ export function ChatsClient() {
                   {i.blocked && <span title="Bloqueado" style={{ fontSize: '.6rem', fontWeight: 700, color: '#fff', background: '#b91c1c', padding: '.05rem .4rem', borderRadius: 5 }}>🚫 Bloqueado</span>}
                   {i.campaign && <span style={{ fontSize: '.62rem', color: 'var(--muted-2,#5d6478)' }}>{i.campaign}</span>}
                 </div>
-                <div style={{ fontSize: '.72rem', color: i.unread && isActive(i) ? 'var(--text)' : 'var(--muted,#8b93a9)', fontWeight: i.unread && isActive(i) ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: '.72rem', color: i.unread && isOpen(i) ? 'var(--text)' : 'var(--muted,#8b93a9)', fontWeight: i.unread && isOpen(i) ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {i.lastFrom === 'user' ? '👤 ' : ''}{i.lastText}
                 </div>
               </button>

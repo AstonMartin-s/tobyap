@@ -7,6 +7,7 @@ import { getTenantBySlug } from '@/lib/tenants';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadStatus } from '@/lib/kommo';
 import { kommoStatusFromPanelStep, acreditarChat } from '@/lib/chat/release';
+import { trimBandeja } from '@/lib/chat/bandeja';
 import { emitCargo, panelApproveEmitsCargo } from '@/lib/cargo/emit';
 import {
   comprobantePendingMessages,
@@ -32,6 +33,10 @@ export async function GET(req: NextRequest) {
   const base = eq(chatSessions.tenantId, session.tenantId);
   let where = base;
   let limit = 200;
+
+  // Bandeja principal: auto-archivar lo que cae fuera del top 30 recientes.
+  if (!view) await trimBandeja(session.tenantId);
+
   if (view === 'done' || view === 'no_cargo') {
     where = and(base, eq(chatSessions.step, view))!;
     limit = 500;
@@ -47,6 +52,34 @@ export async function GET(req: NextRequest) {
     .orderBy(desc(chatSessions.updatedAt))
     .limit(limit);
 
+  // Archivados que todavía requieren atención (revisar / no leídos) — no deben
+  // perderse de la bandeja aunque el trim los haya archivado por antigüedad.
+  let extraRows: typeof rows = [];
+  if (!view) {
+    extraRows = await db
+      .select()
+      .from(chatSessions)
+      .where(
+        and(
+          base,
+          sql`(${chatSessions.data} ->> 'archived') = 'true'`,
+          sql`(
+            (${chatSessions.data} ->> 'unread') = 'true'
+            OR ${chatSessions.step} = 'validando'
+          )`,
+        ),
+      )
+      .orderBy(desc(chatSessions.updatedAt))
+      .limit(50);
+  }
+
+  const merged = new Map<string, typeof rows[number]>();
+  for (const s of rows) merged.set(s.sessionKey, s);
+  for (const s of extraRows) merged.set(s.sessionKey, s);
+  const allRows = [...merged.values()].sort(
+    (a, b) => new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime(),
+  );
+
   // Stats sobre TODA la base (solo step + fecha, liviano) para que los KPIs no
   // queden capados por el límite de 200 de la lista.
   const statRows = await db
@@ -54,7 +87,7 @@ export async function GET(req: NextRequest) {
     .from(chatSessions)
     .where(eq(chatSessions.tenantId, session.tenantId));
 
-  const items = rows.map((s) => {
+  const items = allRows.map((s) => {
     const msgs = (s.messages ?? []) as Msg[];
     const sdata = (s.data ?? {}) as Record<string, unknown>;
     const username = sdata.username as string | undefined;

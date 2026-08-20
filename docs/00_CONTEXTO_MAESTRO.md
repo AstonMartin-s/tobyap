@@ -68,6 +68,13 @@
 - El ícono de inicio en el celu queda pegado al nombre de cuando se instaló (iOS no lo actualiza). Hay que borrar y volver a agregar.
 - Patch: chat refresca piel vía `/brand`; SW no cachea HTML/manifiesto; nota en el panel Livechat.
 
+### 2026-08-20 — Bandeja Todos: máx 30 chats + auto-archivo
+
+- Regla: en "Todos" solo los 30 chats no archivados más recientes. El resto se archiva
+  automáticamente (`lib/chat/bandeja.ts`, `trimBandeja` en GET panel/chats).
+- Reapertura: ya existía — cliente escribe o manda comprobante → `archived: false`.
+- Revisar / No leídos siguen mostrando archivados con comprobante pendiente o sin leer.
+
 ### 2026-08-20 — Burbujas cliente ilegibles en panel (tema claro)
 
 - Síntoma: mensajes del lead (izquierda) con fondo negro y texto invisible en Light Mode.
