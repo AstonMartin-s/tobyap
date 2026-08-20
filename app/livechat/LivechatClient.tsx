@@ -153,7 +153,8 @@ export function LivechatClient() {
           ? 'minmax(220px, 280px) minmax(0, 1fr)'
           : tab === 'links'
             ? 'minmax(0, 1fr)'
-            : 'minmax(280px, 1fr) minmax(300px, 420px)',
+            : 'minmax(280px, 560px) minmax(300px, 420px)',
+        justifyContent: 'start',
         gap: '1.2rem',
         alignItems: 'start',
         width: '100%',
