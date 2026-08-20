@@ -5,6 +5,7 @@ import {
   buildConversationPreview,
   DEFAULT_RUNTIME,
   LINK_SLOTS,
+  PAGODA_MAGIC_URL_SAMPLE,
   type ChatRuntimeConfig,
   type LinkSlotId,
   type OfferType,
@@ -22,10 +23,15 @@ const TABS = [
 
 type TabId = typeof TABS[number]['id'];
 
-function highlightLinks(text: string, links: ChatRuntimeConfig['links'], linkSlot?: LinkSlotId) {
+function highlightLinks(
+  text: string,
+  links: ChatRuntimeConfig['links'],
+  linkSlot?: LinkSlotId,
+  linkMagic?: boolean,
+) {
   const parts: Array<{ t: string; link?: boolean }> = [];
   if (!linkSlot) return [{ t: text }];
-  const url = links[linkSlot];
+  const url = linkMagic ? PAGODA_MAGIC_URL_SAMPLE : links[linkSlot];
   if (!url) return [{ t: text }];
   const idx = text.indexOf(url);
   if (idx < 0) return [{ t: text }];
@@ -38,6 +44,15 @@ function highlightLinks(text: string, links: ChatRuntimeConfig['links'], linkSlo
 function linkSlotLabel(id: LinkSlotId): string {
   return LINK_SLOTS.find((s) => s.id === id)?.label ?? id;
 }
+
+function linkBubbleHint(b: PreviewBubble, links: ChatRuntimeConfig['links']): string | null {
+  if (!b.linkSlot) return null;
+  if (b.linkMagic) return `↗ Magic-link Pagoda (dat4win, único por usuario) · fallback: ${links[b.linkSlot]}`;
+  return `↗ ${linkSlotLabel(b.linkSlot)}`;
+}
+
+const STATIC_SLOTS = LINK_SLOTS.filter((s) => s.kind === 'static');
+const MAGIC_SLOTS = LINK_SLOTS.filter((s) => s.kind === 'magic_fallback');
 
 export function LivechatClient() {
   const [tab, setTab] = useState<TabId>('identidad');
@@ -205,11 +220,18 @@ export function LivechatClient() {
         {tab === 'links' && (
           <section className="card">
             <div className="card__title">Links por mensaje</div>
-            <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '0 0 .9rem', lineHeight: 1.45 }}>
-              Un URL por cada momento del guion. Podés repetir el mismo link o usar distintos según el caso.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '.85rem' }}>
-              {LINK_SLOTS.map((slot) => (
+            <div style={{ marginBottom: '.9rem', padding: '.55rem .65rem', borderRadius: 8, background: 'var(--blue-soft)', border: '1px solid var(--border)', fontSize: '.74rem', lineHeight: 1.45, color: 'var(--muted)' }}>
+              <strong style={{ color: 'var(--text)' }}>Cómo funciona en King (auditado en prod):</strong>
+              <ul style={{ margin: '.35rem 0 0', paddingLeft: '1.1rem' }}>
+                <li><strong>Credenciales</strong> → siempre <code style={{ fontSize: '.7rem' }}>greenbet.uno/login</code> (página fija).</li>
+                <li><strong>Acreditado, Datos, Cargar, Retirar</strong> → magic-link Pagoda <code style={{ fontSize: '.7rem' }}>greenbet.dat4win.com/entrar/…</code> (único por usuario, guardado al crear la cuenta).</li>
+                <li><strong>Soporte</strong> → walink configurado abajo.</li>
+              </ul>
+            </div>
+
+            <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '0 0 .65rem', fontWeight: 600 }}>Links fijos (siempre este URL)</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.85rem', marginBottom: '1rem' }}>
+              {STATIC_SLOTS.map((slot) => (
                 <div key={slot.id} className="field" style={{ margin: 0 }}>
                   <label style={{ marginBottom: 2 }}>{slot.label}</label>
                   <input
@@ -219,15 +241,31 @@ export function LivechatClient() {
                       ...runtime,
                       links: { ...runtime.links, [slot.id]: e.target.value },
                     })}
-                    placeholder={slot.id === 'support' ? 'https://wa.link/…' : 'https://…'}
+                    placeholder={slot.id === 'support' ? 'https://wa.link/…' : 'https://greenbet.uno/login'}
                   />
                   <p style={{ color: 'var(--muted-2)', fontSize: '.7rem', margin: '4px 0 0', lineHeight: 1.35 }}>{slot.hint}</p>
                 </div>
               ))}
             </div>
-            <p style={{ color: 'var(--muted)', fontSize: '.75rem', margin: '.9rem 0 0' }}>
-              El magic-link de Pagoda al acreditar sigue siendo dinámico (one-time). Si no existe, se usa el link de <em>Acreditado — entrar a jugar</em>.
-            </p>
+
+            <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '0 0 .65rem', fontWeight: 600 }}>Fallback (solo si no hay magic-link Pagoda en la sesión)</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.85rem' }}>
+              {MAGIC_SLOTS.map((slot) => (
+                <div key={slot.id} className="field" style={{ margin: 0 }}>
+                  <label style={{ marginBottom: 2 }}>{slot.label}</label>
+                  <input
+                    className="input"
+                    value={runtime.links[slot.id]}
+                    onChange={(e) => setRuntime({
+                      ...runtime,
+                      links: { ...runtime.links, [slot.id]: e.target.value },
+                    })}
+                    placeholder="https://greenbet.uno/login"
+                  />
+                  <p style={{ color: 'var(--muted-2)', fontSize: '.7rem', margin: '4px 0 0', lineHeight: 1.35 }}>{slot.hint}</p>
+                </div>
+              ))}
+            </div>
           </section>
         )}
 
@@ -259,7 +297,7 @@ export function LivechatClient() {
             <section className="card" style={{ alignSelf: 'stretch' }}>
               <div className="card__title">Dónde va cada link</div>
               <p style={{ color: 'var(--muted)', fontSize: '.76rem', margin: '0 0 .7rem', lineHeight: 1.45 }}>
-                Los links en <span style={{ color: '#2563eb', fontWeight: 600 }}>azul</span> en la preview salen de la pestaña Links.
+                Azul = URL en el mensaje. Los de <em>dat4win</em> son magic-links Pagoda (dinámicos); el fallback editable está en Links.
               </p>
               <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
                 {LINK_SLOTS.map((s) => (
@@ -267,7 +305,12 @@ export function LivechatClient() {
                     <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{s.label}</div>
                     <div style={{ color: 'var(--muted-2)', fontSize: '.68rem', marginBottom: 3 }}>{s.hint}</div>
                     <div style={{ color: 'var(--muted-2)', fontSize: '.7rem', wordBreak: 'break-all' }}>
-                      {runtime.links[s.id]}
+                      {s.kind === 'magic_fallback' ? (
+                        <>
+                          <span style={{ color: 'var(--blue)' }}>{PAGODA_MAGIC_URL_SAMPLE}</span>
+                          <span style={{ display: 'block', marginTop: 2 }}>fallback: {runtime.links[s.id]}</span>
+                        </>
+                      ) : runtime.links[s.id]}
                     </div>
                   </li>
                 ))}
@@ -320,12 +363,12 @@ export function LivechatClient() {
                           padding: '7px 10px', borderRadius: 10, fontSize: '.8rem', lineHeight: 1.42, whiteSpace: 'pre-wrap',
                           boxShadow: '0 1px 0.5px rgba(0,0,0,.13)',
                         }}>
-                          {highlightLinks(b.text, runtime.links, b.linkSlot).map((p, j) => (
+                          {highlightLinks(b.text, runtime.links, b.linkSlot, b.linkMagic).map((p, j) => (
                             <span key={j} className={p.link ? 'chat-preview-link' : undefined} style={p.link ? { wordBreak: 'break-all' } : undefined}>{p.t}</span>
                           ))}
                         </div>
-                        {b.linkSlot && (
-                          <div className="chat-preview-link-hint" style={{ fontSize: '.62rem', marginTop: 2 }}>↗ {linkSlotLabel(b.linkSlot)}</div>
+                        {linkBubbleHint(b, runtime.links) && (
+                          <div className="chat-preview-link-hint" style={{ fontSize: '.62rem', marginTop: 2 }}>{linkBubbleHint(b, runtime.links)}</div>
                         )}
                       </div>
                     ))}

@@ -405,12 +405,8 @@ export function ChatsClient() {
 
   return (
     <>
-    <div style={{ display: 'flex', gap: '.4rem', marginBottom: '.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
-      {([['hoy', 'Hoy'], ['ayer', 'Ayer'], ['siempre', 'Desde siempre']] as const).map(([r, label]) => (
-        <button key={r} onClick={() => setKpiRange(r)} className={`btn ${kpiRange === r ? '' : 'btn--ghost'}`} style={{ padding: '.3rem .8rem', fontSize: '.8rem' }}>{label}</button>
-      ))}
-      
-      <div style={{ display: 'flex', marginLeft: 'auto', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg-2, rgba(255,255,255,.015))', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', gap: '.6rem', marginBottom: '.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg-2, rgba(255,255,255,.015))', overflow: 'hidden' }}>
         <KPI label={`Chats ${kpiRange === 'siempre' ? 'total' : kpiRange}`} value={kpis.chats} />
         <div style={{ width: 1, background: 'var(--border)' }} />
         <KPI label="Esperando pago" value={kpis.esperando} color="#3b82f6" />
@@ -424,7 +420,13 @@ export function ChatsClient() {
         <KPI label="Sin leer" value={kpis.sinLeer} color={kpis.sinLeer ? '#22c55e' : undefined} />
       </div>
 
-      <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', marginLeft: '.4rem' }}>
+      <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+        {([['hoy', 'Hoy'], ['ayer', 'Ayer'], ['siempre', 'Desde siempre']] as const).map(([r, label]) => (
+          <button key={r} onClick={() => setKpiRange(r)} className={`btn ${kpiRange === r ? '' : 'btn--ghost'}`} style={{ padding: '.3rem .8rem', fontSize: '.8rem' }}>{label}</button>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', marginLeft: 'auto' }}>
         {counts.atencion > 0 && (
           <button onClick={() => setFilter('revisar')}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem', padding: '.32rem .7rem', fontSize: '.76rem', fontWeight: 700, border: '1px solid #e8883855', borderRadius: 8, background: '#e888381a', color: '#e8a050', cursor: 'pointer' }}

@@ -26,6 +26,8 @@ export interface ChatRuntimeConfig {
 export const DEFAULT_PORTAL_URL = 'https://greenbet.uno/login';
 export const DEFAULT_SUPPORT_URL = 'https://wa.link/jugandoconking';
 export const DEFAULT_PORTAL_REF_IMG = '/king-portal-ref.png';
+/** Ejemplo visual en panel — en prod Pagoda devuelve uno distinto por usuario. */
+export const PAGODA_MAGIC_URL_SAMPLE = 'https://greenbet.dat4win.com/entrar/…';
 
 export const DEFAULT_LINKS: Record<LinkSlotId, string> = {
   portal_login: DEFAULT_PORTAL_URL,
@@ -37,16 +39,57 @@ export const DEFAULT_LINKS: Record<LinkSlotId, string> = {
 };
 
 /** Metadatos para el panel: un link por mensaje del guion. */
-export const LINK_SLOTS: Array<{ id: LinkSlotId; label: string; hint: string }> = [
-  { id: 'portal_login', label: 'Credenciales (cuenta nueva)', hint: 'Al crear usuario o mostrar usuario y contraseña' },
-  { id: 'portal_forgot', label: 'Recordar datos (olvidé usuario)', hint: 'Botón Datos del operador o “olvide mi usuario”' },
-  { id: 'portal_play', label: 'Acreditado — entrar a jugar', hint: 'Tras acreditar; si Pagoda da magic-link, usa ese primero' },
-  { id: 'portal_deposit', label: 'Cargar saldo', hint: 'Menú post-acreditación o botón Cargar' },
-  { id: 'portal_withdraw', label: 'Retirar saldo', hint: 'Menú post-acreditación o botón Retirar' },
-  { id: 'support', label: 'Soporte WhatsApp', hint: 'Ayuda humana, walink o consultas' },
+export const LINK_SLOTS: Array<{
+  id: LinkSlotId;
+  label: string;
+  hint: string;
+  kind: 'static' | 'magic_fallback';
+}> = [
+  {
+    id: 'portal_login',
+    label: 'Credenciales (cuenta nueva)',
+    hint: 'Automático al crear cuenta. Siempre la página fija del portal (greenbet.uno), no el magic-link de Pagoda.',
+    kind: 'static',
+  },
+  {
+    id: 'portal_play',
+    label: 'Acreditado — entrar a jugar',
+    hint: 'Automático al aprobar. En prod usa el magic-link Pagoda (dat4win) guardado en la sesión; abajo = fallback si no hay.',
+    kind: 'magic_fallback',
+  },
+  {
+    id: 'portal_forgot',
+    label: 'Recordar datos (botón Datos)',
+    hint: 'Operador u “olvide mi usuario”. Magic-link Pagoda si existe en la sesión; abajo = fallback.',
+    kind: 'magic_fallback',
+  },
+  {
+    id: 'portal_deposit',
+    label: 'Cargar saldo',
+    hint: 'Botón Cargar del operador o menú post-acreditación. Magic-link Pagoda si existe; abajo = fallback.',
+    kind: 'magic_fallback',
+  },
+  {
+    id: 'portal_withdraw',
+    label: 'Retirar saldo',
+    hint: 'Botón Retirar del operador. Magic-link Pagoda si existe; abajo = fallback.',
+    kind: 'magic_fallback',
+  },
+  {
+    id: 'support',
+    label: 'Soporte WhatsApp',
+    hint: 'Automático (ayuda en texto libre) o botón Soporte del operador.',
+    kind: 'static',
+  },
 ];
 
-export type PreviewBubble = { step: string; who: 'bot' | 'user'; text: string; linkSlot?: LinkSlotId };
+export type PreviewBubble = {
+  step: string;
+  who: 'bot' | 'user';
+  text: string;
+  linkSlot?: LinkSlotId;
+  linkMagic?: boolean;
+};
 
 export const DEFAULT_RUNTIME: ChatRuntimeConfig = {
   brandName: 'King',
@@ -134,6 +177,7 @@ export function offerDepositLine(cfg: ChatRuntimeConfig): string {
 export function buildConversationPreview(cfg: ChatRuntimeConfig, sampleName = 'Martín'): PreviewBubble[] {
   const fn = sampleName.split(/\s+/)[0];
   const L = cfg.links;
+  const magic = PAGODA_MAGIC_URL_SAMPLE;
   return [
     { step: 'welcome', who: 'bot', text: `¡Hola ${fn}! 👋\nBienvenido a *${cfg.brandName}*.\n${offerWelcomeLine(cfg)}` },
     { step: 'welcome', who: 'user', text: 'Quiero mi cuenta 🎁' },
@@ -141,10 +185,10 @@ export function buildConversationPreview(cfg: ChatRuntimeConfig, sampleName = 'M
     { step: 'cbu', who: 'bot', text: `Perfecto 🙌 Datos para tu carga:\n🏦 Titular: *Titular CBU*\n[CBU del panel]\n${offerCbuLine(cfg)}` },
     { step: 'comprobante', who: 'user', text: '📷 [comprobante]' },
     { step: 'validando', who: 'bot', text: '✅ Tu comprobante entró en revisión 🔎 En breve validamos y te acreditamos…' },
-    { step: 'done', who: 'bot', text: `✅ *¡Acreditado con éxito!*\n🎉 ¡Gracias por elegir ${cfg.brandName}!\n\n🎮 Entrá directo a jugar acá 👇\n${L.portal_play}`, linkSlot: 'portal_play' },
-    { step: 'forgot', who: 'bot', text: `🔐 Tus datos de acceso:\n\n👤 Usuario: *martin123*\n🔑 Contraseña: *••••*\n\n🔗 Entrá directo acá 👇\n${L.portal_forgot}`, linkSlot: 'portal_forgot' },
-    { step: 'deposit', who: 'bot', text: `💰 *Cargar saldo*\nEntrá al portal y tocá *"Cargar saldo"* 👇\n${L.portal_deposit}\n\n${offerDepositLine(cfg)}`, linkSlot: 'portal_deposit' },
-    { step: 'withdraw', who: 'bot', text: `💸 *Retirar saldo*\nEntrá al portal 👇\n${L.portal_withdraw}`, linkSlot: 'portal_withdraw' },
+    { step: 'done', who: 'bot', text: `✅ *¡Acreditado con éxito!*\n🎉 ¡Gracias por elegir ${cfg.brandName}!\n\n🎮 Entrá directo a jugar acá 👇\n${magic}`, linkSlot: 'portal_play', linkMagic: true },
+    { step: 'forgot', who: 'bot', text: `🔐 Tus datos de acceso:\n\n👤 Usuario: *martin123*\n🔑 Contraseña: *••••*\n\n🔗 Entrá directo acá 👇\n${magic}`, linkSlot: 'portal_forgot', linkMagic: true },
+    { step: 'deposit', who: 'bot', text: `💰 *Cargar saldo*\nEntrá al portal y tocá *"Cargar saldo"* 👇\n${magic}\n\n${offerDepositLine(cfg)}`, linkSlot: 'portal_deposit', linkMagic: true },
+    { step: 'withdraw', who: 'bot', text: `💸 *Retirar saldo*\nEntrá al portal 👇\n${magic}`, linkSlot: 'portal_withdraw', linkMagic: true },
     { step: 'support', who: 'bot', text: `🙋 *Soporte*\nEscribinos por WhatsApp 👇\n${L.support}`, linkSlot: 'support' },
   ];
 }
