@@ -231,7 +231,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, session: { ...s, data: dataLite } });
   }
 
-  const runtime = await loadChatRuntime(session.tenantId, session.slug);
+  const runtime = await loadChatRuntime(session.tenantId, session.slug, s.phone);
 
   let newMsgs: Msg[] = [];
   let newStep: string | undefined;

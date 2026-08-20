@@ -1,16 +1,56 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { clientSettings } from '@/db/schema';
-import { parseChatRuntime, type ChatRuntimeConfig } from '@/lib/chat/runtime';
+import { phoneCandidates } from '@/lib/phone';
+import { parseChatRuntime, type ChatRuntimeConfig, type OfferType } from '@/lib/chat/runtime';
 
-export async function loadChatRuntime(tenantId: string, fallbackBrand: string): Promise<ChatRuntimeConfig> {
+function clampNum(v: unknown, min: number, max: number, fallback: number): number {
+  const n = typeof v === 'number' ? v : Number(v);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(n)));
+}
+
+/** Si el teléfono está en chat_config.testPhones, aplica chat_config.testRuntime (modo prueba). */
+export function applyPhoneTestRuntime(
+  cfg: ChatRuntimeConfig,
+  raw: unknown,
+  phone?: string | null,
+): ChatRuntimeConfig {
+  if (!phone) return cfg;
+  const o = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  const testPhones = Array.isArray(o.testPhones)
+    ? o.testPhones.map((p) => String(p)).filter(Boolean)
+    : [];
+  if (!testPhones.length) return cfg;
+  const keys = new Set(phoneCandidates(phone));
+  const hit = testPhones.some((p) => phoneCandidates(p).some((c) => keys.has(c)));
+  if (!hit) return cfg;
+  const tr = o.testRuntime && typeof o.testRuntime === 'object' && !Array.isArray(o.testRuntime)
+    ? (o.testRuntime as Record<string, unknown>)
+    : {};
+  const offerType: OfferType = tr.offerType === 'fichas' ? 'fichas' : tr.offerType === 'bonus' ? 'bonus' : cfg.offerType;
+  return {
+    ...cfg,
+    offerType,
+    offerValue: tr.offerValue !== undefined ? clampNum(tr.offerValue, 1, 999999, cfg.offerValue) : cfg.offerValue,
+    minDeposit: tr.minDeposit !== undefined ? clampNum(tr.minDeposit, 100, 50_000_000, cfg.minDeposit) : cfg.minDeposit,
+  };
+}
+
+export async function loadChatRuntime(
+  tenantId: string,
+  fallbackBrand: string,
+  phone?: string | null,
+): Promise<ChatRuntimeConfig> {
   try {
     const [row] = await db
       .select({ chatConfig: clientSettings.chatConfig })
       .from(clientSettings)
       .where(eq(clientSettings.tenantId, tenantId))
       .limit(1);
-    return parseChatRuntime(row?.chatConfig, fallbackBrand);
+    const raw = row?.chatConfig;
+    const base = parseChatRuntime(raw, fallbackBrand);
+    return applyPhoneTestRuntime(base, raw, phone);
   } catch {
     return parseChatRuntime({}, fallbackBrand);
   }

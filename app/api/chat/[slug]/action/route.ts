@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (!s) return NextResponse.json({ error: 'sesión desconocida' }, { status: 404 });
   if ((s.data as Record<string, unknown> | null)?.blocked) return NextResponse.json({ ok: true, messages: [], blocked: true });
 
-  const runtime = await loadChatRuntime(tenant.id, tenant.name);
+  const runtime = await loadChatRuntime(tenant.id, tenant.name, s.phone);
 
   // Persistimos el toque del cliente
   const label = b.label?.trim();
