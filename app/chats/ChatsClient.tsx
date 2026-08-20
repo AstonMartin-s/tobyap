@@ -652,11 +652,10 @@ export function ChatsClient() {
                     </div>
                     <div style={{
                       padding: m.image ? '.4rem' : '.6rem .8rem', borderRadius: 16, fontSize: '.9rem', lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                      boxShadow: mine ? '0 4px 12px -2px rgba(124, 92, 255, 0.15)' : '0 2px 8px -2px rgba(0,0,0,.15)',
-                      background: mine ? 'rgba(124, 92, 255, 0.03)' : 'var(--card-3)',
+                      boxShadow: 'none',
+                      background: mine ? 'var(--card-2)' : 'var(--card-3)',
                       color: 'var(--text)',
-                      border: mine ? `1px solid rgba(124, 92, 255, 0.2)` : '1px solid var(--border)',
-                      borderBottom: mine ? '2px solid rgba(124, 92, 255, 0.6)' : '1px solid var(--border)',
+                      border: mine ? `1px solid rgba(124, 92, 255, 0.45)` : '1px solid var(--border)',
                       borderBottomRightRadius: mine ? 4 : 16,
                       borderBottomLeftRadius: mine ? 16 : 4,
                     }}>
