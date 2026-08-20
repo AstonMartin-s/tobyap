@@ -15,6 +15,16 @@ const POST_MENU = [
   { id: 'forgot_user', label: 'Olvidé mis datos' },
 ];
 
+// La clave pública VAPID viene en base64url; el navegador la pide como Uint8Array.
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
 function renderText(text: string) {
   const parts = text.split(/(\*[^*]+\*|https?:\/\/[^\s]+)/g);
   return parts.map((p, i) => {
@@ -160,6 +170,9 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     const notif = typeof Notification !== 'undefined' && Notification.permission === 'granted';
     if (installed && !appInstall) setAppInstall(true);
     if (notif && !appNotif) setAppNotif(true);
+    // Ya tenía permiso de una sesión previa: aseguramos la suscripción push (idempotente)
+    // para que la habilitación sea de verdad prolongada aunque nunca toque el botón hoy.
+    if (notif && sessionKey) void subscribeWebPush();
     if ((installed || appInstall) && (notif || appNotif)) {
       tapMenu('finish_upload', 'Enviar mi comprobante');
     }
@@ -319,6 +332,35 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
 
   // Notificaciones: pide el permiso REAL. En iOS sin app instalada no se puede
   // (limitación de Apple) → se guía y se da por hecho para no bloquear.
+  // Web Push: suscribe el dispositivo para recibir avisos CON LA APP CERRADA. Es
+  // una habilitación PROLONGADA (dura hasta que el cliente revoque el permiso; no
+  // hay que reactivar por sesión). Best-effort: si el push no está configurado
+  // (sin VAPID) o algo falla, seguimos con las notificaciones in-page de siempre.
+  async function subscribeWebPush() {
+    try {
+      if (typeof navigator === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+      if (!sessionKey) return;
+      const keyRes = await fetch(`/api/chat/${slug}/push`);
+      const kd = await keyRes.json();
+      if (!kd?.ok || !kd.publicKey) return; // push no configurado → fallback in-page
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(kd.publicKey) as unknown as BufferSource,
+        });
+      }
+      await fetch(`/api/chat/${slug}/push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionKey, subscription: sub }),
+      });
+    } catch {
+      /* fallback: notificaciones in-page mientras el chat esté abierto */
+    }
+  }
+
   async function enableNotifs() {
     if (isIos() && !isStandalone()) {
       setMsgs((p) => [...p, { from: 'bot', text: 'En iPhone las notificaciones se activan al *abrir la app instalada*. Con el Paso 1 ya queda listo, ahí adentro te llegan tus avisos.' }]);
@@ -334,6 +376,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
       const p = await Notification.requestPermission(); // ← dispara el diálogo real
       if (p === 'granted') {
         setAppNotif(true);
+        void subscribeWebPush(); // habilitación prolongada (push con la app cerrada)
         try { new Notification(`${skin.brand}`, { body: 'Notificaciones activadas. Te avisamos de tus bonos.' }); } catch {}
         setMsgs((x) => [...x, { from: 'bot', text: 'Notificaciones activadas.' }]);
       } else {

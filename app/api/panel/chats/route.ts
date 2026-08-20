@@ -10,6 +10,7 @@ import { updateLeadStatus } from '@/lib/kommo';
 import { kommoStatusFromPanelStep, acreditarChat } from '@/lib/chat/release';
 import { trimBandeja } from '@/lib/chat/bandeja';
 import { appendChatMessages, mergeChatData } from '@/lib/chat/mutations';
+import { sendPushToSession } from '@/lib/chat/push';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { emitCargo, panelApproveEmitsCargo } from '@/lib/cargo/emit';
 import {
@@ -297,6 +298,18 @@ export async function POST(req: NextRequest) {
   if (operatorTookOver) opAppend.dataMerge = { operatorTookOver: true };
   await appendChatMessages(s.id, opMsgs, opAppend);
 
+  // Web Push (best-effort): si el cliente habilitó notificaciones, le avisamos del
+  // mensaje del operador aunque tenga el chat cerrado. No aplica a 'approve' (ese
+  // agrega su mensaje aparte, más abajo). No bloquea la respuesta.
+  const lastOut = opMsgs[opMsgs.length - 1];
+  if (lastOut?.text) {
+    void sendPushToSession(s.id, data.pushSub, {
+      title: 'Tenés un mensaje nuevo',
+      body: lastOut.text.slice(0, 120),
+      url: `/chat/${session.slug}`,
+    });
+  }
+
   // Espejo a Kommo (best-effort). BIDIRECCIONAL: si el operador cambió el estado,
   // movemos el lead a la etapa correspondiente del embudo (Kommo manda, y el panel
   // ahora también empuja hacia Kommo). Además dejamos la nota de rastro.
@@ -319,6 +332,12 @@ export async function POST(req: NextRequest) {
       // después llegue el webhook de Cargo$ o el poll, no se duplica. El panel
       // recarga el detalle tras la acción, así que el operador lo ve igual.
       await acreditarChat(tenant, { sessionKey: s.sessionKey });
+      // Push de acreditación (best-effort): el aviso más importante para el cliente.
+      void sendPushToSession(s.id, data.pushSub, {
+        title: '¡Acreditado!',
+        body: 'Tu carga fue acreditada con éxito.',
+        url: `/chat/${session.slug}`,
+      });
       // Movemos el lead a Cargo$ (dispara webhook; el candado impide duplicar).
       if (s.kommoLeadId && tenant.statusCargoId) {
         updateLeadStatus(tenant, s.kommoLeadId, tenant.statusCargoId).catch(() => {});
