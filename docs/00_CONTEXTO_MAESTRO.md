@@ -68,6 +68,14 @@
 - El ícono de inicio en el celu queda pegado al nombre de cuando se instaló (iOS no lo actualiza). Hay que borrar y volver a agregar.
 - Patch: chat refresca piel vía `/brand`; SW no cachea HTML/manifiesto; nota en el panel Livechat.
 
+### 2026-08-20 — Bug reingreso PWA Android: form no pasaba (chunks viejos)
+
+- Síntoma: en Android, al reabrir la app instalada, el formulario se veía pero no avanzaba.
+- Diagnóstico: server OK (`/start` 200), WA-check OK (onWhatsApp true para el número), sin errores de consola en desktop, sin 429. Causa: **PWA con HTML cacheado viejo** (SW v1 servía HTML con hashes de chunks que tras los deploys dan 404) → React no hidrata → el form (SSR) se ve pero los botones no responden.
+- Fix SW (`public/chat-sw.js` v3): navegación = network-first (online siempre HTML fresco; cache solo fallback offline). Purga caches viejos en activate. Manifest/brand siempre red.
+- Fix cliente (`app/chat/[slug]/page.tsx`): salvavidas ante ChunkLoadError/unhandledrejection → desregistra SW, limpia caches y recarga una vez (guard en sessionStorage para no loopear).
+- Nota seguridad: se auditaron env de Railway (secretos) solo lectura; NO se copian a git/chat.
+
 ### 2026-08-19 — Imagen de ejemplo del portal (king-portal-ref.png) faltante
 
 - El "comprobante" roto en el panel era el `alt` de `PORTAL_REF_IMG = /king-portal-ref.png` (imagen de referencia del portal que el bot manda en Cargar/Retirar/Soporte). El archivo **no existe** en `public/` → 404 en prod.

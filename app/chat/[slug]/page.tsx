@@ -39,7 +39,7 @@ export default async function ChatPage({
   const brand = cfg.brandName;
   return (
     <>
-      <script dangerouslySetInnerHTML={{ __html: "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__bipEvent=e;});" }} />
+      <script dangerouslySetInnerHTML={{ __html: "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__bipEvent=e;});(function(){function isChunkErr(m){return /ChunkLoadError|Loading chunk|Importing a module script failed|error loading dynamically imported module/i.test(String(m||''));}function recover(){try{if(sessionStorage.getItem('cr'))return;sessionStorage.setItem('cr','1');}catch(_){}if('serviceWorker'in navigator){navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister();});}).catch(function(){});}if(window.caches&&caches.keys){caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k);});}).catch(function(){});}setTimeout(function(){location.reload();},60);}window.addEventListener('error',function(e){if(isChunkErr(e&&e.message)||isChunkErr(e&&e.error&&e.error.message))recover();});window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;if(isChunkErr(r&&r.message)||isChunkErr(r))recover();});})();" }} />
       <ChatWidget
         slug={params.slug}
         token={searchParams.token ?? ''}
