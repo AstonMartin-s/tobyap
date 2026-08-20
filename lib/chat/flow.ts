@@ -199,6 +199,11 @@ const APP_CONFUSION_RE = /(qu[eé] app|cu[aá]l aplicaci|qu[eé] aplicaci|c[oó]
 export const WANT_ACCOUNT_RE = /(quiero|dame|necesito|abr[ií]|crea|hace).*(mi )?cuenta|abrir cuenta|crear cuenta|registrar(me)?|jugar|empezar|usuario y contrase/i;
 
 export function onFreeText(step: string, text?: string, cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg[] {
+  // Comprobante en revisión: acá manda el operario. El bot no responde nada
+  // automático para no interferir mientras se valida — el cliente puede escribir
+  // libremente y el humano interviene.
+  if (step === 'validando') return [];
+
   const asksAboutApp = !!(text && APP_CONFUSION_RE.test(text));
 
   // Confusión con "la app" DURANTE el gate: la causa más común de que alguien se
