@@ -146,6 +146,11 @@ export function ChatsClient() {
   }
   const [toast, setToast] = useState<string | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  // Autoscroll SOLO si el operador ya está al fondo (o abrió otro chat). Si está
+  // leyendo hacia arriba, el poll no lo debe arrastrar hacia abajo.
+  const atBottomRef = useRef(true);
+  const scrollSelRef = useRef<string | null>(null);
+  const scrollCountRef = useRef(0);
 
   const loadList = useCallback(async () => {
     const r = await fetch('/api/panel/chats').then((x) => x.json()).catch(() => null);
@@ -211,7 +216,19 @@ export function ChatsClient() {
     const t = setInterval(() => loadDetail(sel), 6000);
     return () => clearInterval(t);
   }, [sel, loadDetail]);
-  useEffect(() => { if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight; }, [detail]);
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const count = detail?.messages.length ?? 0;
+    const changedChat = scrollSelRef.current !== sel;
+    const grew = count > scrollCountRef.current;
+    scrollSelRef.current = sel;
+    scrollCountRef.current = count;
+    // Baja al fondo si: se abrió otro chat, o llegaron mensajes nuevos y el
+    // operador ya estaba mirando el fondo. Nunca lo arrastra si está leyendo arriba.
+    if (changedChat) { el.scrollTop = el.scrollHeight; atBottomRef.current = true; return; }
+    if (grew && atBottomRef.current) el.scrollTop = el.scrollHeight;
+  }, [detail, sel]);
 
   async function exportDone() {
     const r = await fetch('/api/panel/chats', {
@@ -483,7 +500,9 @@ export function ChatsClient() {
               </div>
             </div>
 
-            <div ref={bodyRef} style={{ flex: 1, overflowY: 'auto', padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '.7rem', minHeight: 0, background: 'var(--bg, rgba(0,0,0,.18))' }}>
+            <div ref={bodyRef}
+              onScroll={(e) => { const el = e.currentTarget; atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}
+              style={{ flex: 1, overflowY: 'auto', padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '.7rem', minHeight: 0, background: 'var(--bg, rgba(0,0,0,.18))' }}>
               {detail.messages.map((m, idx) => {
                 // Vista de operador: el LEAD (cliente) va a la izquierda, NOSOTROS
                 // (bot/operador) a la derecha — estilo Black Dragon.
