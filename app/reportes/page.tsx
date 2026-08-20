@@ -1,12 +1,18 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
-import { getClientKpis, getDailyReport } from '@/lib/reports';
+import {
+  buildDailyChartSeries,
+  getClientKpis,
+  getDailyReport,
+  lastNDaysRangeAR,
+} from '@/lib/reports';
 import { Nav } from '../_components/Nav';
+import { DailyAdsCharts } from './DailyAdsCharts';
+import { DailyAdsTable } from './DailyAdsTable';
 
 export const dynamic = 'force-dynamic';
 
 const fmt = (n: number) => n.toLocaleString('es-AR');
-const money = (n: number) => `$${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default async function ReportesPage({
   searchParams,
@@ -17,15 +23,28 @@ export default async function ReportesPage({
   if (!session) redirect('/login');
   if (session.role === 'admin') redirect('/admin');
 
-  const k = await getClientKpis(session.tenantId, {
-    campaign: searchParams.campaign || undefined,
-    start: searchParams.start ? `${searchParams.start}T00:00:00.000Z` : undefined,
-    end: searchParams.end ? `${searchParams.end}T23:59:59.999Z` : undefined,
-  });
+  const chartRange = lastNDaysRangeAR(3);
 
-  // Historial diario (mismo que el admin, pero SOLO LECTURA: el gasto/recarga los
-  // carga el admin; el cliente los ve pero no los edita).
-  const daily = await getDailyReport({ start: searchParams.start, end: searchParams.end, tenantId: session.tenantId });
+  const [k, daily, chartRows] = await Promise.all([
+    getClientKpis(session.tenantId, {
+      campaign: searchParams.campaign || undefined,
+      start: searchParams.start ? `${searchParams.start}T00:00:00.000Z` : undefined,
+      end: searchParams.end ? `${searchParams.end}T23:59:59.999Z` : undefined,
+    }),
+    getDailyReport({
+      start: searchParams.start,
+      end: searchParams.end,
+      tenantId: session.tenantId,
+    }),
+    getDailyReport({
+      start: chartRange.start,
+      end: chartRange.end,
+      tenantId: session.tenantId,
+    }),
+  ]);
+
+  const chartData = buildDailyChartSeries(chartRows, 3);
+
   const tot = daily.reduce(
     (a, r) => ({ chats: a.chats + r.chats, cargas: a.cargas + r.cargas, gasto: a.gasto + r.gasto, recarga: a.recarga + r.recarga }),
     { chats: 0, cargas: 0, gasto: 0, recarga: 0 },
@@ -42,6 +61,15 @@ export default async function ReportesPage({
             <h1>Reportes</h1>
             <p>Estadísticas y análisis de eventos de tu cuenta.</p>
           </div>
+        </div>
+
+        <div className="card">
+          <div className="card__title">
+            Reportes diarios de ads
+            <span className="card__sub">gasto/recarga cargados por el administrador</span>
+          </div>
+          <DailyAdsTable daily={daily} tot={tot} convTot={convTot} saldoFinal={saldoFinal} />
+          <DailyAdsCharts data={chartData} />
         </div>
 
         <form method="get" className="card" style={{ paddingBottom: '1.1rem' }}>
@@ -128,56 +156,6 @@ export default async function ReportesPage({
               ))}
             </tbody>
           </table>
-        </div>
-
-        <div className="card">
-          <div className="card__title">
-            Reportes diarios de ads
-            <span className="card__sub">gasto/recarga cargados por el administrador</span>
-          </div>
-          {daily.length === 0 ? (
-            <div className="empty">Sin eventos ni cargas en el período seleccionado.</div>
-          ) : (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th className="num">Chats</th><th className="num">$/Chat</th>
-                  <th className="num">Cargas</th><th className="num">Conv.</th>
-                  <th className="num">$/Carga</th><th className="num">Gasto</th>
-                  <th className="num">Recarga</th><th className="num">Saldo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {daily.map((r) => (
-                  <tr key={r.day}>
-                    <td style={{ whiteSpace: 'nowrap' }}>{r.day}</td>
-                    <td className="num">{r.chats}</td>
-                    <td className="num">{money(r.costPerChat)}</td>
-                    <td className="num">{r.cargas}</td>
-                    <td className="num" style={{ color: 'var(--accent)' }}>{r.conversion}%</td>
-                    <td className="num">{money(r.costPerCarga)}</td>
-                    <td className="num">{money(r.gasto)}</td>
-                    <td className="num">{money(r.recarga)}</td>
-                    <td className="num" style={{ fontWeight: 600, color: r.saldo >= 0 ? 'var(--text)' : 'var(--danger)' }}>{money(r.saldo)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr style={{ borderTop: '2px solid var(--border-2)', fontWeight: 700 }}>
-                  <td>Σ Acumulado</td>
-                  <td className="num">{tot.chats}</td>
-                  <td className="num">{money(tot.chats ? tot.gasto / tot.chats : 0)}</td>
-                  <td className="num">{tot.cargas}</td>
-                  <td className="num" style={{ color: 'var(--accent)' }}>{convTot}%</td>
-                  <td className="num">{money(tot.cargas ? tot.gasto / tot.cargas : 0)}</td>
-                  <td className="num">{money(tot.gasto)}</td>
-                  <td className="num">{money(tot.recarga)}</td>
-                  <td className="num" style={{ color: saldoFinal >= 0 ? 'var(--accent)' : 'var(--danger)' }}>{money(saldoFinal)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          )}
         </div>
       </main>
     </>

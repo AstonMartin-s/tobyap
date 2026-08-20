@@ -6,6 +6,7 @@ import {
   DEFAULT_RUNTIME,
   LINK_SLOTS,
   type ChatRuntimeConfig,
+  type LinkSlotId,
   type OfferType,
   type PreviewBubble,
 } from '@/lib/chat/runtime';
@@ -21,17 +22,21 @@ const TABS = [
 
 type TabId = typeof TABS[number]['id'];
 
-function highlightLinks(text: string, runtime: ChatRuntimeConfig, linkField?: string) {
+function highlightLinks(text: string, links: ChatRuntimeConfig['links'], linkSlot?: LinkSlotId) {
   const parts: Array<{ t: string; link?: boolean }> = [];
-  const urls = linkField === 'supportUrl' ? [runtime.supportUrl] : linkField ? [runtime.portalUrl] : [];
-  if (!urls.length || !urls[0]) return [{ t: text }];
-  const url = urls[0];
+  if (!linkSlot) return [{ t: text }];
+  const url = links[linkSlot];
+  if (!url) return [{ t: text }];
   const idx = text.indexOf(url);
   if (idx < 0) return [{ t: text }];
   if (idx > 0) parts.push({ t: text.slice(0, idx) });
   parts.push({ t: url, link: true });
   if (idx + url.length < text.length) parts.push({ t: text.slice(idx + url.length) });
   return parts;
+}
+
+function linkSlotLabel(id: LinkSlotId): string {
+  return LINK_SLOTS.find((s) => s.id === id)?.label ?? id;
 }
 
 export function LivechatClient() {
@@ -67,8 +72,7 @@ export function LivechatClient() {
           offerType: runtime.offerType,
           offerValue: runtime.offerValue,
           minDeposit: runtime.minDeposit,
-          portalUrl: runtime.portalUrl,
-          supportUrl: runtime.supportUrl,
+          links: runtime.links,
         }),
       });
       const d = await r.json();
@@ -131,7 +135,9 @@ export function LivechatClient() {
         display: 'grid',
         gridTemplateColumns: tab === 'preview'
           ? 'minmax(220px, 280px) minmax(0, 1fr)'
-          : 'minmax(280px, 1fr) minmax(300px, 420px)',
+          : tab === 'links'
+            ? 'minmax(0, 1fr)'
+            : 'minmax(280px, 1fr) minmax(300px, 420px)',
         gap: '1.2rem',
         alignItems: 'start',
         width: '100%',
@@ -198,26 +204,29 @@ export function LivechatClient() {
 
         {tab === 'links' && (
           <section className="card">
-            <div className="card__title">Links de plataforma</div>
-            <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '0 0 .8rem' }}>
-              Cada link se usa en varios momentos del guion. La vista previa muestra dónde aparece.
+            <div className="card__title">Links por mensaje</div>
+            <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '0 0 .9rem', lineHeight: 1.45 }}>
+              Un URL por cada momento del guion. Podés repetir el mismo link o usar distintos según el caso.
             </p>
-            <div className="field">
-              <label>Portal (login, jugar, cargar, retirar)</label>
-              <input className="input" value={runtime.portalUrl} onChange={(e) => setRuntime({ ...runtime, portalUrl: e.target.value })} placeholder="https://greenbet.uno/login" />
-              <p style={{ color: 'var(--muted-2)', fontSize: '.72rem', margin: '4px 0 0' }}>
-                {LINK_SLOTS.filter((s) => s.field === 'portalUrl').map((s) => s.label).join(' · ')}
-              </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.85rem' }}>
+              {LINK_SLOTS.map((slot) => (
+                <div key={slot.id} className="field" style={{ margin: 0 }}>
+                  <label style={{ marginBottom: 2 }}>{slot.label}</label>
+                  <input
+                    className="input"
+                    value={runtime.links[slot.id]}
+                    onChange={(e) => setRuntime({
+                      ...runtime,
+                      links: { ...runtime.links, [slot.id]: e.target.value },
+                    })}
+                    placeholder={slot.id === 'support' ? 'https://wa.link/…' : 'https://…'}
+                  />
+                  <p style={{ color: 'var(--muted-2)', fontSize: '.7rem', margin: '4px 0 0', lineHeight: 1.35 }}>{slot.hint}</p>
+                </div>
+              ))}
             </div>
-            <div className="field">
-              <label>Soporte WhatsApp (walink u otro)</label>
-              <input className="input" value={runtime.supportUrl} onChange={(e) => setRuntime({ ...runtime, supportUrl: e.target.value })} placeholder="https://wa.link/…" />
-              <p style={{ color: 'var(--muted-2)', fontSize: '.72rem', margin: '4px 0 0' }}>
-                {LINK_SLOTS.filter((s) => s.field === 'supportUrl').map((s) => s.label).join(' · ')}
-              </p>
-            </div>
-            <p style={{ color: 'var(--muted)', fontSize: '.75rem', margin: 0 }}>
-              El magic-link de Pagoda al acreditar sigue siendo dinámico (one-time). Si no existe, se usa el portal de arriba.
+            <p style={{ color: 'var(--muted)', fontSize: '.75rem', margin: '.9rem 0 0' }}>
+              El magic-link de Pagoda al acreditar sigue siendo dinámico (one-time). Si no existe, se usa el link de <em>Acreditado — entrar a jugar</em>.
             </p>
           </section>
         )}
@@ -256,8 +265,9 @@ export function LivechatClient() {
                 {LINK_SLOTS.map((s) => (
                   <li key={s.id} style={{ fontSize: '.78rem', lineHeight: 1.35, padding: '.45rem .55rem', borderRadius: 8, background: 'var(--bg-2)', border: '1px solid var(--border)' }}>
                     <div style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{s.label}</div>
+                    <div style={{ color: 'var(--muted-2)', fontSize: '.68rem', marginBottom: 3 }}>{s.hint}</div>
                     <div style={{ color: 'var(--muted-2)', fontSize: '.7rem', wordBreak: 'break-all' }}>
-                      {s.field === 'supportUrl' ? runtime.supportUrl : runtime.portalUrl}
+                      {runtime.links[s.id]}
                     </div>
                   </li>
                 ))}
@@ -310,12 +320,12 @@ export function LivechatClient() {
                           padding: '7px 10px', borderRadius: 10, fontSize: '.8rem', lineHeight: 1.42, whiteSpace: 'pre-wrap',
                           boxShadow: '0 1px 0.5px rgba(0,0,0,.13)',
                         }}>
-                          {highlightLinks(b.text, runtime, b.linkField).map((p, j) => (
+                          {highlightLinks(b.text, runtime.links, b.linkSlot).map((p, j) => (
                             <span key={j} className={p.link ? 'chat-preview-link' : undefined} style={p.link ? { wordBreak: 'break-all' } : undefined}>{p.t}</span>
                           ))}
                         </div>
-                        {b.linkField && (
-                          <div className="chat-preview-link-hint" style={{ fontSize: '.62rem', marginTop: 2 }}>↗ {b.linkField === 'supportUrl' ? 'Link soporte' : 'Link portal'}</div>
+                        {b.linkSlot && (
+                          <div className="chat-preview-link-hint" style={{ fontSize: '.62rem', marginTop: 2 }}>↗ {linkSlotLabel(b.linkSlot)}</div>
                         )}
                       </div>
                     ))}

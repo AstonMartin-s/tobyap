@@ -12,6 +12,37 @@ export function todayAR(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: AR_TZ }).format(new Date()); // YYYY-MM-DD
 }
 
+/** Desplaza un día AR (YYYY-MM-DD) por delta días. */
+export function shiftDayAR(day: string, delta: number): string {
+  const [y, m, d] = day.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + delta);
+  return dt.toISOString().slice(0, 10);
+}
+
+export function lastNDaysRangeAR(days: number): { start: string; end: string } {
+  const end = todayAR();
+  const start = shiftDayAR(end, -(days - 1));
+  return { start, end };
+}
+
+/** Serie de N días con ceros si falta fila en DB. */
+export function buildDailyChartSeries(rows: DailyRow[], days = 3): Array<{ day: string; gasto: number; costPerCarga: number; cargas: number }> {
+  const end = todayAR();
+  const out: Array<{ day: string; gasto: number; costPerCarga: number; cargas: number }> = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const day = shiftDayAR(end, -i);
+    const r = rows.find((x) => x.day === day);
+    out.push({
+      day,
+      gasto: r?.gasto ?? 0,
+      costPerCarga: r?.costPerCarga ?? 0,
+      cargas: r?.cargas ?? 0,
+    });
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Reportes admin — agregan SIEMPRE desde nuestra DB (meta_events). El sistema es
 // independiente del PAYBOT original (ver memoria tobyap-independiente).

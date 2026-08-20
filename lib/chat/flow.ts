@@ -67,7 +67,7 @@ export async function accountStep(
     };
   }
 
-  const creds = `\n\n👤 Usuario: *${acc.username}*\n🔑 Contraseña: *${acc.password}*\n\n🔗 Entrá acá:\n${cfg.portalUrl}`;
+  const creds = `\n\n👤 Usuario: *${acc.username}*\n🔑 Contraseña: *${acc.password}*\n\n🔗 Entrá acá:\n${cfg.links.portal_login}`;
   const messages: BotMsg[] = acc.existing
     ? [
         { from: 'bot', delayMs: 600, at: now(), text: 'Dejame chequear tu cuenta… 👀' },
@@ -134,14 +134,14 @@ export function comprobanteRejectedMessages(): BotMsg[] {
 // Mensaje de soporte / walink suelto (lo entrega el operador cuando hace falta).
 export function supportMessage(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg[] {
   return [
-    { from: 'bot', delayMs: 400, at: now(), text: `🙋 Para ayudarte mejor, escribinos por WhatsApp y te atendemos al toque, 24hs 👇\n${cfg.supportUrl}` },
+    { from: 'bot', delayMs: 400, at: now(), text: `🙋 Para ayudarte mejor, escribinos por WhatsApp y te atendemos al toque, 24hs 👇\n${cfg.links.support}` },
   ];
 }
 
 // ── Paso 5: CARGO (se emite recién cuando el operador mueve el lead) ───────
 // Acá SÍ usamos el magic-link de Pagoda (primer acceso directo, loguea de una).
 export function accreditedMessages(loginUrl?: string | null, cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg[] {
-  const link = loginUrl || cfg.portalUrl;
+  const link = loginUrl || cfg.links.portal_play;
   return [
     { from: 'bot', delayMs: 600, at: now(), text: `✅ *¡Acreditado con éxito!*\n🎉 ¡Gracias por elegir ${cfg.brandName}! Ya tenés tu saldo.\n\n🎮 Entrá directo a jugar acá 👇\n${link}` },
     { from: 'bot', delayMs: 1200, at: now(), text: '¿Necesitás algo más? Elegí una opción 👇' },
@@ -152,9 +152,9 @@ export function accreditedMessages(loginUrl?: string | null, cfg: ChatRuntimeCon
 export function postActionMessages(action: string, data: Record<string, unknown>, cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): { messages: BotMsg[]; step?: string } {
   const user = String(data.username ?? '');
   const pass = String(data.password ?? '');
-  // Post-acreditación: magic-link de Pagoda si existe; sino portal configurado.
-  const url = String(data.loginUrl || cfg.portalUrl);
-  const portal = `\n${url}`;
+  const loginUrl = data.loginUrl ? String(data.loginUrl) : '';
+  const portalUrl = (slot: 'portal_deposit' | 'portal_withdraw' | 'portal_forgot') =>
+    loginUrl || cfg.links[slot];
   const refImg = cfg.portalRefImg || PORTAL_REF_IMG;
   const ref = (text: string): BotMsg[] => [
     { from: 'bot', delayMs: 600, at: now(), text },
@@ -162,13 +162,13 @@ export function postActionMessages(action: string, data: Record<string, unknown>
   ];
   switch (action) {
     case 'deposit':
-      return { messages: ref(`💰 *Cargar saldo*\nEntrá al portal y tocá *"Cargar saldo"* 👇${portal}\n\n${offerDepositLine(cfg)}`) };
+      return { messages: ref(`💰 *Cargar saldo*\nEntrá al portal y tocá *"Cargar saldo"* 👇\n${portalUrl('portal_deposit')}\n\n${offerDepositLine(cfg)}`) };
     case 'withdraw':
-      return { messages: ref(`💸 *Retirar saldo*\nEntrá al portal y tocá *"Retirar saldo"* 👇${portal}\n\nCargá tu CBU en "Mi cuenta bancaria" y listo.`) };
+      return { messages: ref(`💸 *Retirar saldo*\nEntrá al portal y tocá *"Retirar saldo"* 👇\n${portalUrl('portal_withdraw')}\n\nCargá tu CBU en "Mi cuenta bancaria" y listo.`) };
     case 'support':
-      return { messages: [{ from: 'bot', delayMs: 600, at: now(), text: `🙋 *Soporte*\nEscribinos por WhatsApp y te atendemos al toque, 24hs 👇\n${cfg.supportUrl}` }] };
+      return { messages: [{ from: 'bot', delayMs: 600, at: now(), text: `🙋 *Soporte*\nEscribinos por WhatsApp y te atendemos al toque, 24hs 👇\n${cfg.links.support}` }] };
     case 'forgot_user':
-      return { messages: [{ from: 'bot', delayMs: 600, at: now(), text: `🔐 Tus datos de acceso:\n\n👤 Usuario: *${user}*\n🔑 Contraseña: *${pass}*\n\n🔗 Entrá directo acá 👇${portal}` }] };
+      return { messages: [{ from: 'bot', delayMs: 600, at: now(), text: `🔐 Tus datos de acceso:\n\n👤 Usuario: *${user}*\n🔑 Contraseña: *${pass}*\n\n🔗 Entrá directo acá 👇\n${portalUrl('portal_forgot')}` }] };
     case 'cancel':
       return { messages: [{ from: 'bot', delayMs: 500, at: now(), text: '¡Gracias! Cerramos la consulta 👋 Cuando quieras, escribinos de nuevo.' }], step: 'closed' };
     default:
@@ -180,7 +180,7 @@ export function postActionMessages(action: string, data: Record<string, unknown>
 // no resuelve → lo mandamos directo al soporte de WhatsApp.
 const HELP_RE = /(ayuda|no entiendo|no comprendo|no puedo|no me (anda|funciona|sale)|problema|c[oó]mo hago|como funciona|no s[eé]|duda|consulta|hablar con|una persona|un humano|asesor|operador|reclamo|estafa|no me lleg|error)/i;
 function supportReply(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg[] {
-  return [{ from: 'bot', delayMs: 600, at: now(), text: `🙋 Para ayudarte mejor, escribinos por WhatsApp y te atendemos al toque, 24hs 👇\n${cfg.supportUrl}` }];
+  return [{ from: 'bot', delayMs: 600, at: now(), text: `🙋 Para ayudarte mejor, escribinos por WhatsApp y te atendemos al toque, 24hs 👇\n${cfg.links.support}` }];
 }
 
 // Palabras que indican un problema real (no solo confusión con el paso de la

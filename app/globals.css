@@ -105,6 +105,26 @@ a { color: inherit; }
 .chat-preview-phone .chat-preview-link { color: #027eb5; font-weight: 600; text-decoration: underline; }
 .chat-preview-phone .chat-preview-link-hint { color: #027eb5; }
 
+/* Reportes — gráficos últimos 3 días */
+.daily-charts { margin-top: 1.25rem; padding-top: 1.1rem; border-top: 1px solid var(--border); }
+.daily-charts__hint { color: var(--muted-2); font-size: .75rem; margin: 0 0 .75rem; }
+.daily-charts__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; }
+.daily-chart {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: .65rem .7rem .5rem;
+}
+.daily-chart__head { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; margin-bottom: .25rem; }
+.daily-chart__title { font-size: .78rem; font-weight: 600; color: var(--muted); }
+.daily-chart__last { font-size: .85rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.daily-chart__svg { width: 100%; height: auto; display: block; }
+.daily-chart__grid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 4; opacity: .7; }
+.daily-chart__axis { fill: var(--muted-2); font-size: 9px; font-family: system-ui, sans-serif; }
+@media (max-width: 900px) {
+  .daily-charts__grid { grid-template-columns: 1fr; }
+}
+
 :root { --sidebar-w: 200px; }
 /* Sidebar colapsado (solo iconos) — estilo Black Dragon. Una sola variable
    maneja el ancho del sidebar y el margen del contenido. */

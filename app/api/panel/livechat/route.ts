@@ -7,7 +7,9 @@ import { parseChatConfig } from '@/lib/chat/brand';
 import {
   buildConversationPreview,
   LINK_SLOTS,
+  LINK_SLOT_IDS,
   parseChatRuntime,
+  type LinkSlotId,
   type OfferType,
 } from '@/lib/chat/runtime';
 import { saveBrandAvatar } from '@/lib/storage';
@@ -60,9 +62,18 @@ export async function PUT(req: NextRequest) {
     minDeposit?: number;
     portalUrl?: string;
     supportUrl?: string;
+    links?: Partial<Record<LinkSlotId, string>>;
   };
   const row = await loadRow(session.tenantId);
   const prev = (row?.chatConfig ?? {}) as Record<string, unknown>;
+  const prevRuntime = parseChatRuntime(prev, typeof prev.brandName === 'string' ? prev.brandName : session.slug);
+  const mergedLinks = { ...prevRuntime.links };
+  if (body.links && typeof body.links === 'object') {
+    for (const id of LINK_SLOT_IDS) {
+      const v = body.links[id];
+      if (typeof v === 'string') mergedLinks[id] = v.trim();
+    }
+  }
   const next = {
     ...prev,
     brandName: typeof body.brandName === 'string' ? body.brandName.trim() : prev.brandName,
@@ -71,8 +82,9 @@ export async function PUT(req: NextRequest) {
     offerType: body.offerType === 'fichas' || body.offerType === 'bonus' ? body.offerType : prev.offerType,
     offerValue: typeof body.offerValue === 'number' ? body.offerValue : prev.offerValue,
     minDeposit: typeof body.minDeposit === 'number' ? body.minDeposit : prev.minDeposit,
-    portalUrl: typeof body.portalUrl === 'string' ? body.portalUrl.trim() : prev.portalUrl,
-    supportUrl: typeof body.supportUrl === 'string' ? body.supportUrl.trim() : prev.supportUrl,
+    links: mergedLinks,
+    portalUrl: mergedLinks.portal_login,
+    supportUrl: mergedLinks.support,
   };
   const [saved] = await db
     .insert(clientSettings)
