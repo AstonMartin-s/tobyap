@@ -43,6 +43,9 @@ function tenantValues(input: CreateTenantInput) {
     externalApiKey: encryptOptional(input.externalApiKey),
     pagodaUrl: input.pagodaUrl ?? null,
     pagodaApiKey: encryptOptional(input.pagodaApiKey),
+    provider: input.provider ?? 'pagoda',
+    partnerApiUrl: input.partnerApiUrl ?? null,
+    partnerApiKey: encryptOptional(input.partnerApiKey),
   };
 }
 
@@ -146,6 +149,9 @@ export interface UpdateTenantPatch {
   metaCapiToken?: string;
   kommoToken?: string;
   customFields?: Record<string, number>;
+  provider?: string;
+  partnerApiUrl?: string;
+  partnerApiKey?: string;
 }
 
 export async function updateTenantFields(slug: string, patch: UpdateTenantPatch): Promise<void> {
@@ -159,6 +165,9 @@ export async function updateTenantFields(slug: string, patch: UpdateTenantPatch)
   if (patch.metaCapiToken) set.metaCapiToken = encrypt(patch.metaCapiToken);
   if (patch.kommoToken) set.kommoToken = encrypt(patch.kommoToken);
   if (patch.customFields !== undefined) set.customFields = patch.customFields;
+  if (patch.provider !== undefined) set.provider = patch.provider;
+  if (patch.partnerApiUrl !== undefined) set.partnerApiUrl = patch.partnerApiUrl;
+  if (patch.partnerApiKey) set.partnerApiKey = encrypt(patch.partnerApiKey);
   if (patch.panelPassword) set.panelPasswordHash = await bcrypt.hash(patch.panelPassword, 10);
 
   await db.update(tenants).set(set).where(eq(tenants.slug, slug));
@@ -191,6 +200,9 @@ function resolve(row: TenantRow): ResolvedTenant {
     externalApiKey: decryptOptional(row.externalApiKey),
     pagodaUrl: row.pagodaUrl,
     pagodaApiKey: decryptOptional(row.pagodaApiKey),
+    provider: row.provider ?? 'pagoda',
+    partnerApiUrl: row.partnerApiUrl,
+    partnerApiKey: decryptOptional(row.partnerApiKey),
     customFields: cf,
     bonoMap: (row.bonoMap ?? {}) as Record<string, string>,
     readonly: row.readonly ?? false,

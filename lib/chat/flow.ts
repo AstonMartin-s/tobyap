@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { clientSettings } from '@/db/schema';
 import { createPortalAccount, buildPortalName } from '@/lib/pagoda';
+import { createPlayerWithRetry } from '@/lib/partner-api';
 import type { ResolvedTenant } from '@/lib/types';
 import {
   DEFAULT_RUNTIME,
@@ -50,12 +51,14 @@ export function welcomeStep(name?: string | null, cfg: ChatRuntimeConfig = DEFAU
   };
 }
 
-// ── Paso 2: PIDIO USER (crea en Pagoda) ────────────────────────────────────
+// ── Paso 2: PIDIO USER (crea cuenta — Pagoda o Partner API según el tenant) ─
 export async function accountStep(
   tenant: ResolvedTenant,
   session: { phone: string; name?: string | null },
   cfg: ChatRuntimeConfig = DEFAULT_RUNTIME,
 ): Promise<{ messages: BotMsg[]; buttons: Btn[]; data: Record<string, unknown>; step: string }> {
+  if (tenant.provider === 'partner_api') return accountStepPartnerApi(tenant, session, cfg);
+
   const portalName = portalNameFrom(session.name, session.phone);
   let acc;
   try {
@@ -84,6 +87,36 @@ export async function accountStep(
     data: { username: acc.username, password: acc.password, loginUrl: acc.loginUrl, portalName, existing: acc.existing },
     step: 'credenciales',
   };
+}
+
+// Partner API (bblack/KingPlay): a diferencia de Pagoda, ACÁ nosotros elegimos
+// username/password (createPlayerWithRetry reintenta con otro nombre si el
+// elegido ya existe — 422 de validación). Sin magic-link: mostramos la página
+// de login estable; el SSO de 60s se pide recién cuando el cliente va a jugar
+// (fase de "Jugar" post-acreditación, no acá).
+async function accountStepPartnerApi(
+  tenant: ResolvedTenant,
+  session: { phone: string; name?: string | null },
+  cfg: ChatRuntimeConfig,
+): Promise<{ messages: BotMsg[]; buttons: Btn[]; data: Record<string, unknown>; step: string }> {
+  try {
+    const { username, password } = await createPlayerWithRetry(tenant, { name: session.name, phone: session.phone });
+    const creds = `\n\n👤 Usuario: *${username}*\n🔑 Contraseña: *${password}*\n\n🔗 Entrá acá:\n${cfg.links.portal_login}`;
+    return {
+      messages: [
+        { from: 'bot', delayMs: 600, at: now(), text: 'Genial 🙌 Te estoy creando tu usuario, dame un segundo…' },
+        { from: 'bot', delayMs: 1800, at: now(), text: `✅ *¡Felicitaciones!* Tu usuario ya está creado:${creds}` },
+      ],
+      buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
+      data: { username, password, loginUrl: null, portalName: username, existing: false },
+      step: 'credenciales',
+    };
+  } catch {
+    return {
+      messages: [{ from: 'bot', delayMs: 1200, at: now(), text: 'Uy, tuve un problemita con tu usuario. Un asesor te ayuda en un momento 🙌' }],
+      buttons: [], data: { credsError: true }, step: 'error',
+    };
+  }
 }
 
 // ── Paso 3: CBU (número separado + copiar) ─────────────────────────────────

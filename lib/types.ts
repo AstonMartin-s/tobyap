@@ -23,6 +23,11 @@ export interface ResolvedTenant {
   pagodaUrl: string | null;
   pagodaApiKey: string | null;
 
+  // Proveedor de creación de cuenta: 'pagoda' (King) | 'partner_api' (bblack).
+  provider: string;
+  partnerApiUrl: string | null;
+  partnerApiKey: string | null; // descifrado
+
   // Mapa de custom fields de Kommo
   customFields: Record<string, number>;
   // Override CCPP -> bono (se combina con el mapa global por defecto)
@@ -110,6 +115,9 @@ export interface CreateTenantInput {
   externalApiKey?: string; // cifrado
   pagodaUrl?: string;
   pagodaApiKey?: string; // cifrado
+  provider?: string;
+  partnerApiUrl?: string;
+  partnerApiKey?: string; // cifrado
 
   // Sub-entidades opcionales (se insertan en sus tablas)
   settings?: TenantSettingsInput;

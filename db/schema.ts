@@ -78,6 +78,14 @@ export const tenants = pgTable('tenants', {
   pagodaUrl: text('pagoda_url'), // ej: https://pagoda.dat4win.com
   pagodaApiKey: text('pagoda_api_key'), // cifrado — pgk_...
 
+  // Proveedor de creación de cuenta de portal: 'pagoda' (King) | 'partner_api'
+  // (bblack — server-to-server, nosotros generamos user/pass). Default 'pagoda'
+  // preserva el comportamiento de todos los tenants existentes.
+  provider: text('provider').default('pagoda'),
+  // Partner API (ej. KingPlay/bblack) — alta de jugador + login único.
+  partnerApiUrl: text('partner_api_url'), // ej: https://api-kplay.com/api/v1
+  partnerApiKey: text('partner_api_key'), // cifrado — pk_...
+
   // Override por cliente del mapa CCPP -> bono (ej. { "A1": "Bono10%" }).
   // Si falta una clave, se usa el mapa global por defecto (lib/attribution).
   bonoMap: jsonb('bono_map').$type<Record<string, string>>().default({}),
@@ -448,3 +456,30 @@ export const a3State = pgTable('a3_state', {
 });
 
 export type A3ConversationRow = typeof a3Conversations.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// partner_operations — cargas/retiros de saldo real hechos vía Partner API
+// (bblack/KingPlay) desde el panel. Una fila por operación. Sirve para:
+//  (a) idempotencia: la `reference` única evita duplicar ante doble-click/retry.
+//  (b) "Balance Total" del panel (sumatoria de cargado/retirado — la API no lo da).
+// ---------------------------------------------------------------------------
+export const partnerOperations = pgTable('partner_operations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id')
+    .notNull()
+    .references(() => tenants.id, { onDelete: 'cascade' }),
+  sessionId: uuid('session_id'), // chat asociado (si aplica)
+  username: text('username').notNull(), // jugador en la plataforma
+  type: text('type').notNull(), // 'deposit' | 'withdraw'
+  amount: doublePrecision('amount').notNull(), // en pesos
+  reference: text('reference').notNull().unique(), // llave de idempotencia
+  bonusPercent: integer('bonus_percent'), // bono aplicado (solo deposit)
+  ledgerId: bigint('ledger_id', { mode: 'number' }), // id de la op en la plataforma
+  balanceAfter: doublePrecision('balance_after'), // saldo resultante que devolvió la API
+  operator: text('operator'), // quién la disparó (panel)
+  status: text('status').default('pending'), // pending | done | failed
+  error: text('error'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+export type PartnerOperationRow = typeof partnerOperations.$inferSelect;

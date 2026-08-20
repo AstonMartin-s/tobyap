@@ -54,12 +54,32 @@ function linkBubbleHint(b: PreviewBubble, links: ChatRuntimeConfig['links']): st
 const STATIC_SLOTS = LINK_SLOTS.filter((s) => s.kind === 'static');
 const MAGIC_SLOTS = LINK_SLOTS.filter((s) => s.kind === 'magic_fallback');
 
-export function LivechatClient() {
+// Bono (etiqueta) → código CCPP que entiende la landing/atribución (DEFAULT_BONO_MAP).
+const BONO_LINK_OPTS: Array<{ label: string; code: string }> = [
+  { label: 'Bono 10%', code: 'A1' },
+  { label: 'Bono 20%', code: 'A2' },
+  { label: 'Bono 30%', code: 'A3' },
+  { label: 'Bono 50%', code: 'A5' },
+  { label: '100% (Duplica)', code: 'A200' },
+  { label: 'Fichas gratis', code: 'F1' },
+];
+
+export function LivechatClient({ slug }: { slug: string }) {
   const [tab, setTab] = useState<TabId>('identidad');
   const [brand, setBrand] = useState<Brand>({ brandName: '', primaryColor: '#008069', avatarUrl: null });
   const [runtime, setRuntime] = useState<ChatRuntimeConfig>(DEFAULT_RUNTIME);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
+  const [linkBono, setLinkBono] = useState('A2');
+  const [linkCampaign, setLinkCampaign] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const genLink = (() => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const cid = linkCampaign.trim();
+    const qs = `ccpp=${linkBono}${cid ? `&campaign=${cid}` : ''}`;
+    return `${origin}/l/${slug}/go?${qs}`;
+  })();
 
   const preview = useMemo(() => buildConversationPreview(runtime, 'Martín'), [runtime]);
 
@@ -95,7 +115,7 @@ export function LivechatClient() {
       if (!r.ok) throw new Error(d.error ?? 'error');
       if (d.brand) setBrand(d.brand);
       if (d.runtime) setRuntime(d.runtime);
-      setMsg('✓ Guardado. Los chats nuevos usan esta config; King sin cambios hasta guardar.');
+      setMsg('✓ Guardado. Los chats nuevos toman esta configuración.');
     } catch (e) {
       setMsg('Error: ' + (e as Error).message);
     } finally {
@@ -321,26 +341,60 @@ export function LivechatClient() {
         )}
 
         {(tab === 'identidad' || tab === 'oferta' || tab === 'links') && (
-          <section className="card">
-            <div className="card__title">Cabecera del chat</div>
-            <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)', fontFamily: 'system-ui, sans-serif' }}>
-              <div style={{ background: brand.primaryColor || '#008069', color: '#fff', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                {brand.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={brand.avatarUrl} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', background: '#25D366' }} />
-                ) : (
-                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#25D366', display: 'grid', placeItems: 'center', fontWeight: 700 }}>{initial}</div>
-                )}
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 16 }}>{brand.brandName || runtime.brandName || 'Soporte'}</div>
-                  <div style={{ fontSize: 12, opacity: 0.85 }}>en línea</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: 0 }}>
+            <section className="card">
+              <div className="card__title">Cabecera del chat</div>
+              <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)', fontFamily: 'system-ui, sans-serif' }}>
+                <div style={{ background: brand.primaryColor || '#008069', color: '#fff', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {brand.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={brand.avatarUrl} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', background: '#25D366' }} />
+                  ) : (
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#25D366', display: 'grid', placeItems: 'center', fontWeight: 700 }}>{initial}</div>
+                  )}
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 16 }}>{brand.brandName || runtime.brandName || 'Soporte'}</div>
+                    <div style={{ fontSize: 12, opacity: 0.85 }}>en línea</div>
+                  </div>
+                </div>
+                <div className="chat-preview-phone" style={{ borderRadius: 0, border: 'none', boxShadow: 'none', padding: 14, minHeight: 80, fontSize: 13 }}>
+                  Cambios de identidad y oferta se ven acá y en la pestaña Vista previa.
                 </div>
               </div>
-              <div className="chat-preview-phone" style={{ borderRadius: 0, border: 'none', boxShadow: 'none', padding: 14, minHeight: 80, fontSize: 13 }}>
-                Cambios de identidad y oferta se ven acá y en la pestaña Vista previa.
+            </section>
+
+            {/* Generador de link del chat (bono + campaña) para los anuncios. */}
+            <section className="card">
+              <div className="card__title">Generar link del chat</div>
+              <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '0 0 .6rem' }}>
+                Link para el anuncio: redirige al chat con el bono y la campaña ya cargados.
+              </p>
+              <div className="grid-2">
+                <div className="field">
+                  <label>Bono</label>
+                  <select className="input" value={linkBono} onChange={(e) => setLinkBono(e.target.value)}>
+                    {BONO_LINK_OPTS.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Campaign ID <span style={{ color: 'var(--muted)', fontSize: '.72rem' }}>(letras/números)</span></label>
+                  <input className="input" value={linkCampaign}
+                    onChange={(e) => setLinkCampaign(e.target.value.replace(/[^A-Za-z0-9]/g, ''))}
+                    placeholder="C1" />
+                </div>
               </div>
-            </div>
-          </section>
+              <div className="field" style={{ marginTop: '.3rem' }}>
+                <label>Link generado</label>
+                <input className="input" readOnly value={genLink} onFocus={(e) => e.currentTarget.select()}
+                  style={{ fontSize: '.78rem', fontFamily: 'monospace' }} />
+              </div>
+              <div className="row" style={{ marginTop: '.4rem' }}>
+                <button className="btn" type="button" onClick={() => {
+                  navigator.clipboard?.writeText(genLink).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => {});
+                }}>{copied ? '✓ Copiado' : 'Copiar link'}</button>
+              </div>
+            </section>
+          </div>
         )}
 
         {tab === 'preview' && (

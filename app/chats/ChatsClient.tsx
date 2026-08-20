@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fmtChatTime } from '@/lib/datetime/ar';
+import OperationsPanel from './OperationsPanel';
 
 type Item = {
   sessionKey: string;
@@ -150,6 +151,7 @@ export function ChatsClient() {
   const [delChat, setDelChat] = useState(false);
   const [delLead, setDelLead] = useState(false);
   const [stats, setStats] = useState<Array<{ step: string | null; createdAt: string | null }>>([]);
+  const [tenantProvider, setTenantProvider] = useState<string>('pagoda');
   // Ancho de la lista (barra divisora arrastrable, estilo Black Dragon).
   const [listW, setListW] = useState(380);
   const listWRef = useRef(380);
@@ -220,6 +222,7 @@ export function ChatsClient() {
     prevAttn.current = attnNow;
     setItems(its);
     setStats(r.stats ?? []);
+    if (r.tenantProvider) setTenantProvider(r.tenantProvider);
   }, []);
 
   // Pestañas terminales (Acreditados / No cargó / Archivadas): son estados viejos
@@ -786,6 +789,10 @@ export function ChatsClient() {
                   </>
                 );
               })()}
+              {/* Panel de operaciones (saldo real) — solo clientes Partner API (bblack). */}
+              {tenantProvider === 'partner_api' && detail.username && sel && (
+                <OperationsPanel sessionKey={sel} onDone={() => sel && loadDetail(sel)} />
+              )}
               <div style={{ display: 'flex', gap: '.4rem', marginTop: '.1rem' }}>
                 <input className="input" placeholder="Mensaje libre al cliente…" value={custom}
                   onChange={(e) => setCustom(e.target.value)}

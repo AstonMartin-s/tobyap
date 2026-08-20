@@ -26,11 +26,77 @@ export function ConfigClient() {
         </div>
       </div>
       <SettingsSection />
+      <LiberadorSection />
       <LandingsSection />
       <NumbersSection />
       <StatusSection />
       <RulesSection />
     </>
+  );
+}
+
+// -------------------- Liberador de Fichas (Partner API) --------------------
+function LiberadorSection() {
+  const [url, setUrl] = useState('');
+  const [key, setKey] = useState('');
+  const [hasKey, setHasKey] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    j('/api/settings/liberador').then((d) => {
+      setUrl(d.partnerApiUrl ?? '');
+      setHasKey(!!d.hasKey);
+      setEnabled(d.provider === 'partner_api');
+    }).catch(() => {});
+  }, []);
+
+  async function save() {
+    setBusy(true); setMsg('Guardando…');
+    try {
+      await j('/api/settings/liberador', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ partnerApiUrl: url.trim(), partnerApiKey: key.trim() || undefined, enabled }),
+      });
+      setMsg('✓ Guardado');
+      if (key.trim()) { setHasKey(true); setKey(''); } // token cargado, limpiamos el input
+      setTimeout(() => setMsg(''), 2500);
+    } catch (e) {
+      setMsg('Error: ' + (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card">
+      <div className="card__title"><span className="ico">🎰</span> Liberador de Fichas (API de carga)</div>
+      <p style={{ color: 'var(--muted)', fontSize: '.82rem', margin: '0 0 .6rem' }}>
+        Conecta el panel con la plataforma para cargar/retirar fichas por API. El token es secreto:
+        se guarda cifrado y nunca se muestra de vuelta.
+      </p>
+      <div className="grid-2">
+        <div className="field">
+          <label>URL de la API</label>
+          <input className="input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://api-…/api/v1" />
+        </div>
+        <div className="field">
+          <label>Token API {hasKey && <span style={{ color: 'var(--ok,#16a34a)', fontSize: '.72rem' }}>· ✓ configurado</span>}</label>
+          <input className="input" type="password" value={key} onChange={(e) => setKey(e.target.value)}
+            placeholder={hasKey ? '•••••••• (dejar vacío para no cambiar)' : 'pk_…'} autoComplete="new-password" />
+        </div>
+      </div>
+      <label className="field" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '.5rem', marginTop: '.2rem', cursor: 'pointer' }}>
+        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+        <span>Activar Liberador de Fichas para este cliente <span style={{ color: 'var(--muted)', fontSize: '.78rem' }}>(requiere URL y token)</span></span>
+      </label>
+      <div className="row" style={{ marginTop: '0.4rem' }}>
+        <button className="btn" onClick={save} disabled={busy}>Guardar</button>
+        <span style={{ color: 'var(--muted)', fontSize: '0.82rem' }}>{msg}</span>
+      </div>
+    </section>
   );
 }
 
