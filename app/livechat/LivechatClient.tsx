@@ -72,12 +72,15 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
   const [busy, setBusy] = useState(false);
   const [linkBono, setLinkBono] = useState('A2');
   const [linkCampaign, setLinkCampaign] = useState('');
+  const [landingDomain, setLandingDomain] = useState('');
   const [copied, setCopied] = useState(false);
 
   const genLink = (() => {
-    // Dominio público del landing (go.fichaslibres.online), no la URL cruda de
-    // Railway con la que el operador pudo haber abierto el panel.
-    const origin = landingOrigin || (typeof window !== 'undefined' ? window.location.origin : '');
+    // Prioridad: dominio propio del cliente (subdominio) → dominio público
+    // compartido (RAILWAY_PUBLIC_DOMAIN) → origin actual como último recurso.
+    const origin = landingDomain
+      ? `https://${landingDomain}`
+      : (landingOrigin || (typeof window !== 'undefined' ? window.location.origin : ''));
     const cid = linkCampaign.trim();
     const qs = `ccpp=${linkBono}${cid ? `&campaign=${cid}` : ''}`;
     return `${origin}/l/${slug}/go?${qs}`;
@@ -91,6 +94,7 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
       .then((d) => {
         if (d.brand) setBrand(d.brand);
         if (d.runtime) setRuntime(d.runtime);
+        if (typeof d.landingDomain === 'string') setLandingDomain(d.landingDomain.replace(/^https?:\/\//, ''));
       })
       .catch(() => setMsg('No se pudo leer la config (¿falta columna chat_config en DB?)'));
   }, []);
@@ -111,12 +115,14 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
           minDeposit: runtime.minDeposit,
           links: runtime.links,
           magicLinks: runtime.magicLinks,
+          landingDomain,
         }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error ?? 'error');
       if (d.brand) setBrand(d.brand);
       if (d.runtime) setRuntime(d.runtime);
+      if (typeof d.landingDomain === 'string') setLandingDomain(d.landingDomain.replace(/^https?:\/\//, ''));
       setMsg('✓ Guardado. Los chats nuevos toman esta configuración.');
     } catch (e) {
       setMsg('Error: ' + (e as Error).message);
@@ -371,6 +377,12 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
               <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '0 0 .6rem' }}>
                 Link para el anuncio: redirige al chat con el bono y la campaña ya cargados.
               </p>
+              <div className="field" style={{ marginBottom: '.3rem' }}>
+                <label>Dominio del cliente <span style={{ color: 'var(--muted)', fontSize: '.72rem' }}>(subdominio propio; vacío = dominio compartido)</span></label>
+                <input className="input" value={landingDomain.replace(/^https?:\/\//, '')}
+                  onChange={(e) => setLandingDomain(e.target.value.trim())}
+                  placeholder="bblack.fichaslibres.online" style={{ fontSize: '.82rem' }} />
+              </div>
               <div className="grid-2">
                 <div className="field">
                   <label>Bono</label>

@@ -28,10 +28,12 @@ export async function GET() {
     const row = await loadRow(session.tenantId);
     const brand = parseChatConfig(row?.chatConfig, session.slug, session.slug);
     const runtime = parseChatRuntime(row?.chatConfig, brand.brandName);
+    const landingDomain = (row?.chatConfig as Record<string, unknown> | null)?.landingDomain;
     return NextResponse.json({
       ok: true,
       brand,
       runtime,
+      landingDomain: typeof landingDomain === 'string' ? landingDomain : '',
       linkSlots: LINK_SLOTS,
       preview: buildConversationPreview(runtime),
     });
@@ -64,6 +66,14 @@ export async function PUT(req: NextRequest) {
     supportUrl?: string;
     links?: Partial<Record<LinkSlotId, string>>;
     magicLinks?: LinkSlotId[];
+    landingDomain?: string;
+  };
+
+  // Normaliza el dominio del landing del cliente a un origin https limpio (sin
+  // path ni barra final). Vacío = usa el dominio público compartido.
+  const normDomain = (raw: string): string => {
+    const s = raw.trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
+    return s ? `https://${s}` : '';
   };
   const row = await loadRow(session.tenantId);
   const prev = (row?.chatConfig ?? {}) as Record<string, unknown>;
@@ -88,6 +98,7 @@ export async function PUT(req: NextRequest) {
     magicLinks: Array.isArray(body.magicLinks) ? body.magicLinks.filter(isLinkSlot) : prevRuntime.magicLinks,
     portalUrl: mergedLinks.portal_login,
     supportUrl: mergedLinks.support,
+    landingDomain: typeof body.landingDomain === 'string' ? normDomain(body.landingDomain) : prev.landingDomain,
   };
   const [saved] = await db
     .insert(clientSettings)
@@ -96,10 +107,12 @@ export async function PUT(req: NextRequest) {
     .returning();
   const brand = parseChatConfig(saved.chatConfig, session.slug, session.slug);
   const runtime = parseChatRuntime(saved.chatConfig, brand.brandName);
+  const savedDomain = (saved.chatConfig as Record<string, unknown> | null)?.landingDomain;
   return NextResponse.json({
     ok: true,
     brand,
     runtime,
+    landingDomain: typeof savedDomain === 'string' ? savedDomain : '',
     preview: buildConversationPreview(runtime),
   });
 }
