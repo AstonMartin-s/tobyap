@@ -397,19 +397,34 @@ export function ChatsClient() {
   });
 
   const KPI = ({ label, value, color }: { label: string; value: string | number; color?: string }) => (
-    <div style={{ flex: '1 1 0', minWidth: 86, padding: '.5rem .7rem', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg-2, rgba(255,255,255,.015))' }}>
-      <div style={{ fontSize: '1.05rem', fontWeight: 700, color: color ?? 'var(--text)', lineHeight: 1.05 }}>{value}</div>
-      <div style={{ fontSize: '.62rem', color: 'var(--muted-2,#5d6478)', marginTop: '.28rem', textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
+    <div style={{ padding: '.5rem .85rem', flex: '1 1 auto', minWidth: 90 }}>
+      <div style={{ fontSize: '1.2rem', fontWeight: 700, color: color ?? 'var(--text)', lineHeight: 1.1 }}>{value}</div>
+      <div style={{ fontSize: '.62rem', color: 'var(--muted-2,#5d6478)', marginTop: '.25rem', textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap' }}>{label}</div>
     </div>
   );
 
   return (
     <>
-    <div style={{ display: 'flex', gap: '.4rem', marginBottom: '.6rem', alignItems: 'center' }}>
+    <div style={{ display: 'flex', gap: '.4rem', marginBottom: '.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
       {([['hoy', 'Hoy'], ['ayer', 'Ayer'], ['siempre', 'Desde siempre']] as const).map(([r, label]) => (
         <button key={r} onClick={() => setKpiRange(r)} className={`btn ${kpiRange === r ? '' : 'btn--ghost'}`} style={{ padding: '.3rem .8rem', fontSize: '.8rem' }}>{label}</button>
       ))}
-      <div style={{ marginLeft: 'auto', display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+      
+      <div style={{ display: 'flex', marginLeft: 'auto', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--bg-2, rgba(255,255,255,.015))', overflow: 'hidden' }}>
+        <KPI label={`Chats ${kpiRange === 'siempre' ? 'total' : kpiRange}`} value={kpis.chats} />
+        <div style={{ width: 1, background: 'var(--border)' }} />
+        <KPI label="Esperando pago" value={kpis.esperando} color="#3b82f6" />
+        <div style={{ width: 1, background: 'var(--border)' }} />
+        <KPI label="Revisar imagen" value={kpis.revisar} color="#f97316" />
+        <div style={{ width: 1, background: 'var(--border)' }} />
+        <KPI label={`Acreditados ${kpiRange === 'siempre' ? 'total' : kpiRange}`} value={kpis.acreditados} color="#22c55e" />
+        <div style={{ width: 1, background: 'var(--border)' }} />
+        <KPI label={`Conversión ${kpiRange === 'siempre' ? '' : kpiRange}`.trim()} value={`${kpis.conv}%`} color="var(--accent, #7c5cff)" />
+        <div style={{ width: 1, background: 'var(--border)' }} />
+        <KPI label="Sin leer" value={kpis.sinLeer} color={kpis.sinLeer ? '#22c55e' : undefined} />
+      </div>
+
+      <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', marginLeft: '.4rem' }}>
         {counts.atencion > 0 && (
           <button onClick={() => setFilter('revisar')}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem', padding: '.32rem .7rem', fontSize: '.76rem', fontWeight: 700, border: '1px solid #e8883855', borderRadius: 8, background: '#e888381a', color: '#e8a050', cursor: 'pointer' }}
@@ -430,15 +445,7 @@ export function ChatsClient() {
           title="Exportar CSV: rango de fechas, filtro por estado, usuario y teléfono separados">⬇ Exportar</button>
       </div>
     </div>
-    <div style={{ display: 'flex', gap: '.6rem', marginBottom: '.8rem', flexWrap: 'wrap' }}>
-      <KPI label={`Chats ${kpiRange === 'siempre' ? 'total' : kpiRange}`} value={kpis.chats} />
-      <KPI label="Esperando pago" value={kpis.esperando} color="#3b82f6" />
-      <KPI label="Revisar imagen" value={kpis.revisar} color="#f97316" />
-      <KPI label={`Acreditados ${kpiRange === 'siempre' ? 'total' : kpiRange}`} value={kpis.acreditados} color="#22c55e" />
-      <KPI label={`Conversión ${kpiRange === 'siempre' ? '' : kpiRange}`.trim()} value={`${kpis.conv}%`} color="var(--accent, #7c5cff)" />
-      <KPI label="Sin leer" value={kpis.sinLeer} color={kpis.sinLeer ? '#22c55e' : undefined} />
-    </div>
-    <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: `${listW}px 10px minmax(0,1fr)`, alignItems: 'stretch', height: 'calc(100vh - 155px)', minHeight: 560 }}>
+    <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: `${listW}px 10px minmax(0,1fr)`, alignItems: 'stretch', height: 'calc(100vh - 105px)', minHeight: 560 }}>
       {/* LISTA */}
       <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ padding: '.6rem .6rem .35rem', flexShrink: 0 }}>
