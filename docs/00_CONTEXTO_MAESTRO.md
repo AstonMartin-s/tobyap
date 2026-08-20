@@ -68,6 +68,14 @@
 - El ícono de inicio en el celu queda pegado al nombre de cuando se instaló (iOS no lo actualiza). Hay que borrar y volver a agregar.
 - Patch: chat refresca piel vía `/brand`; SW no cachea HTML/manifiesto; nota en el panel Livechat.
 
+### 2026-08-19 — Imagen de ejemplo del portal (king-portal-ref.png) faltante
+
+- El "comprobante" roto en el panel era el `alt` de `PORTAL_REF_IMG = /king-portal-ref.png` (imagen de referencia del portal que el bot manda en Cargar/Retirar/Soporte). El archivo **no existe** en `public/` → 404 en prod.
+- Cliente: no lo ve roto (el widget tiene `onError` que oculta la imagen). Panel: sí mostraba ícono roto.
+- Fix panel (`ChatsClient.tsx`): imágenes del BOT con `onError` que las oculta (como el cliente); las del cliente (comprobantes reales) se siguen mostrando aunque fallen, para que el operador detecte problemas.
+- Pendiente producto: subir la captura real a `public/king-portal-ref.png` para que el ejemplo se vea (no lo puedo fabricar; es screenshot real del portal).
+- NOTA: TOBYAP no envía WhatsApp saliente. Las notificaciones del chat son push web de la PWA instalada; no se puede mandar a un número arbitrario.
+
 ### 2026-08-19 — Fix panel Chats: pestañas terminales vacías (King)
 
 - Síntoma: en King, pestaña **Acreditados** mostraba "Sin chats" con contador 52. Idem **No cargó** (468).

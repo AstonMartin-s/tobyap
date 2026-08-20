@@ -505,7 +505,16 @@ export function ChatsClient() {
                       borderBottomRightRadius: mine ? 4 : 16,
                       borderBottomLeftRadius: mine ? 16 : 4,
                     }}>
-                      {m.image ? <a href={m.image} target="_blank" rel="noreferrer" title="Abrir imagen completa"><img src={m.image} alt="comprobante" style={{ maxWidth: 150, maxHeight: 150, borderRadius: 10, display: 'block', objectFit: 'cover', cursor: 'zoom-in' }} /></a> : m.text}
+                      {m.image ? (
+                        mine ? (
+                          // Imagen de referencia del bot/operador (ej. portal). Si el
+                          // archivo falta, se oculta (igual que en el chat del cliente)
+                          // para no mostrar un ícono roto que parece un comprobante.
+                          <img src={m.image} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} style={{ maxWidth: 150, maxHeight: 150, borderRadius: 10, display: 'block', objectFit: 'cover' }} />
+                        ) : (
+                          <a href={m.image} target="_blank" rel="noreferrer" title="Abrir imagen completa"><img src={m.image} alt="comprobante" style={{ maxWidth: 150, maxHeight: 150, borderRadius: 10, display: 'block', objectFit: 'cover', cursor: 'zoom-in' }} /></a>
+                        )
+                      ) : m.text}
                     </div>
                   </div>
                 );
