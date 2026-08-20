@@ -399,7 +399,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 10px', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22%3E%3Ccircle cx=%223%22 cy=%223%22 r=%221%22 fill=%22%23d8cfc4%22/%3E%3C/svg%3E")' }}>
         {msgs.map((m, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: m.from === 'user' ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
-            <div style={{ maxWidth: '80%', background: m.from === 'user' ? C.userBubble : C.botBubble, color: C.ink, padding: '7px 10px', borderRadius: 10, borderTopLeftRadius: m.from === 'bot' ? 2 : 10, borderTopRightRadius: m.from === 'user' ? 2 : 10, boxShadow: '0 1px 1px rgba(0,0,0,.12)', fontSize: 15, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+            <div style={{ maxWidth: '80%', background: m.from === 'user' ? C.userBubble : C.botBubble, color: '#111827', padding: '7px 10px', borderRadius: 10, borderTopLeftRadius: m.from === 'bot' ? 2 : 10, borderTopRightRadius: m.from === 'user' ? 2 : 10, boxShadow: '0 1px 1px rgba(0,0,0,.12)', fontSize: 15, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
               {m.image ? <img src={m.image} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} style={{ maxWidth: 240, maxHeight: 320, borderRadius: 8, display: 'block' }} /> : (
                 m.copy ? (
                   <div>
@@ -466,10 +466,14 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
 
       {phase === 'chat' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#F0F2F5' }}>
-          <button onClick={() => fileRef.current?.click()} title="Adjuntar comprobante" style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: C.sub }}>📎</button>
+          <button onClick={() => fileRef.current?.click()} title="Adjuntar comprobante" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#54656F', display: 'flex', alignItems: 'center' }}>
+            <svg viewBox="0 0 24 24" width="24" height="24" preserveAspectRatio="xMidYMid meet" fill="currentColor"><path d="M11.83,6.11 L7.46,10.47 C6.24,11.7 6.24,13.68 7.46,14.91 L13.9,21.36 C16.29,23.75 20.17,23.75 22.56,21.36 C24.95,18.97 24.95,15.09 22.56,12.7 L14.77,4.92 C13.06,3.21 10.3,3.21 8.59,4.92 C6.88,6.63 6.88,9.39 8.59,11.1 L14.19,16.7 C14.93,17.43 16.12,17.43 16.86,16.7 C17.59,15.96 17.59,14.77 16.86,14.03 L11.83,9.01 L13.25,7.59 L18.27,12.61 C20.15,14.49 20.15,17.54 18.27,19.42 C16.39,21.3 13.34,21.3 11.46,19.42 L5.02,12.97 C2.68,10.63 2.68,6.84 5.02,4.5 C7.36,2.16 11.15,2.16 13.49,4.5 L21.28,12.28 C22.9,13.9 22.9,16.53 21.28,18.15 C19.66,19.78 17.03,19.78 15.41,18.15 L8.97,11.71 C8.4,11.14 8.4,10.22 8.97,9.65 L13.34,5.29 L11.83,6.11 Z"></path></svg>
+          </button>
           <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.currentTarget.value = ''; }} />
-          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send(); }} placeholder="Escribí un mensaje" style={{ flex: 1, border: 'none', borderRadius: 20, padding: '10px 14px', fontSize: 15, outline: 'none' }} />
-          <button onClick={send} style={{ background: C.send, color: '#fff', border: 'none', width: 42, height: 42, borderRadius: '50%', fontSize: 18, cursor: 'pointer' }}>➤</button>
+          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send(); }} placeholder="Escribí un mensaje" style={{ flex: 1, border: 'none', borderRadius: 20, padding: '10px 14px', fontSize: 15, outline: 'none', background: '#fff', color: '#111827' }} />
+          <button onClick={send} style={{ background: C.send, color: '#fff', border: 'none', width: 42, height: 42, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingRight: 3 }}>
+            <svg viewBox="0 0 24 24" width="24" height="24" preserveAspectRatio="xMidYMid meet" fill="currentColor"><path d="M1.101,21.757 L23.8,12.028 L1.101,2.3 L1.101,9.858 L16.852,12.028 L1.101,14.198 L1.101,21.757 Z"></path></svg>
+          </button>
         </div>
       )}
 
@@ -483,12 +487,12 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
               ) : (
                 <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#25D366', display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 700 }}>{initial}</div>
               )}
-              <div style={{ fontWeight: 700, fontSize: 18, color: C.ink }}>{skin.brand}</div>
+              <div style={{ fontWeight: 700, fontSize: 18, color: '#111827' }}>{skin.brand}</div>
             </div>
-            <p style={{ color: C.sub, fontSize: 14, margin: '4px 0 16px' }}>Dejanos tu número para crear tu usuario y darte tu bonificación 🎁</p>
+            <p style={{ color: '#54656F', fontSize: 14, margin: '4px 0 16px' }}>Dejanos tu número para crear tu usuario y darte tu bonificación 🎁</p>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre o apodo" style={inputStyle} />
             <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="Tu WhatsApp (ej: 11 2345 6789)" style={inputStyle} />
-            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, color: C.ink, margin: '6px 0 14px', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, color: '#111827', margin: '6px 0 14px', cursor: 'pointer' }}>
               <input type="checkbox" checked={accept} onChange={(e) => setAccept(e.target.checked)} style={{ marginTop: 2 }} />
               <span>Confirmo que este es <b>mi número</b>. Si no lo es, no podré recibir mi bonificación.</span>
             </label>
@@ -503,4 +507,4 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   );
 }
 
-const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', border: '1px solid #D1D7DB', borderRadius: 10, padding: '12px 14px', fontSize: 15, marginBottom: 10, outline: 'none' };
+const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', border: '1px solid #D1D7DB', borderRadius: 10, padding: '12px 14px', fontSize: 15, marginBottom: 10, outline: 'none', background: '#fff', color: '#111827' };
