@@ -630,7 +630,7 @@ export function ChatsClient() {
           <div className="empty" style={{ padding: '3rem', margin: 'auto' }}>Elegí un chat para ver la conversación.</div>
         ) : (
           <>
-            <div style={{ padding: '.8rem 1rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap' }}>
+            <div style={{ padding: '.8rem 1rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap', overflow: 'visible', position: 'relative', zIndex: 5 }}>
               {/* IZQUIERDA: icono, nombre + selector de estado, y campaña */}
               <div style={{ display: 'flex', gap: '.7rem', minWidth: 0 }}>
                 <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--card-3)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', flexShrink: 0 }}>
@@ -689,17 +689,17 @@ export function ChatsClient() {
                   return (
                     <>
                       <span style={{ width: 1, height: 14, background: 'var(--border)', margin: '0 .1rem' }} aria-hidden />
-                      <button className="tt tt--down tt--right" data-tt={blk ? 'Podrá volver a escribir' : 'No podrá seguir en el chat; se archiva'} disabled={busy}
-                        onClick={() => act(blk ? 'unblock' : 'block')}
-                        style={{ ...hdrBtn, background: blk ? '#ef4444' : 'transparent', border: `1px solid ${blk ? '#ef4444' : '#b91c1c'}`, color: blk ? '#fff' : '#f87171' }}>
-                        {blk ? ICONS.unblock : ICONS.block}{blk ? 'Desbloquear' : 'Bloquear'}
-                      </button>
-                      <button className="tt" data-tt="Supervisor: pasa a cola Revisar (validando) para que un operario lo atienda" disabled={busy}
+                      <button className="tt tt--down" data-tt="Supervisor: pasa a cola Revisar para que un operario lo atienda" disabled={busy}
                         onClick={() => act('mark_revisar')}
                         style={{ ...hdrBtn, background: 'rgba(249,115,22,.12)', border: '1px solid rgba(249,115,22,.45)', color: '#fb923c' }}>
                         {ICONS.revisar} Revisar
                       </button>
-                      <button className="tt" data-tt="Eliminar chat y opcionalmente el lead en Kommo" disabled={busy}
+                      <button className="tt tt--down" data-tt={blk ? 'Podrá volver a escribir' : 'No podrá seguir en el chat; se archiva'} disabled={busy}
+                        onClick={() => act(blk ? 'unblock' : 'block')}
+                        style={{ ...hdrBtn, background: blk ? '#ef4444' : 'transparent', border: `1px solid ${blk ? '#ef4444' : '#b91c1c'}`, color: blk ? '#fff' : '#f87171' }}>
+                        {blk ? ICONS.unblock : ICONS.block}{blk ? 'Desbloquear' : 'Bloquear'}
+                      </button>
+                      <button className="tt tt--down tt--right" data-tt="Borrar chat y opcionalmente el lead en Kommo" disabled={busy}
                         onClick={() => { setDelChat(false); setDelLead(false); setDeleteOpen(true); }}
                         style={{ ...hdrBtn, background: 'transparent', border: '1px solid #7f1d1d', color: '#fca5a5' }}>
                         {ICONS.delete} Eliminar
