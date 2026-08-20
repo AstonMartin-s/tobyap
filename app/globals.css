@@ -92,7 +92,19 @@ body {
 
 a { color: inherit; }
 
-/* ---------- Layout (sidebar + content) ---------- */
+/* Mockup chat cliente — siempre aspecto WhatsApp claro, aislado del tema del panel */
+.chat-preview-phone {
+  color-scheme: light;
+  color: #111827;
+  background: #ece5dd;
+}
+.chat-preview-phone .chat-preview-step { color: #667781; }
+.chat-preview-phone .chat-preview-bubble { color: #111827; }
+.chat-preview-phone .chat-preview-bubble--bot { background: #fff; }
+.chat-preview-phone .chat-preview-bubble--user { background: #dcf8c6; }
+.chat-preview-phone .chat-preview-link { color: #027eb5; font-weight: 600; text-decoration: underline; }
+.chat-preview-phone .chat-preview-link-hint { color: #027eb5; }
+
 :root { --sidebar-w: 200px; }
 /* Sidebar colapsado (solo iconos) — estilo Black Dragon. Una sola variable
    maneja el ancho del sidebar y el margen del contenido. */

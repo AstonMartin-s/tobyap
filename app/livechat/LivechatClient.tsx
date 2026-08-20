@@ -238,7 +238,7 @@ export function LivechatClient() {
                   <div style={{ fontSize: 12, opacity: 0.85 }}>en línea</div>
                 </div>
               </div>
-              <div style={{ background: '#ECE5DD', padding: 14, minHeight: 80, fontSize: 13, color: '#111' }}>
+              <div className="chat-preview-phone" style={{ borderRadius: 0, border: 'none', boxShadow: 'none', padding: 14, minHeight: 80, fontSize: 13 }}>
                 Cambios de identidad y oferta se ven acá y en la pestaña Vista previa.
               </div>
             </div>
@@ -272,30 +272,29 @@ export function LivechatClient() {
               <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '0 0 1rem' }}>
                 Así ve el lead el guion completo (ejemplo con Martín).
               </p>
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '0 .5rem' }}>
-                <div style={{
+              <div style={{ display: 'flex', justifyContent: 'flex-start', padding: '0 .25rem' }}>
+                <div className="chat-preview-phone" style={{
                   width: '100%',
                   maxWidth: 400,
                   borderRadius: 14,
                   overflow: 'hidden',
-                  border: '1px solid var(--border)',
-                  boxShadow: '0 12px 40px rgba(0,0,0,.22)',
-                  fontFamily: 'system-ui, sans-serif',
+                  border: '1px solid #d1d7db',
+                  boxShadow: '0 12px 40px rgba(0,0,0,.35)',
+                  fontFamily: 'system-ui, -apple-system, sans-serif',
                 }}>
                   <div style={{ background: brand.primaryColor || '#008069', color: '#fff', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
                     {brand.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={brand.avatarUrl} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', background: '#25D366' }} />
                     ) : (
-                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#25D366', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 14 }}>{initial}</div>
+                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#25D366', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 14, color: '#fff' }}>{initial}</div>
                     )}
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: 15 }}>{brand.brandName || runtime.brandName}</div>
-                      <div style={{ fontSize: 11, opacity: 0.9 }}>en línea</div>
+                      <div style={{ fontWeight: 600, fontSize: 15, color: '#fff' }}>{brand.brandName || runtime.brandName}</div>
+                      <div style={{ fontSize: 11, opacity: 0.9, color: '#fff' }}>en línea</div>
                     </div>
                   </div>
                   <div style={{
-                    background: '#ECE5DD',
                     padding: '12px 10px',
                     minHeight: 420,
                     maxHeight: 'min(62vh, 560px)',
@@ -306,18 +305,17 @@ export function LivechatClient() {
                   }}>
                     {preview.map((b: PreviewBubble, i: number) => (
                       <div key={i} style={{ alignSelf: b.who === 'user' ? 'flex-end' : 'flex-start', maxWidth: '92%' }}>
-                        <div style={{ fontSize: '.58rem', color: '#667', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '.03em' }}>{b.step}</div>
-                        <div style={{
+                        <div className="chat-preview-step" style={{ fontSize: '.58rem', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '.03em' }}>{b.step}</div>
+                        <div className={`chat-preview-bubble ${b.who === 'user' ? 'chat-preview-bubble--user' : 'chat-preview-bubble--bot'}`} style={{
                           padding: '7px 10px', borderRadius: 10, fontSize: '.8rem', lineHeight: 1.42, whiteSpace: 'pre-wrap',
-                          background: b.who === 'user' ? '#DCF8C6' : '#fff',
-                          boxShadow: '0 1px 1px rgba(0,0,0,.1)',
+                          boxShadow: '0 1px 0.5px rgba(0,0,0,.13)',
                         }}>
                           {highlightLinks(b.text, runtime, b.linkField).map((p, j) => (
-                            <span key={j} style={p.link ? { color: '#2563eb', fontWeight: 600, textDecoration: 'underline', wordBreak: 'break-all' } : undefined}>{p.t}</span>
+                            <span key={j} className={p.link ? 'chat-preview-link' : undefined} style={p.link ? { wordBreak: 'break-all' } : undefined}>{p.t}</span>
                           ))}
                         </div>
                         {b.linkField && (
-                          <div style={{ fontSize: '.62rem', color: '#2563eb', marginTop: 2 }}>↗ {b.linkField === 'supportUrl' ? 'Link soporte' : 'Link portal'}</div>
+                          <div className="chat-preview-link-hint" style={{ fontSize: '.62rem', marginTop: 2 }}>↗ {b.linkField === 'supportUrl' ? 'Link soporte' : 'Link portal'}</div>
                         )}
                       </div>
                     ))}
