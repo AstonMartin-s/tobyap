@@ -84,6 +84,17 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: 999999, behavior: 'smooth' }); }, [msgs, typing, buttons]);
 
+  // Recordatorio háptico: mientras falte activar notificaciones o instalar la app,
+  // vibramos suave cada ~9s (solo Android; iOS no expone la API) para llamar la
+  // atención hacia los botones que titilan arriba. Se corta al completar ambos.
+  useEffect(() => {
+    if (phase !== 'chat') return;
+    if (appInstall && appNotif) return;
+    if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return;
+    const t = setInterval(() => { try { navigator.vibrate?.([40, 60, 40]); } catch { /* sin haptics */ } }, 9000);
+    return () => clearInterval(t);
+  }, [phase, appInstall, appNotif]);
+
   // Reanudar sesión si el usuario vuelve (fue al banco a transferir y volvió).
   // Prioridad: ?s= en la URL (sobrevive al acceso directo / otro contexto de
   // storage) y si no, localStorage.
@@ -393,6 +404,38 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
           <div style={{ fontWeight: 600, fontSize: 16 }}>{skin.brand}</div>
           <div style={{ fontSize: 12, opacity: 0.85 }}>{typing ? 'escribiendo…' : 'en línea'}</div>
         </div>
+        {phase === 'chat' && (
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={enableNotifs}
+              disabled={appNotif}
+              title={appNotif ? 'Notificaciones activadas' : 'Activar notificaciones'}
+              aria-label="Activar notificaciones"
+              className={appNotif ? '' : 'hdr-pulse'}
+              style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: appNotif ? 'default' : 'pointer', background: appNotif ? 'rgba(255,255,255,.28)' : 'rgba(255,255,255,.18)', color: '#fff' }}
+            >
+              {appNotif ? (
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              ) : (
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+              )}
+            </button>
+            <button
+              onClick={installApp}
+              disabled={appInstall}
+              title={appInstall ? 'App instalada' : 'Descargar app'}
+              aria-label="Descargar app"
+              className={appInstall ? '' : 'hdr-pulse'}
+              style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: appInstall ? 'default' : 'pointer', background: appInstall ? 'rgba(255,255,255,.28)' : 'rgba(255,255,255,.18)', color: '#fff' }}
+            >
+              {appInstall ? (
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              ) : (
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 10px', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22%3E%3Ccircle cx=%223%22 cy=%223%22 r=%221%22 fill=%22%23d8cfc4%22/%3E%3C/svg%3E")' }}>
@@ -500,7 +543,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         </div>
       )}
 
-      <style>{`.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#9aa;animation:b 1.2s infinite}.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}@keyframes b{0%,60%,100%{opacity:.3}30%{opacity:1}}`}</style>
+      <style>{`.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#9aa;animation:b 1.2s infinite}.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}@keyframes b{0%,60%,100%{opacity:.3}30%{opacity:1}}.hdr-pulse{animation:hp 1.6s infinite}@keyframes hp{0%{box-shadow:0 0 0 0 rgba(255,255,255,.55)}70%{box-shadow:0 0 0 8px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}`}</style>
     </div>
   );
 }

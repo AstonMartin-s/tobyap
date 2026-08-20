@@ -49,6 +49,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
 
   let replies = onFreeText(s.step ?? 'comprobante', b.text, runtime);
+  // OPERADOR AL MANDO: si un humano ya intervino con un mensaje libre, el bot se
+  // calla. No tiene sentido que reinyecte "mandame el comprobante" mientras el
+  // operador está resolviendo otra cosa con el cliente.
+  if ((s.data as Record<string, unknown> | null)?.operatorTookOver) {
+    replies = [];
+  }
   // ANTI-LOOP: no repetir el MISMO auto-mensaje si ya fue el último del bot. El
   // cliente sigue escribiendo ("no tengo plata", etc.) y no tiene sentido repetir
   // "mandame el comprobante" cada vez. Lo decimos una vez y esperamos.

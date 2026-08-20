@@ -235,6 +235,10 @@ export async function POST(req: NextRequest) {
   let newMsgs: Msg[] = [];
   let newStep: string | undefined;
   let note: string | null = null;
+  // Cuando el operador escribe un mensaje libre, "toma" la conversación: a partir
+  // de ahí el bot deja de mandar los recordatorios automáticos por paso (ej.
+  // "mandame el comprobante"), para no pisar la charla humana en curso.
+  let operatorTookOver = false;
 
   switch (b.op) {
     case 'approve':
@@ -267,6 +271,7 @@ export async function POST(req: NextRequest) {
       if (!t) return NextResponse.json({ error: 'texto vacío' }, { status: 400 });
       newMsgs = [{ from: 'bot', text: t, at: Date.now() }];
       note = `✍️ Mensaje manual del operador: "${t.slice(0, 120)}"`;
+      operatorTookOver = true;
       break;
     }
     // Cambio de estado manual (dropdown estilo Kommo) — NO manda mensaje al cliente,
@@ -287,7 +292,10 @@ export async function POST(req: NextRequest) {
   // para distinguirlo de los mensajes automáticos (BOT) en la vista. Append atómico
   // para no pisar mensajes que entren en paralelo (otro operario / supervisor / poll).
   const opMsgs = newMsgs.map((m) => ({ ...m, op: true as const }));
-  await appendChatMessages(s.id, opMsgs, newStep ? { step: newStep } : {});
+  const opAppend: { step?: string; dataMerge?: Record<string, unknown> } = {};
+  if (newStep) opAppend.step = newStep;
+  if (operatorTookOver) opAppend.dataMerge = { operatorTookOver: true };
+  await appendChatMessages(s.id, opMsgs, opAppend);
 
   // Espejo a Kommo (best-effort). BIDIRECCIONAL: si el operador cambió el estado,
   // movemos el lead a la etapa correspondiente del embudo (Kommo manda, y el panel
