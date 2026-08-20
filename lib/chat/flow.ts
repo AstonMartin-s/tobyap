@@ -141,7 +141,8 @@ export function supportMessage(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg
 // ── Paso 5: CARGO (se emite recién cuando el operador mueve el lead) ───────
 // Acá SÍ usamos el magic-link de Pagoda (primer acceso directo, loguea de una).
 export function accreditedMessages(loginUrl?: string | null, cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg[] {
-  const link = loginUrl || cfg.links.portal_play;
+  const useMagic = cfg.magicLinks.includes('portal_play');
+  const link = (useMagic && loginUrl) ? loginUrl : cfg.links.portal_play;
   return [
     { from: 'bot', delayMs: 600, at: now(), text: `✅ *¡Acreditado con éxito!*\n🎉 ¡Gracias por elegir ${cfg.brandName}! Ya tenés tu saldo.\n\n🎮 Entrá directo a jugar acá 👇\n${link}` },
     { from: 'bot', delayMs: 1200, at: now(), text: '¿Necesitás algo más? Elegí una opción 👇' },
@@ -153,8 +154,10 @@ export function postActionMessages(action: string, data: Record<string, unknown>
   const user = String(data.username ?? '');
   const pass = String(data.password ?? '');
   const loginUrl = data.loginUrl ? String(data.loginUrl) : '';
-  const portalUrl = (slot: 'portal_deposit' | 'portal_withdraw' | 'portal_forgot') =>
-    loginUrl || cfg.links[slot];
+  const portalUrl = (slot: 'portal_deposit' | 'portal_withdraw' | 'portal_forgot') => {
+    const useMagic = cfg.magicLinks.includes(slot);
+    return (useMagic && loginUrl) ? loginUrl : cfg.links[slot];
+  };
   const refImg = cfg.portalRefImg || PORTAL_REF_IMG;
   const ref = (text: string): BotMsg[] => [
     { from: 'bot', delayMs: 600, at: now(), text },

@@ -63,6 +63,7 @@ export async function PUT(req: NextRequest) {
     portalUrl?: string;
     supportUrl?: string;
     links?: Partial<Record<LinkSlotId, string>>;
+    magicLinks?: LinkSlotId[];
   };
   const row = await loadRow(session.tenantId);
   const prev = (row?.chatConfig ?? {}) as Record<string, unknown>;
@@ -74,6 +75,7 @@ export async function PUT(req: NextRequest) {
       if (typeof v === 'string') mergedLinks[id] = v.trim();
     }
   }
+  const isLinkSlot = (x: unknown): x is LinkSlotId => typeof x === 'string' && LINK_SLOT_IDS.includes(x as LinkSlotId);
   const next = {
     ...prev,
     brandName: typeof body.brandName === 'string' ? body.brandName.trim() : prev.brandName,
@@ -83,6 +85,7 @@ export async function PUT(req: NextRequest) {
     offerValue: typeof body.offerValue === 'number' ? body.offerValue : prev.offerValue,
     minDeposit: typeof body.minDeposit === 'number' ? body.minDeposit : prev.minDeposit,
     links: mergedLinks,
+    magicLinks: Array.isArray(body.magicLinks) ? body.magicLinks.filter(isLinkSlot) : prevRuntime.magicLinks,
     portalUrl: mergedLinks.portal_login,
     supportUrl: mergedLinks.support,
   };

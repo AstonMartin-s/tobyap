@@ -88,6 +88,7 @@ export function LivechatClient() {
           offerValue: runtime.offerValue,
           minDeposit: runtime.minDeposit,
           links: runtime.links,
+          magicLinks: runtime.magicLinks,
         }),
       });
       const d = await r.json();
@@ -221,11 +222,10 @@ export function LivechatClient() {
           <section className="card">
             <div className="card__title">Links por mensaje</div>
             <div style={{ marginBottom: '.9rem', padding: '.55rem .65rem', borderRadius: 8, background: 'var(--blue-soft)', border: '1px solid var(--border)', fontSize: '.74rem', lineHeight: 1.45, color: 'var(--muted)' }}>
-              <strong style={{ color: 'var(--text)' }}>Cómo funciona en King (auditado en prod):</strong>
+              <strong style={{ color: 'var(--text)' }}>Cómo funciona en King:</strong>
               <ul style={{ margin: '.35rem 0 0', paddingLeft: '1.1rem' }}>
-                <li><strong>Credenciales</strong> → siempre <code style={{ fontSize: '.7rem' }}>greenbet.uno/login</code> (página fija).</li>
-                <li><strong>Acreditado, Datos, Cargar, Retirar</strong> → magic-link Pagoda <code style={{ fontSize: '.7rem' }}>greenbet.dat4win.com/entrar/…</code> (único por usuario, guardado al crear la cuenta).</li>
-                <li><strong>Soporte</strong> → walink configurado abajo.</li>
+                <li><strong>Credenciales y Soporte</strong> → siempre usan la URL fija definida abajo.</li>
+                <li><strong>Acreditado, Datos, Cargar, Retirar</strong> → podés elegir si querés usar el magic-link que devuelve Pagoda al crear la cuenta (único por lead) o ignorarlo y usar siempre una URL fija.</li>
               </ul>
             </div>
 
@@ -248,23 +248,51 @@ export function LivechatClient() {
               ))}
             </div>
 
-            <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '0 0 .65rem', fontWeight: 600 }}>Fallback (solo si no hay magic-link Pagoda en la sesión)</p>
+            <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '0 0 .65rem', fontWeight: 600 }}>Fallback y Magic-Link Pagoda (dinámico)</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.85rem' }}>
-              {MAGIC_SLOTS.map((slot) => (
-                <div key={slot.id} className="field" style={{ margin: 0 }}>
-                  <label style={{ marginBottom: 2 }}>{slot.label}</label>
-                  <input
-                    className="input"
-                    value={runtime.links[slot.id]}
-                    onChange={(e) => setRuntime({
-                      ...runtime,
-                      links: { ...runtime.links, [slot.id]: e.target.value },
-                    })}
-                    placeholder="https://greenbet.uno/login"
-                  />
-                  <p style={{ color: 'var(--muted-2)', fontSize: '.7rem', margin: '4px 0 0', lineHeight: 1.35 }}>{slot.hint}</p>
-                </div>
-              ))}
+              {MAGIC_SLOTS.map((slot) => {
+                const isMagic = runtime.magicLinks.includes(slot.id);
+                return (
+                  <div key={slot.id} className="field" style={{ margin: 0 }}>
+                    <label style={{ marginBottom: 2, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>{slot.label}</span>
+                    </label>
+                    <div style={{ display: 'flex', gap: '.4rem' }}>
+                      <select
+                        className="select"
+                        style={{ width: '45%', fontSize: '.76rem' }}
+                        value={isMagic ? 'magic' : 'fixed'}
+                        onChange={(e) => {
+                          const v = e.target.value === 'magic';
+                          setRuntime({
+                            ...runtime,
+                            magicLinks: v
+                              ? [...runtime.magicLinks, slot.id]
+                              : runtime.magicLinks.filter((x) => x !== slot.id),
+                          });
+                        }}
+                      >
+                        <option value="magic">Usar Magic-Link (si existe)</option>
+                        <option value="fixed">Usar solo URL fija</option>
+                      </select>
+                      <input
+                        className="input"
+                        style={{ flex: 1 }}
+                        value={runtime.links[slot.id]}
+                        onChange={(e) => setRuntime({
+                          ...runtime,
+                          links: { ...runtime.links, [slot.id]: e.target.value },
+                        })}
+                        placeholder="https://greenbet.uno/login"
+                        title={isMagic ? "URL de fallback si falla el magic-link" : "URL fija a enviar"}
+                      />
+                    </div>
+                    <p style={{ color: 'var(--muted-2)', fontSize: '.7rem', margin: '4px 0 0', lineHeight: 1.35 }}>
+                      {isMagic ? "Si la sesión tiene un link dinámico de Pagoda, se usa ese. Sino, se envía la URL fija de la derecha." : "Ignora el link de Pagoda y manda siempre la URL fija."}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </section>
         )}

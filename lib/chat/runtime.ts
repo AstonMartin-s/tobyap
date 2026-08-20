@@ -21,6 +21,7 @@ export interface ChatRuntimeConfig {
   minDeposit: number;
   portalRefImg: string;
   links: Record<LinkSlotId, string>;
+  magicLinks: LinkSlotId[];
 }
 
 export const DEFAULT_PORTAL_URL = 'https://greenbet.uno/login';
@@ -98,6 +99,7 @@ export const DEFAULT_RUNTIME: ChatRuntimeConfig = {
   minDeposit: 1000,
   portalRefImg: DEFAULT_PORTAL_REF_IMG,
   links: { ...DEFAULT_LINKS },
+  magicLinks: ['portal_play', 'portal_forgot', 'portal_deposit', 'portal_withdraw'],
 };
 
 function clampNum(v: unknown, min: number, max: number, fallback: number): number {
@@ -138,6 +140,10 @@ export function parseChatRuntime(raw: unknown, fallbackBrand = 'King'): ChatRunt
   const brandName = typeof o.brandName === 'string' && o.brandName.trim() ? o.brandName.trim() : fallbackBrand;
   const offerType: OfferType = o.offerType === 'fichas' ? 'fichas' : 'bonus';
   const refImg = typeof o.portalRefImg === 'string' && o.portalRefImg.trim() ? o.portalRefImg.trim() : DEFAULT_PORTAL_REF_IMG;
+  const isLinkSlot = (x: unknown): x is LinkSlotId => typeof x === 'string' && LINK_SLOT_IDS.includes(x as LinkSlotId);
+  const magicLinks = (Array.isArray(o.magicLinks)
+    ? o.magicLinks.filter(isLinkSlot)
+    : ['portal_play', 'portal_forgot', 'portal_deposit', 'portal_withdraw']) as LinkSlotId[];
   return {
     brandName,
     offerType,
@@ -145,6 +151,7 @@ export function parseChatRuntime(raw: unknown, fallbackBrand = 'King'): ChatRunt
     minDeposit: clampNum(o.minDeposit, 100, 50_000_000, DEFAULT_RUNTIME.minDeposit),
     portalRefImg: refImg.startsWith('/') ? refImg : DEFAULT_PORTAL_REF_IMG,
     links: parseLinks(o),
+    magicLinks,
   };
 }
 
@@ -177,7 +184,8 @@ export function offerDepositLine(cfg: ChatRuntimeConfig): string {
 export function buildConversationPreview(cfg: ChatRuntimeConfig, sampleName = 'Martín'): PreviewBubble[] {
   const fn = sampleName.split(/\s+/)[0];
   const L = cfg.links;
-  const magic = PAGODA_MAGIC_URL_SAMPLE;
+  const m = (slot: LinkSlotId) => cfg.magicLinks.includes(slot) ? PAGODA_MAGIC_URL_SAMPLE : L[slot];
+  const isM = (slot: LinkSlotId) => cfg.magicLinks.includes(slot);
   return [
     { step: 'welcome', who: 'bot', text: `¡Hola ${fn}! 👋\nBienvenido a *${cfg.brandName}*.\n${offerWelcomeLine(cfg)}` },
     { step: 'welcome', who: 'user', text: 'Quiero mi cuenta 🎁' },
@@ -185,10 +193,10 @@ export function buildConversationPreview(cfg: ChatRuntimeConfig, sampleName = 'M
     { step: 'cbu', who: 'bot', text: `Perfecto 🙌 Datos para tu carga:\n🏦 Titular: *Titular CBU*\n[CBU del panel]\n${offerCbuLine(cfg)}` },
     { step: 'comprobante', who: 'user', text: '📷 [comprobante]' },
     { step: 'validando', who: 'bot', text: '✅ Tu comprobante entró en revisión 🔎 En breve validamos y te acreditamos…' },
-    { step: 'done', who: 'bot', text: `✅ *¡Acreditado con éxito!*\n🎉 ¡Gracias por elegir ${cfg.brandName}!\n\n🎮 Entrá directo a jugar acá 👇\n${magic}`, linkSlot: 'portal_play', linkMagic: true },
-    { step: 'forgot', who: 'bot', text: `🔐 Tus datos de acceso:\n\n👤 Usuario: *martin123*\n🔑 Contraseña: *••••*\n\n🔗 Entrá directo acá 👇\n${magic}`, linkSlot: 'portal_forgot', linkMagic: true },
-    { step: 'deposit', who: 'bot', text: `💰 *Cargar saldo*\nEntrá al portal y tocá *"Cargar saldo"* 👇\n${magic}\n\n${offerDepositLine(cfg)}`, linkSlot: 'portal_deposit', linkMagic: true },
-    { step: 'withdraw', who: 'bot', text: `💸 *Retirar saldo*\nEntrá al portal 👇\n${magic}`, linkSlot: 'portal_withdraw', linkMagic: true },
+    { step: 'done', who: 'bot', text: `✅ *¡Acreditado con éxito!*\n🎉 ¡Gracias por elegir ${cfg.brandName}!\n\n🎮 Entrá directo a jugar acá 👇\n${m('portal_play')}`, linkSlot: 'portal_play', linkMagic: isM('portal_play') },
+    { step: 'forgot', who: 'bot', text: `🔐 Tus datos de acceso:\n\n👤 Usuario: *martin123*\n🔑 Contraseña: *••••*\n\n🔗 Entrá directo acá 👇\n${m('portal_forgot')}`, linkSlot: 'portal_forgot', linkMagic: isM('portal_forgot') },
+    { step: 'deposit', who: 'bot', text: `💰 *Cargar saldo*\nEntrá al portal y tocá *"Cargar saldo"* 👇\n${m('portal_deposit')}\n\n${offerDepositLine(cfg)}`, linkSlot: 'portal_deposit', linkMagic: isM('portal_deposit') },
+    { step: 'withdraw', who: 'bot', text: `💸 *Retirar saldo*\nEntrá al portal 👇\n${m('portal_withdraw')}`, linkSlot: 'portal_withdraw', linkMagic: isM('portal_withdraw') },
     { step: 'support', who: 'bot', text: `🙋 *Soporte*\nEscribinos por WhatsApp 👇\n${L.support}`, linkSlot: 'support' },
   ];
 }
