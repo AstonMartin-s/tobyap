@@ -120,6 +120,17 @@ export async function updateLeadStatus(
   return res.ok;
 }
 
+/** Elimina un lead en Kommo (irreversible). Best-effort: devuelve false si falla. */
+export async function deleteKommoLead(tenant: ResolvedTenant, leadId: number): Promise<boolean> {
+  if (!tenant.kommoSubdomain || !tenant.kommoToken || !leadId) return false;
+  const url = `https://${tenant.kommoSubdomain}.kommo.com/api/v4/leads/${leadId}`;
+  const res = await kfetch(url, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${tenant.kommoToken}` },
+  });
+  return res.ok || res.status === 204;
+}
+
 // Agrega etiquetas a un lead SIN pisar las existentes (Kommo PATCH reemplaza la
 // lista, así que primero leemos las actuales y mergeamos por nombre).
 // Asegura el color de un tag a nivel cuenta (paleta fija de Kommo: hex de 6

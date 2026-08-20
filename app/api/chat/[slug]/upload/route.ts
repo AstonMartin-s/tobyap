@@ -5,6 +5,7 @@ import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { onComprobante } from '@/lib/chat/flow';
 import { appendChatMessages } from '@/lib/chat/mutations';
+import { unreadDataMerge } from '@/lib/chat/unread';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { saveComprobante } from '@/lib/storage';
 import { signFilePath } from '@/lib/chat/fileToken';
@@ -50,9 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   await appendChatMessages(s.id, newMsgs, {
     step: 'app_onboarding', // primero instala app + notificaciones, luego entra a revisión
     dataMerge: {
-      archived: false, // mandó comprobante → activo, se reabre si estaba archivado
-      unread: true, // comprobante nuevo → pendiente de revisar
-      // En disco: guardamos la ruta y NADA de base64 (DB liviana). En fallback: base64.
+      ...unreadDataMerge(s.data as Record<string, unknown> | null),
       ...(storedPath ? { comprobantePath: storedPath } : { comprobante: buf.toString('base64') }),
       comprobanteMime: mime,
       comprobanteName: file.name,

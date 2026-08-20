@@ -6,8 +6,9 @@ import { getSession } from '@/lib/session';
 import { getTenantBySlug } from '@/lib/tenants';
 import { phoneForExport } from '@/lib/phone';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
-import { updateLeadStatus } from '@/lib/kommo';
+import { updateLeadStatus, deleteKommoLead } from '@/lib/kommo';
 import { kommoStatusFromPanelStep, acreditarChat } from '@/lib/chat/release';
+import { purgeChatSession } from '@/lib/chat/deleteSession';
 import { trimBandeja } from '@/lib/chat/bandeja';
 import { appendChatMessages, mergeChatData } from '@/lib/chat/mutations';
 import { sendPushToSession } from '@/lib/chat/push';
@@ -116,6 +117,9 @@ export async function GET(req: NextRequest) {
       username: username ?? null, // usuario del portal (ej. camilo787) — búscable
       archived: sdata.archived === true,
       unread: sdata.unread === true,
+      unreadCount: typeof sdata.unreadCount === 'number' && sdata.unreadCount > 0
+        ? sdata.unreadCount
+        : (sdata.unread === true ? 1 : 0),
       blocked: sdata.blocked === true,
       step: s.step,
       kommoLeadId: s.kommoLeadId,
@@ -153,6 +157,8 @@ export async function POST(req: NextRequest) {
     from?: string;
     to?: string;
     steps?: string[];
+    deleteChat?: boolean;
+    deleteLead?: boolean;
   };
 
   // Export CSV flexible: rango de creación + filtro opcional por estado. Para cruzar
@@ -213,8 +219,33 @@ export async function POST(req: NextRequest) {
 
   // Marcar no leído a mano (para volver después). Leer se hace solo al abrir.
   if (b.op === 'mark_unread') {
-    await mergeChatData(s.id, { unread: true });
+    await mergeChatData(s.id, { unread: true, unreadCount: 1 });
     return NextResponse.json({ ok: true, unread: true });
+  }
+
+  if (b.op === 'mark_revisar') {
+    await db.update(chatSessions).set({ step: 'validando', updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+    await mergeChatData(s.id, { unread: true, unreadCount: 1, archived: false });
+    const tenant = await getTenantBySlug(session.slug);
+    if (tenant && s.kommoLeadId) {
+      addLeadNote(tenant, s.kommoLeadId, 'Supervisor: marcado para revisar desde el panel TrackerIO.');
+      const kstatus = kommoStatusFromPanelStep(tenant, 'validando');
+      if (kstatus) updateLeadStatus(tenant, s.kommoLeadId, kstatus).catch(() => {});
+    }
+    return NextResponse.json({ ok: true, step: 'validando' });
+  }
+
+  if (b.op === 'delete') {
+    const deleteLead = b.deleteLead === true;
+    const deleteChat = b.deleteChat === true || deleteLead;
+    if (!deleteChat) return NextResponse.json({ error: 'confirmá qué querés borrar' }, { status: 400 });
+    const tenant = await getTenantBySlug(session.slug);
+    let leadDeleted = false;
+    if (deleteLead && s.kommoLeadId && tenant) {
+      leadDeleted = await deleteKommoLead(tenant, s.kommoLeadId);
+    }
+    await purgeChatSession(s.id, data);
+    return NextResponse.json({ ok: true, deletedChat: true, deletedLead: leadDeleted });
   }
 
   // Bloquear / desbloquear: un bloqueado no puede seguir en el chat (start/message/
@@ -231,7 +262,7 @@ export async function POST(req: NextRequest) {
   if (b.op === 'get') {
     const full = (s.data ?? {}) as Record<string, unknown>;
     // Abrir el chat = leerlo → limpia el "no leído" (best-effort, sin bloquear).
-    if (full.unread) mergeChatData(s.id, { unread: false }, undefined, { touchUpdatedAt: false }).catch(() => {});
+    if (full.unread) mergeChatData(s.id, { unread: false, unreadCount: 0 }, undefined, { touchUpdatedAt: false }).catch(() => {});
     const { comprobante, ...dataLite } = full;
     void comprobante;
     return NextResponse.json({ ok: true, session: { ...s, data: dataLite } });

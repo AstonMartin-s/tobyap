@@ -5,6 +5,7 @@ import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { onFreeText, accountStep, WANT_ACCOUNT_RE } from '@/lib/chat/flow';
 import { appendChatMessages } from '@/lib/chat/mutations';
+import { unreadDataMerge } from '@/lib/chat/unread';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadFields, updateLeadName } from '@/lib/kommo';
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if ((s.step ?? 'welcome') === 'welcome' && WANT_ACCOUNT_RE.test(b.text)) {
     const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name }, runtime);
     const botMsgs = r.messages.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }));
-    await appendChatMessages(s.id, [userMsg, ...botMsgs], { step: r.step, dataMerge: { ...r.data, unread: true, archived: false } });
+    await appendChatMessages(s.id, [userMsg, ...botMsgs], { step: r.step, dataMerge: { ...r.data, ...unreadDataMerge(s.data as Record<string, unknown> | null) } });
     const history = [...(s.messages ?? []), userMsg, ...botMsgs];
     if (s.kommoLeadId && r.data.username) {
       const fields: Array<{ fieldId: number; value: string }> = [];
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // Inbound del cliente → marca NO LEÍDO (pendiente de responder) y, si estaba
   // archivado, se reabre solo (vuelve a la bandeja). Append atómico (no pisa lo que
   // escriba el scheduler de recordatorios o el operador en paralelo).
-  await appendChatMessages(s.id, [userMsg, ...botMsgs], { dataMerge: { unread: true, archived: false } });
+  await appendChatMessages(s.id, [userMsg, ...botMsgs], { dataMerge: unreadDataMerge(s.data as Record<string, unknown> | null) });
   const history = [...(s.messages ?? []), userMsg, ...botMsgs];
 
   if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, `👤 Lead: ${b.text}`);

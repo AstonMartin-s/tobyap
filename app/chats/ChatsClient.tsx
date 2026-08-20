@@ -9,6 +9,7 @@ type Item = {
   username: string | null;
   archived: boolean;
   unread: boolean;
+  unreadCount?: number;
   blocked: boolean;
   step: string | null;
   kommoLeadId: number | null;
@@ -43,7 +44,36 @@ const STEP_ORDER = ['welcome', 'credenciales', 'comprobante', 'app_onboarding', 
 
 const stepInfo = (s: string | null) => STEP[s ?? ''] ?? { label: s ?? '—', color: '#64748b' };
 
-// Chime suave (Web Audio) — arpegio mayor, ataque lento, sin dependencias.
+function Ico({ children, size = 14 }: { children: React.ReactNode; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flexShrink: 0 }}>
+      {children}
+    </svg>
+  );
+}
+
+const ICONS = {
+  approve: <Ico><polyline points="20 6 9 17 4 12" /></Ico>,
+  pending: <Ico><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></Ico>,
+  reject: <Ico><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></Ico>,
+  noCargo: <Ico><circle cx="12" cy="12" r="9" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></Ico>,
+  support: <Ico><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2z" /></Ico>,
+  deposit: <Ico><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /></Ico>,
+  withdraw: <Ico><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></Ico>,
+  datos: <Ico><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" /></Ico>,
+  archive: <Ico><polyline points="21 8 21 21 3 21 3 8" /><rect x="1" y="3" width="22" height="5" /><line x1="10" y1="12" x2="14" y2="12" /></Ico>,
+  unarchive: <Ico><polyline points="17 11 12 6 7 11" /><line x1="12" y1="6" x2="12" y2="18" /></Ico>,
+  block: <Ico><circle cx="12" cy="12" r="9" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></Ico>,
+  unblock: <Ico><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" /></Ico>,
+  revisar: <Ico><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></Ico>,
+  delete: <Ico><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></Ico>,
+  phone: <Ico size={12}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" /></Ico>,
+  copy: <Ico size={12}><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></Ico>,
+  user: <Ico size={11}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></Ico>,
+  receipt: <Ico size={11}><path d="M14 2H6a2 2 0 0 0-2 2v16l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V4a2 2 0 0 0-2-2z" /><line x1="8" y1="10" x2="16" y2="10" /><line x1="8" y1="14" x2="13" y2="14" /></Ico>,
+};
+
+// Chime suave (Web Audio)
 let _audioCtx: AudioContext | null = null;
 function playChime() {
   try {
@@ -66,12 +96,13 @@ function playChime() {
     });
   } catch { /* sin audio */ }
 }
+const TZ_AR = 'America/Argentina/Buenos_Aires';
 const fmtTime = (at: number) => {
-  const d = new Date(at < 1e12 ? at * 1000 : at); // tolera epoch en segundos
+  const d = new Date(at < 1e12 ? at * 1000 : at);
   const today = new Date();
-  const sameDay = d.toDateString() === today.toDateString();
-  const hh = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-  return sameDay ? hh : `${d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })} ${hh}`;
+  const sameDay = d.toLocaleDateString('es-AR', { timeZone: TZ_AR }) === today.toLocaleDateString('es-AR', { timeZone: TZ_AR });
+  const hh = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: TZ_AR });
+  return sameDay ? hh : `${d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', timeZone: TZ_AR })} ${hh}`;
 };
 const timeAgo = (iso: string | null) => {
   if (!iso) return '';
@@ -121,6 +152,9 @@ export function ChatsClient() {
   const [exportTo, setExportTo] = useState('');
   const [exportSteps, setExportSteps] = useState<string[]>([]);
   const [exportBusy, setExportBusy] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [delChat, setDelChat] = useState(false);
+  const [delLead, setDelLead] = useState(false);
   const [stats, setStats] = useState<Array<{ step: string | null; createdAt: string | null }>>([]);
   // Ancho de la lista (barra divisora arrastrable, estilo Black Dragon).
   const [listW, setListW] = useState(380);
@@ -306,25 +340,40 @@ export function ChatsClient() {
     setTimeout(() => setToast(null), 2800);
   }
 
-  async function act(op: string, text?: string, step?: string) {
+  async function act(op: string, text?: string, step?: string, extra?: { deleteChat?: boolean; deleteLead?: boolean }) {
     if (!sel || busy) return;
     setBusy(true);
     const r = await fetch('/api/panel/chats', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionKey: sel, op, text, step }),
+      body: JSON.stringify({ sessionKey: sel, op, text, step, ...extra }),
     }).then((x) => x.json()).catch(() => null);
     setBusy(false);
     if (r?.ok) {
-      setToast('Enviado al chat ✓');
-      setTimeout(() => setToast(null), 1800);
-      forceScrollRef.current = true; // el operador envió → mostramos el fondo
-      await loadDetail(sel);
-      await loadList();
+      if (op === 'delete') {
+        setDeleteOpen(false);
+        setDelChat(false);
+        setDelLead(false);
+        setSel(null);
+        setDetail(null);
+        setToast(r.deletedLead ? 'Chat y lead eliminados ✓' : 'Chat eliminado ✓');
+        await loadList();
+      } else {
+        setToast(op === 'mark_revisar' ? 'Movido a Revisar ✓' : 'Enviado al chat ✓');
+        forceScrollRef.current = op === 'custom';
+        await loadDetail(sel);
+        await loadList();
+      }
+      setTimeout(() => setToast(null), 2200);
     } else {
       setToast(r?.error ?? 'Error');
       setTimeout(() => setToast(null), 2500);
     }
+  }
+
+  async function confirmDelete() {
+    if (!delChat && !delLead) return;
+    await act('delete', undefined, undefined, { deleteChat: delChat || delLead, deleteLead: delLead });
   }
 
   // "Revisar" = necesita acción del operador sobre una imagen: mandó comprobante
@@ -397,6 +446,13 @@ export function ChatsClient() {
     background: filled ? (color || 'var(--accent)') : 'transparent',
     color: filled ? '#fff' : (color || 'var(--text)'),
     whiteSpace: 'nowrap',
+  });
+
+  const opStyle = (color?: string, filled?: boolean): React.CSSProperties => ({
+    ...abtn(color, filled),
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '.35rem',
   });
 
   const KPI = ({ label, value, color }: { label: string; value: string | number; color?: string }) => (
@@ -537,20 +593,22 @@ export function ChatsClient() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.45rem', flexShrink: 0 }}>
                     <span style={{ fontSize: '.66rem', color: 'var(--muted-2, #5d6478)' }}>{timeAgo(i.lastAt ?? i.updatedAt)}</span>
                     {i.unread && (
-                      <span title="Mensajes sin leer" style={{ width: 18, height: 18, borderRadius: '50%', background: '#e8a050', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '.62rem', fontWeight: 750, boxShadow: '0 0 6px rgba(232,160,80,0.4)' }}>1</span>
+                      <span title="Mensajes sin leer" style={{ minWidth: 18, height: 18, padding: '0 4px', borderRadius: 9, background: '#e8a050', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '.58rem', fontWeight: 750, boxShadow: '0 0 6px rgba(232,160,80,0.4)' }}>
+                        {(i.unreadCount ?? 1) > 9 ? '9+' : (i.unreadCount ?? 1)}
+                      </span>
                     )}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '.35rem', alignItems: 'center', margin: '.28rem 0' }}>
                   <span style={{ fontSize: '.62rem', fontWeight: 700, color: '#fff', background: si.color, padding: '.05rem .4rem', borderRadius: 5 }}>{si.label}</span>
                   {i.hasComprobante && i.step !== 'done' && i.step !== 'closed' && (
-                    <span title="Envió comprobante — requiere revisión" style={{ fontSize: '.6rem', fontWeight: 700, color: '#4ade80' }}>🧾 comprob.</span>
+                    <span title="Envió comprobante — requiere revisión" style={{ fontSize: '.6rem', fontWeight: 700, color: '#4ade80', display: 'inline-flex', alignItems: 'center', gap: '.2rem' }}>{ICONS.receipt} comprob.</span>
                   )}
-                  {i.blocked && <span title="Bloqueado" style={{ fontSize: '.6rem', fontWeight: 700, color: '#fff', background: '#b91c1c', padding: '.05rem .4rem', borderRadius: 5 }}>🚫 Bloqueado</span>}
+                  {i.blocked && <span title="Bloqueado" style={{ fontSize: '.6rem', fontWeight: 700, color: '#fff', background: '#b91c1c', padding: '.05rem .4rem', borderRadius: 5, display: 'inline-flex', alignItems: 'center', gap: '.2rem' }}>{ICONS.block} Bloqueado</span>}
                   {i.campaign && <span style={{ fontSize: '.62rem', color: 'var(--muted-2,#5d6478)' }}>{i.campaign}</span>}
                 </div>
                 <div style={{ fontSize: '.72rem', color: i.unread ? 'var(--text)' : 'var(--muted,#8b93a9)', fontWeight: i.unread ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {i.lastFrom === 'user' ? '👤 ' : ''}{i.lastText}
+                  {i.lastFrom === 'user' ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.2rem', verticalAlign: 'middle' }}>{ICONS.user}</span> : null}{i.lastText}
                 </div>
               </button>
             );
@@ -615,22 +673,41 @@ export function ChatsClient() {
                   })()}
                 </div>
               </div>
-              {/* DERECHA: contacto */}
-              <div style={{ fontSize: '.76rem', color: 'var(--muted,#94a3b8)', display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap' }}>
-                <span>📞 {detail.phone || '—'}</span>
-                {detail.phone && (
-                  <button onClick={() => { navigator.clipboard?.writeText(detail.phone!).then(() => { setToast('Teléfono copiado ✓'); setTimeout(() => setToast(null), 1500); }); }}
-                    title="Copiar teléfono" style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', color: 'var(--muted,#94a3b8)', fontSize: '.7rem', padding: '.05rem .35rem' }}>⧉ copiar</button>
-                )}
-                <span>{detail.kommoLeadId ? `· Kommo #${detail.kommoLeadId}` : '· sin lead Kommo'}</span>
+              {/* DERECHA: contacto + acciones supervisor */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.35rem', fontSize: '.76rem', color: 'var(--muted,#94a3b8)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem' }}>{ICONS.phone} {detail.phone || '—'}</span>
+                  {detail.phone && (
+                    <button onClick={() => { navigator.clipboard?.writeText(detail.phone!).then(() => { setToast('Teléfono copiado ✓'); setTimeout(() => setToast(null), 1500); }); }}
+                      title="Copiar teléfono" style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', color: 'var(--muted,#94a3b8)', fontSize: '.7rem', padding: '.05rem .35rem', display: 'inline-flex', alignItems: 'center', gap: '.25rem' }}>
+                      {ICONS.copy} copiar
+                    </button>
+                  )}
+                  <span>{detail.kommoLeadId ? `· Kommo #${detail.kommoLeadId}` : '· sin lead Kommo'}</span>
+                </div>
                 {(() => {
                   const blk = items.find((i) => i.sessionKey === sel)?.blocked;
+                  const hdrBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: '.3rem', borderRadius: 6, cursor: 'pointer', fontSize: '.7rem', fontWeight: 600, padding: '.18rem .5rem' };
                   return (
-                    <button className="tt tt--down tt--right" data-tt={blk ? 'Podrá volver a escribir' : 'No podrá seguir en el chat; se archiva'} disabled={busy}
-                      onClick={() => act(blk ? 'unblock' : 'block')}
-                      style={{ marginLeft: '.3rem', background: blk ? '#ef4444' : 'transparent', border: `1px solid ${blk ? '#ef4444' : '#b91c1c'}`, color: blk ? '#fff' : '#f87171', borderRadius: 6, cursor: 'pointer', fontSize: '.7rem', fontWeight: 600, padding: '.1rem .45rem' }}>
-                      {blk ? '🔓 Desbloquear' : '🚫 Bloquear'}
-                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.3rem' }}>
+                      <button className="tt tt--down tt--right" data-tt={blk ? 'Podrá volver a escribir' : 'No podrá seguir en el chat; se archiva'} disabled={busy}
+                        onClick={() => act(blk ? 'unblock' : 'block')}
+                        style={{ ...hdrBtn, background: blk ? '#ef4444' : 'transparent', border: `1px solid ${blk ? '#ef4444' : '#b91c1c'}`, color: blk ? '#fff' : '#f87171' }}>
+                        {blk ? ICONS.unblock : ICONS.block}{blk ? 'Desbloquear' : 'Bloquear'}
+                      </button>
+                      <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <button className="tt" data-tt="Supervisor: pasa a cola Revisar (validando) para que un operario lo atienda" disabled={busy}
+                          onClick={() => act('mark_revisar')}
+                          style={{ ...hdrBtn, background: 'rgba(249,115,22,.12)', border: '1px solid rgba(249,115,22,.45)', color: '#fb923c' }}>
+                          {ICONS.revisar} Revisar
+                        </button>
+                        <button className="tt" data-tt="Eliminar chat y opcionalmente el lead en Kommo" disabled={busy}
+                          onClick={() => { setDelChat(false); setDelLead(false); setDeleteOpen(true); }}
+                          style={{ ...hdrBtn, background: 'transparent', border: '1px solid #7f1d1d', color: '#fca5a5' }}>
+                          {ICONS.delete} Eliminar
+                        </button>
+                      </div>
+                    </div>
                   );
                 })()}
               </div>
@@ -704,16 +781,16 @@ export function ChatsClient() {
                   <>
                     <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
                       <span style={{ fontSize: '.6rem', fontWeight: 700, color: 'var(--muted-2,#5d6478)', textTransform: 'uppercase', letterSpacing: '.04em', marginRight: '.15rem' }}>Comprob.</span>
-                      <button className="tt" data-tt="Comprobante válido → acredita y pasa a Cargo$ (dispara la conversión a Meta)" disabled={busy} onClick={() => act('approve')} style={abtn('#16a34a', true)}>✅ Aprobar</button>
-                      <button className="tt" data-tt="En revisión — le avisa que estamos validando" disabled={busy} onClick={() => act('pending')} style={abtn()}>⏳ Pendiente</button>
-                      <button className="tt" data-tt="Comprobante ilegible/incompleto — le pide reenviarlo" disabled={busy} onClick={() => act('reject')} style={abtn('#f59e0b')}>⚠️ Erróneo</button>
-                      <button className="tt" data-tt="No depositó — lo pasa a No Cargo (sale de atención)" disabled={busy} onClick={() => act('set_step', undefined, 'no_cargo')} style={abtn('#ef4444')}>🚫 No cargó</button>
+                      <button className="tt" data-tt="Comprobante válido → acredita y pasa a Cargo$ (dispara la conversión a Meta)" disabled={busy} onClick={() => act('approve')} style={opStyle('#16a34a', true)}>{ICONS.approve} Aprobar</button>
+                      <button className="tt" data-tt="En revisión — le avisa que estamos validando" disabled={busy} onClick={() => act('pending')} style={opStyle()}>{ICONS.pending} Pendiente</button>
+                      <button className="tt" data-tt="Comprobante ilegible/incompleto — le pide reenviarlo" disabled={busy} onClick={() => act('reject')} style={opStyle('#f59e0b')}>{ICONS.reject} Erróneo</button>
+                      <button className="tt" data-tt="No depositó — lo pasa a No Cargo (sale de atención)" disabled={busy} onClick={() => act('set_step', undefined, 'no_cargo')} style={opStyle('#ef4444')}>{ICONS.noCargo} No cargó</button>
                       <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 .1rem' }} />
-                      <button className="tt" data-tt="Le pasa el WhatsApp de soporte (walink)" disabled={busy} onClick={() => act('support')} style={abtn()}>🙋 Soporte</button>
-                      <button className="tt" data-tt="Le manda cómo cargar saldo" disabled={busy} onClick={() => act('deposit')} style={abtn()}>💰 Cargar</button>
-                      <button className="tt" data-tt="Le manda cómo retirar" disabled={busy} onClick={() => act('withdraw')} style={abtn()}>💸 Retirar</button>
-                      <button className="tt" data-tt="Le reenvía usuario y contraseña" disabled={busy} onClick={() => act('forgot_user')} style={abtn()}>🔐 Datos</button>
-                      <button className="tt" data-tt={isArch ? 'Volver a la bandeja' : 'Sacar de la bandeja; vuelve solo si el cliente escribe'} disabled={busy} onClick={() => act(isArch ? 'unarchive' : 'archive')} style={abtn()}>{isArch ? '📤 Desarch.' : '🗂 Archivar'}</button>
+                      <button className="tt" data-tt="Le pasa el WhatsApp de soporte (walink)" disabled={busy} onClick={() => act('support')} style={opStyle()}>{ICONS.support} Soporte</button>
+                      <button className="tt" data-tt="Le manda cómo cargar saldo" disabled={busy} onClick={() => act('deposit')} style={opStyle()}>{ICONS.deposit} Cargar</button>
+                      <button className="tt" data-tt="Le manda cómo retirar" disabled={busy} onClick={() => act('withdraw')} style={opStyle()}>{ICONS.withdraw} Retirar</button>
+                      <button className="tt" data-tt="Le reenvía usuario y contraseña" disabled={busy} onClick={() => act('forgot_user')} style={opStyle()}>{ICONS.datos} Datos</button>
+                      <button className="tt" data-tt={isArch ? 'Volver a la bandeja' : 'Sacar de la bandeja; vuelve solo si el cliente escribe'} disabled={busy} onClick={() => act(isArch ? 'unarchive' : 'archive')} style={opStyle()}>{isArch ? ICONS.unarchive : ICONS.archive}{isArch ? ' Desarch.' : ' Archivar'}</button>
                     </div>
                   </>
                 );
@@ -729,6 +806,34 @@ export function ChatsClient() {
           </>
         )}
       </div>
+
+      {deleteOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => !busy && setDeleteOpen(false)}>
+          <div className="card" style={{ width: 'min(440px, 100%)', padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '.75rem' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontWeight: 700, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '.45rem' }}>{ICONS.delete} Eliminar lead / chat</div>
+            <p style={{ fontSize: '.78rem', color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
+              Confirmá qué querés borrar. Esta acción no se puede deshacer.
+            </p>
+            <label style={{ display: 'flex', gap: '.55rem', alignItems: 'flex-start', fontSize: '.82rem', cursor: 'pointer' }}>
+              <input type="checkbox" checked={delChat} onChange={(e) => setDelChat(e.target.checked)} style={{ marginTop: 3 }} />
+              <span><strong>Borrar conversación</strong> del panel (TrackerIO). El lead en Kommo se conserva.</span>
+            </label>
+            <label style={{ display: 'flex', gap: '.55rem', alignItems: 'flex-start', fontSize: '.82rem', cursor: 'pointer' }}>
+              <input type="checkbox" checked={delLead} onChange={(e) => { setDelLead(e.target.checked); if (e.target.checked) setDelChat(true); }} style={{ marginTop: 3 }} />
+              <span><strong>También borrar el lead en Kommo</strong> (irreversible). Incluye borrar el chat.</span>
+            </label>
+            {delChat && !delLead && (
+              <p style={{ fontSize: '.72rem', color: 'var(--warn,#f59e0b)', margin: 0 }}>Si el cliente vuelve a chatear, puede crearse un lead nuevo en Kommo.</p>
+            )}
+            <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end', marginTop: '.25rem' }}>
+              <button className="btn btn--ghost" disabled={busy} onClick={() => setDeleteOpen(false)}>Cancelar</button>
+              <button disabled={busy || (!delChat && !delLead)} onClick={confirmDelete} style={opStyle('#b91c1c', true)}>{busy ? 'Eliminando…' : 'Confirmar eliminación'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {exportOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
