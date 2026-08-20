@@ -68,6 +68,37 @@
 - El ícono de inicio en el celu queda pegado al nombre de cuando se instaló (iOS no lo actualiza). Hay que borrar y volver a agregar.
 - Patch: chat refresca piel vía `/brand`; SW no cachea HTML/manifiesto; nota en el panel Livechat.
 
+### 2026-08-20 — Multi-operario / escala (Fases A–C)
+
+**Contexto:** preparar el alta de +2/3 clientes y uso desde 2/3 compus (cada cliente
+con su operario; a lo sumo supervisor/owner abre el mismo para mirar/actuar).
+
+**Fase A — Escrituras atómicas (correctness multi-operario).** Antes, todas las
+escrituras de `chat_sessions` leían el array de mensajes / objeto data en JS y lo
+reescribían entero → lost-update si dos escritores pegaban a la vez (operario +
+supervisor, o cliente + scheduler de recordatorios). Se centralizó en
+`lib/chat/mutations.ts` (`appendChatMessages`, `mergeChatData`) que concatena/mergea
+a nivel Postgres (`||`, `jsonb_set`, `- key`) — mismo criterio que `acreditarChat`.
+Refactor: `app/api/panel/chats` (custom/pending/reject/support/set_step/archive/
+mark_unread/block/get), `app/api/chat/[slug]/message`, `.../upload`, `lib/chat/reminders`.
+
+**Fase B — Smoke de concurrencia.** `scripts/smoke-concurrency.ts` (`npm run
+smoke:concurrency`): crea 1 fila efímera, dispara 25 appends + 25 merges en paralelo,
+verifica que no se pierde ninguno y la borra. Corre contra la DB configurada (.env
+apunta a prod) → correr off-hours; impacto = una fila temporal.
+
+**Fase C — Guardarraíles de escala (reglas, no romper):**
+- **1 réplica fija en Railway.** `rateLimit` (`lib/rateLimit.ts`) y los schedulers
+  (`instrumentation-node.ts`: reminders/autoclose/purge/retry) son in-process. Con
+  2+ réplicas se DUPLICAN recordatorios/notificaciones y el rate limit se parte.
+  Para escalar horizontal primero mover schedulers a advisory-lock de Postgres.
+- **Pool DB `max: 8` por proceso** (`db/index.ts`). Más clientes/fuentes = más polls
+  concurrentes (chat activo ~3.5s, panel 6-8s). Medir pico de conexiones vs límite del
+  plan Postgres antes de sumar fuentes; subir `max` o poner PgBouncer si hace falta.
+- **Cache de tenant TTL 60s local al proceso**: cambios de config tardan ≤60s en verse.
+- **Sesión de panel stateless (cookie HMAC 8h)**: login multi-compu OK, sin límite.
+- Pendiente Fase D (opcional): señal visual de qué chat tiene abierto cada operario.
+
 ### 2026-08-20 — Bandeja Todos: máx 30 chats + auto-archivo
 
 - Regla: en "Todos" solo los 30 chats no archivados más recientes. El resto se archiva

@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { onComprobante } from '@/lib/chat/flow';
+import { appendChatMessages } from '@/lib/chat/mutations';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { saveComprobante } from '@/lib/storage';
 import { signFilePath } from '@/lib/chat/fileToken';
@@ -38,26 +39,26 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const storedPath = await saveComprobante(sessionKey, buf, mime).catch(() => null);
 
   const replies = onComprobante();
-  const history = [
-    ...(s.messages ?? []),
+  const newMsgs = [
     { from: 'user' as const, image: fileUrl, at: Date.now() },
     ...replies.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at })),
   ];
-  await db.update(chatSessions).set({
-    messages: history,
+  // Append atómico + merge de data (no pisa mensajes ni flags concurrentes).
+  await appendChatMessages(s.id, newMsgs, {
     step: 'app_onboarding', // primero instala app + notificaciones, luego entra a revisión
-    data: {
-      ...(s.data ?? {}),
+    dataMerge: {
       archived: false, // mandó comprobante → activo, se reabre si estaba archivado
       unread: true, // comprobante nuevo → pendiente de revisar
       // En disco: guardamos la ruta y NADA de base64 (DB liviana). En fallback: base64.
-      ...(storedPath ? { comprobantePath: storedPath, comprobante: undefined } : { comprobante: buf.toString('base64') }),
+      ...(storedPath ? { comprobantePath: storedPath } : { comprobante: buf.toString('base64') }),
       comprobanteMime: mime,
       comprobanteName: file.name,
       comprobanteAt: Date.now(), // para la limpieza automática a las 48h
     },
-    updatedAt: new Date(),
-  }).where(eq(chatSessions.id, s.id));
+    // Si quedó en disco, borramos cualquier base64 viejo de un intento anterior.
+    dataRemove: storedPath ? ['comprobante'] : [],
+  });
+  const history = [...(s.messages ?? []), ...newMsgs];
 
   if (s.kommoLeadId) {
     // URL pública real (detrás del proxy de Railway, req.nextUrl.origin miente).

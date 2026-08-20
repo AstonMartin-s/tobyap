@@ -21,6 +21,7 @@
     "adapt-bots": "tsx --env-file=.env scripts/adapt-bots.ts",
     "smoke:wiring": "tsx --env-file=.env scripts/smoke-wiring.ts",
     "smoke:db": "tsx --env-file=.env scripts/smoke-db.ts",
+    "smoke:concurrency": "tsx --env-file=.env scripts/smoke-concurrency.ts",
     "smoke": "npm run typecheck && npm run smoke:wiring && npm run smoke:db"
   },
   "dependencies": {

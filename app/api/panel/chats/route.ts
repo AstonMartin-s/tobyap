@@ -8,6 +8,7 @@ import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadStatus } from '@/lib/kommo';
 import { kommoStatusFromPanelStep, acreditarChat } from '@/lib/chat/release';
 import { trimBandeja } from '@/lib/chat/bandeja';
+import { appendChatMessages, mergeChatData } from '@/lib/chat/mutations';
 import { emitCargo, panelApproveEmitsCargo } from '@/lib/cargo/emit';
 import {
   comprobantePendingMessages,
@@ -171,13 +172,13 @@ export async function POST(req: NextRequest) {
   // vuelve solo a la bandeja cuando el cliente escribe (ver /message y /upload).
   if (b.op === 'archive' || b.op === 'unarchive') {
     const archived = b.op === 'archive';
-    await db.update(chatSessions).set({ data: { ...((s.data ?? {}) as Record<string, unknown>), archived }, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+    await mergeChatData(s.id, { archived });
     return NextResponse.json({ ok: true, archived });
   }
 
   // Marcar no leído a mano (para volver después). Leer se hace solo al abrir.
   if (b.op === 'mark_unread') {
-    await db.update(chatSessions).set({ data: { ...((s.data ?? {}) as Record<string, unknown>), unread: true }, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+    await mergeChatData(s.id, { unread: true });
     return NextResponse.json({ ok: true, unread: true });
   }
 
@@ -185,7 +186,7 @@ export async function POST(req: NextRequest) {
   // upload lo rechazan). Además lo archivamos para sacarlo de la bandeja.
   if (b.op === 'block' || b.op === 'unblock') {
     const blocked = b.op === 'block';
-    await db.update(chatSessions).set({ data: { ...((s.data ?? {}) as Record<string, unknown>), blocked, ...(blocked ? { archived: true, unread: false } : {}) }, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+    await mergeChatData(s.id, { blocked, ...(blocked ? { archived: true, unread: false } : {}) });
     return NextResponse.json({ ok: true, blocked });
   }
 
@@ -195,7 +196,7 @@ export async function POST(req: NextRequest) {
   if (b.op === 'get') {
     const full = (s.data ?? {}) as Record<string, unknown>;
     // Abrir el chat = leerlo → limpia el "no leído" (best-effort, sin bloquear).
-    if (full.unread) db.update(chatSessions).set({ data: { ...full, unread: false } }).where(eq(chatSessions.id, s.id)).catch(() => {});
+    if (full.unread) mergeChatData(s.id, { unread: false }).catch(() => {});
     const { comprobante, ...dataLite } = full;
     void comprobante;
     return NextResponse.json({ ok: true, session: { ...s, data: dataLite } });
@@ -253,12 +254,10 @@ export async function POST(req: NextRequest) {
   }
 
   // Marcamos como del OPERADOR (op:true) todo lo que se dispara desde el panel,
-  // para distinguirlo de los mensajes automáticos (BOT) en la vista.
-  const opMsgs = newMsgs.map((m) => ({ ...m, op: true }));
-  const history = [...((s.messages ?? []) as Msg[]), ...opMsgs];
-  const patch: Record<string, unknown> = { messages: history, updatedAt: new Date() };
-  if (newStep) patch.step = newStep;
-  await db.update(chatSessions).set(patch).where(eq(chatSessions.id, s.id));
+  // para distinguirlo de los mensajes automáticos (BOT) en la vista. Append atómico
+  // para no pisar mensajes que entren en paralelo (otro operario / supervisor / poll).
+  const opMsgs = newMsgs.map((m) => ({ ...m, op: true as const }));
+  await appendChatMessages(s.id, opMsgs, newStep ? { step: newStep } : {});
 
   // Espejo a Kommo (best-effort). BIDIRECCIONAL: si el operador cambió el estado,
   // movemos el lead a la etapa correspondiente del embudo (Kommo manda, y el panel

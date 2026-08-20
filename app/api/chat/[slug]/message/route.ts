@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { onFreeText, accountStep, WANT_ACCOUNT_RE } from '@/lib/chat/flow';
+import { appendChatMessages } from '@/lib/chat/mutations';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadFields, updateLeadName } from '@/lib/kommo';
 
@@ -22,7 +23,6 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if ((s.data as Record<string, unknown> | null)?.blocked) return NextResponse.json({ ok: true, messages: [], blocked: true });
 
   const userMsg = { from: 'user' as const, text: b.text, at: Date.now() };
-  const sdata = (s.data ?? {}) as Record<string, unknown>;
 
   // El cliente tipeó la intención de "quiero mi cuenta" en vez de tocar el botón
   // (muy común en mobile) — si lo dejamos pasar por onFreeText queda trabado en
@@ -30,9 +30,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // camino que el botón 'want_account' del panel de acciones.
   if ((s.step ?? 'welcome') === 'welcome' && WANT_ACCOUNT_RE.test(b.text)) {
     const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name });
-    const history = [...(s.messages ?? []), userMsg, ...r.messages.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }))];
-    const patch: Record<string, unknown> = { step: r.step, data: { ...sdata, ...r.data, unread: true, archived: false }, messages: history, updatedAt: new Date() };
-    await db.update(chatSessions).set(patch).where(eq(chatSessions.id, s.id));
+    const botMsgs = r.messages.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }));
+    await appendChatMessages(s.id, [userMsg, ...botMsgs], { step: r.step, dataMerge: { ...r.data, unread: true, archived: false } });
+    const history = [...(s.messages ?? []), userMsg, ...botMsgs];
     if (s.kommoLeadId && r.data.username) {
       const fields: Array<{ fieldId: number; value: string }> = [];
       const uF = tenant.customFields['portal_url_field'];
@@ -57,11 +57,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (replies.length === 1 && lastBot && (lastBot.text ?? '') === (replies[0].text ?? '')) {
     replies = [];
   }
-  const history = [...(s.messages ?? []), userMsg, ...replies.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }))];
+  const botMsgs = replies.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }));
   // Inbound del cliente → marca NO LEÍDO (pendiente de responder) y, si estaba
-  // archivado, se reabre solo (vuelve a la bandeja).
-  const patch: Record<string, unknown> = { messages: history, updatedAt: new Date(), data: { ...sdata, unread: true, archived: false } };
-  await db.update(chatSessions).set(patch).where(eq(chatSessions.id, s.id));
+  // archivado, se reabre solo (vuelve a la bandeja). Append atómico (no pisa lo que
+  // escriba el scheduler de recordatorios o el operador en paralelo).
+  await appendChatMessages(s.id, [userMsg, ...botMsgs], { dataMerge: { unread: true, archived: false } });
+  const history = [...(s.messages ?? []), userMsg, ...botMsgs];
 
   if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, `👤 Lead: ${b.text}`);
 

@@ -1,7 +1,7 @@
 import { and, gt, notInArray } from 'drizzle-orm';
-import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
+import { appendChatMessages } from '@/lib/chat/mutations';
 
 // Recontacto automático: UN solo mensajito corto por chat. Si desde nuestro
 // último mensaje el cliente no contesta en ~10 min, le mandamos un empujoncito
@@ -44,13 +44,9 @@ export async function runReminders(): Promise<{ scanned: number; sent: number }>
     if (quietMin < QUIET_MIN) continue;
 
     const text = NUDGES[Math.floor(Math.random() * NUDGES.length)];
-    const newMsg: Msg = { from: 'bot', text, at: Date.now(), n: true };
-    const messages = [...msgs, newMsg] as unknown as (typeof chatSessions.$inferSelect)['messages'];
-    await db.update(chatSessions).set({
-      messages,
-      data: { ...data, reminderSent: true },
-      updatedAt: new Date(),
-    }).where(eq(chatSessions.id, s.id));
+    const newMsg = { from: 'bot' as const, text, at: Date.now(), n: true };
+    // Append atómico: no pisa un mensaje que el cliente/operador escriba justo ahora.
+    await appendChatMessages(s.id, [newMsg], { dataMerge: { reminderSent: true } });
     sent++;
   }
   return { scanned: rows.length, sent };
