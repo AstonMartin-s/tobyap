@@ -68,6 +68,13 @@
 - El ícono de inicio en el celu queda pegado al nombre de cuando se instaló (iOS no lo actualiza). Hay que borrar y volver a agregar.
 - Patch: chat refresca piel vía `/brand`; SW no cachea HTML/manifiesto; nota en el panel Livechat.
 
+### 2026-08-20 — Export CSV flexible (panel chats)
+
+- Botón «Exportar» con modal: rango de fechas (createdAt), filtro opcional por estado.
+- CSV: nombre, usuario, telefono (549… sin «+», columnas separadas), estado, campana,
+  ccpp, creado, actualizado, kommo. Límite 10k filas. `export_done` legacy sigue.
+- Helper `phoneForExport` en `lib/phone.ts`.
+
 ### 2026-08-20 — Multi-operario / escala (Fases A–C)
 
 **Contexto:** preparar el alta de +2/3 clientes y uso desde 2/3 compus (cada cliente

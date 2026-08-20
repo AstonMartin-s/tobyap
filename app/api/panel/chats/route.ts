@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getSession } from '@/lib/session';
 import { getTenantBySlug } from '@/lib/tenants';
+import { phoneForExport } from '@/lib/phone';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadStatus } from '@/lib/kommo';
 import { kommoStatusFromPanelStep, acreditarChat } from '@/lib/chat/release';
@@ -136,25 +137,51 @@ export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'no autorizado' }, { status: 401 });
 
-  const b = (await req.json().catch(() => ({}))) as { sessionKey?: string; op?: string; text?: string; step?: string };
+  const b = (await req.json().catch(() => ({}))) as {
+    sessionKey?: string;
+    op?: string;
+    text?: string;
+    step?: string;
+    from?: string;
+    to?: string;
+    steps?: string[];
+  };
 
-  // Exportar acreditados (comprobante aprobado) — no necesita sessionKey. Devuelve
-  // usuario del portal + teléfono para cruzar trazabilidad con la base de cargas.
-  if (b.op === 'export_done') {
-    const rows = await db
-      .select()
-      .from(chatSessions)
-      .where(and(eq(chatSessions.tenantId, session.tenantId), eq(chatSessions.step, 'done')))
-      .orderBy(desc(chatSessions.updatedAt));
-    const data = rows.map((s) => ({
-      nombre: s.name ?? '',
-      usuario: (((s.data ?? {}) as Record<string, unknown>).username as string) ?? '',
-      telefono: s.phone ?? '',
-      campana: s.campaign ?? '',
-      acreditado: s.updatedAt ? new Date(s.updatedAt).toISOString() : '',
-      kommo: s.kommoLeadId ?? '',
-    }));
-    return NextResponse.json({ ok: true, rows: data });
+  // Export CSV flexible: rango de creación + filtro opcional por estado. Para cruzar
+  // con bases externas (no solo step=done en TrackerIO).
+  if (b.op === 'export_csv' || b.op === 'export_done') {
+    let where = eq(chatSessions.tenantId, session.tenantId);
+    // Legacy export_done = solo acreditados, sin filtro de fecha.
+    if (b.op === 'export_done') {
+      where = and(where, eq(chatSessions.step, 'done'))!;
+    } else {
+      if (b.from) where = and(where, gte(chatSessions.createdAt, new Date(`${b.from}T00:00:00`)))!;
+      if (b.to) where = and(where, lte(chatSessions.createdAt, new Date(`${b.to}T23:59:59.999`)))!;
+      const steps = (b.steps ?? []).filter(Boolean);
+      if (steps.length) where = and(where, inArray(chatSessions.step, steps))!;
+    }
+    const STEP_LABEL: Record<string, string> = {
+      form: 'Formulario', welcome: 'Pidió Usuario', credenciales: 'Usuario Creado',
+      cbu: 'Pidió CBU', comprobante: 'Pidió CBU', app_onboarding: 'Instalando app',
+      validando: 'Revisar imagen', done: 'Cargo$', no_cargo: 'No Cargo', closed: 'Cerrado',
+    };
+    const rows = await db.select().from(chatSessions).where(where).orderBy(desc(chatSessions.createdAt)).limit(10000);
+    const data = rows.map((s) => {
+      const sdata = (s.data ?? {}) as Record<string, unknown>;
+      const st = s.step ?? '';
+      return {
+        nombre: s.name ?? '',
+        usuario: (sdata.username as string) ?? '',
+        telefono: phoneForExport(s.phone),
+        estado: STEP_LABEL[st] ?? st,
+        campana: s.campaign ?? '',
+        ccpp: s.ccpp ?? '',
+        creado: s.createdAt ? new Date(s.createdAt).toISOString() : '',
+        actualizado: s.updatedAt ? new Date(s.updatedAt).toISOString() : '',
+        kommo: s.kommoLeadId ?? '',
+      };
+    });
+    return NextResponse.json({ ok: true, rows: data, truncated: rows.length >= 10000 });
   }
 
   if (!b.sessionKey || !b.op) return NextResponse.json({ error: 'sessionKey y op requeridos' }, { status: 400 });

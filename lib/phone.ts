@@ -32,3 +32,14 @@ export function phoneCandidates(raw: string | null | undefined): string[] {
   }
   return [...set];
 }
+
+/** CSV / cruce con bases externas: solo dígitos, AR normalizado a 549 + 10 (sin «+»). */
+export function phoneForExport(raw: string | null | undefined): string {
+  const digits = phoneKey(raw);
+  if (!digits) return '';
+  let d = digits;
+  if (d.startsWith('00')) d = d.slice(2);
+  if (!d.startsWith('54')) d = '54' + d;
+  if (d.startsWith('54') && !d.startsWith('549')) d = '549' + d.slice(2);
+  return d;
+}

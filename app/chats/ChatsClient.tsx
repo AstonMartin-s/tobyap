@@ -96,6 +96,15 @@ const itemNeedsAttention = (i: Item): boolean => {
   return i.step === 'validando' || i.hasComprobante || i.unread;
 };
 
+const EXPORT_STEPS = ['welcome', 'credenciales', 'comprobante', 'app_onboarding', 'validando', 'done', 'no_cargo', 'closed'] as const;
+
+function isoDateLocal(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function ChatsClient() {
   const [items, setItems] = useState<Item[]>([]);
   const [sel, setSel] = useState<string | null>(null);
@@ -105,6 +114,11 @@ export function ChatsClient() {
   const [filter, setFilter] = useState<'todos' | 'revisar' | 'no_leidos' | 'activos' | 'acreditados' | 'no_cargo' | 'archivadas'>('todos');
   const [q, setQ] = useState('');
   const [kpiRange, setKpiRange] = useState<'hoy' | 'ayer' | 'siempre'>('hoy');
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportFrom, setExportFrom] = useState('');
+  const [exportTo, setExportTo] = useState('');
+  const [exportSteps, setExportSteps] = useState<string[]>([]);
+  const [exportBusy, setExportBusy] = useState(false);
   const [stats, setStats] = useState<Array<{ step: string | null; createdAt: string | null }>>([]);
   // Ancho de la lista (barra divisora arrastrable, estilo Black Dragon).
   const [listW, setListW] = useState(380);
@@ -237,24 +251,57 @@ export function ChatsClient() {
     }
   }, [detail, sel]);
 
-  async function exportDone() {
+  function openExport() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (kpiRange === 'hoy') {
+      setExportFrom(isoDateLocal(today));
+      setExportTo(isoDateLocal(today));
+    } else if (kpiRange === 'ayer') {
+      const y = new Date(today);
+      y.setDate(y.getDate() - 1);
+      setExportFrom(isoDateLocal(y));
+      setExportTo(isoDateLocal(y));
+    } else {
+      setExportFrom('');
+      setExportTo('');
+    }
+    setExportSteps([]);
+    setExportOpen(true);
+  }
+
+  async function runExport() {
+    if (exportBusy) return;
+    setExportBusy(true);
+    const body: { op: string; from?: string; to?: string; steps?: string[] } = { op: 'export_csv' };
+    if (exportFrom) body.from = exportFrom;
+    if (exportTo) body.to = exportTo;
+    if (exportSteps.length) body.steps = exportSteps;
     const r = await fetch('/api/panel/chats', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op: 'export_done' }),
+      body: JSON.stringify(body),
     }).then((x) => x.json()).catch(() => null);
-    if (!r?.ok || !r.rows?.length) { setToast('No hay acreditados para exportar'); setTimeout(() => setToast(null), 2000); return; }
-    const cols = ['nombre', 'usuario', 'telefono', 'campana', 'acreditado', 'kommo'];
+    setExportBusy(false);
+    if (!r?.ok || !r.rows?.length) {
+      setToast('No hay registros con esos filtros');
+      setTimeout(() => setToast(null), 2200);
+      return;
+    }
+    const cols = ['nombre', 'usuario', 'telefono', 'estado', 'campana', 'ccpp', 'creado', 'actualizado', 'kommo'];
     const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const csv = [cols.join(','), ...r.rows.map((row: Record<string, unknown>) => cols.map((c) => esc(row[c])).join(','))].join('\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `acreditados-${new Date().toISOString().slice(0, 10)}.csv`;
+    const tag = exportFrom && exportTo ? `${exportFrom}_${exportTo}` : 'completo';
+    a.download = `chats-${tag}-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    setToast(`Exportados ${r.rows.length} acreditados ✓`);
-    setTimeout(() => setToast(null), 2200);
+    setExportOpen(false);
+    const trunc = r.truncated ? ' (límite 10k)' : '';
+    setToast(`Exportados ${r.rows.length} registros ✓${trunc}`);
+    setTimeout(() => setToast(null), 2800);
   }
 
   async function act(op: string, text?: string, step?: string) {
@@ -378,9 +425,9 @@ export function ChatsClient() {
             {!soundOn && <line x1="3" y1="3" x2="21" y2="21" />}
           </svg>
         </button>
-        <button onClick={exportDone}
+        <button onClick={openExport}
           style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem', padding: '.32rem .7rem', fontSize: '.76rem', fontWeight: 600, border: '1px solid #16a34a55', borderRadius: 8, background: '#16a34a1a', color: '#4ade80', cursor: 'pointer' }}
-          title="Descargar CSV con usuario + teléfono de los acreditados">⬇ Acreditados</button>
+          title="Exportar CSV: rango de fechas, filtro por estado, usuario y teléfono separados">⬇ Exportar</button>
       </div>
     </div>
     <div style={{ display: 'flex', gap: '.6rem', marginBottom: '.8rem', flexWrap: 'wrap' }}>
@@ -583,6 +630,50 @@ export function ChatsClient() {
           </>
         )}
       </div>
+
+      {exportOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => !exportBusy && setExportOpen(false)}>
+          <div className="card" style={{ width: 'min(420px, 100%)', padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '.75rem' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontWeight: 700, fontSize: '1rem' }}>Exportar chats a CSV</div>
+            <p style={{ fontSize: '.78rem', color: 'var(--muted)', margin: 0, lineHeight: 1.45 }}>
+              Cruza con bases externas: usuario y teléfono en columnas separadas (teléfono sin «+», formato 549…).
+              Sin filtro de estado = todos los registros del rango.
+            </p>
+            <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
+              <div className="field" style={{ flex: '1 1 120px' }}>
+                <label style={{ fontSize: '.72rem', color: 'var(--muted-2)' }}>Desde (creado)</label>
+                <input className="input" type="date" value={exportFrom} onChange={(e) => setExportFrom(e.target.value)} style={{ fontSize: '.8rem' }} />
+              </div>
+              <div className="field" style={{ flex: '1 1 120px' }}>
+                <label style={{ fontSize: '.72rem', color: 'var(--muted-2)' }}>Hasta (creado)</label>
+                <input className="input" type="date" value={exportTo} onChange={(e) => setExportTo(e.target.value)} style={{ fontSize: '.8rem' }} />
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '.72rem', color: 'var(--muted-2)', marginBottom: '.35rem' }}>Estado (opcional — vacío = todos)</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem' }}>
+                {EXPORT_STEPS.map((st) => {
+                  const on = exportSteps.includes(st);
+                  const si = stepInfo(st);
+                  return (
+                    <button key={st} type="button" onClick={() => setExportSteps((p) => on ? p.filter((x) => x !== st) : [...p, st])}
+                      style={{ padding: '.22rem .5rem', fontSize: '.7rem', fontWeight: on ? 700 : 500, borderRadius: 6, cursor: 'pointer',
+                        border: `1px solid ${on ? si.color : 'var(--border)'}`, background: on ? `${si.color}22` : 'transparent', color: on ? si.color : 'var(--muted)' }}>
+                      {si.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end', marginTop: '.25rem' }}>
+              <button className="btn btn--ghost" disabled={exportBusy} onClick={() => setExportOpen(false)}>Cancelar</button>
+              <button disabled={exportBusy} onClick={runExport} style={abtn('#16a34a', true)}>{exportBusy ? 'Exportando…' : '⬇ Descargar CSV'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#111827', color: '#fff', padding: '.6rem 1rem', borderRadius: 10, fontSize: '.85rem', zIndex: 50 }}>{toast}</div>
