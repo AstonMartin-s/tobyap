@@ -527,11 +527,16 @@ export function ChatsClient() {
                 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '.35rem', minWidth: 0 }}>
-                    {attn && <span title="Requiere atención" style={{ width: 7, height: 7, borderRadius: '50%', background: '#e88838', flexShrink: 0 }} />}
-                    <strong style={{ fontSize: '.85rem', fontWeight: attn ? 750 : 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{i.name || i.phone || 'Sin nombre'}</strong>
+                    {needsReview(i) && <span title="Comprobante por revisar" style={{ width: 7, height: 7, borderRadius: '50%', background: '#e88838', flexShrink: 0 }} />}
+                    <strong style={{ fontSize: '.85rem', fontWeight: attn ? 750 : 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: i.unread && isOpen(i) ? '#fff' : 'inherit' }}>{i.name || i.phone || 'Sin nombre'}</strong>
                     {i.username && <span title="Usuario del portal" style={{ fontSize: '.7rem', fontWeight: 600, color: 'var(--accent)', whiteSpace: 'nowrap' }}>@{i.username}</span>}
                   </span>
-                  <span style={{ fontSize: '.66rem', color: 'var(--muted-2, #5d6478)', flexShrink: 0 }}>{timeAgo(i.updatedAt)}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.45rem', flexShrink: 0 }}>
+                    <span style={{ fontSize: '.66rem', color: 'var(--muted-2, #5d6478)' }}>{timeAgo(i.updatedAt)}</span>
+                    {i.unread && isOpen(i) && (
+                      <span title="Mensajes sin leer" style={{ width: 18, height: 18, borderRadius: '50%', background: '#e8a050', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '.62rem', fontWeight: 750, boxShadow: '0 0 6px rgba(232,160,80,0.4)' }}>1</span>
+                    )}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: '.35rem', alignItems: 'center', margin: '.28rem 0' }}>
                   <span style={{ fontSize: '.62rem', fontWeight: 700, color: '#fff', background: si.color, padding: '.05rem .4rem', borderRadius: 5 }}>{si.label}</span>
@@ -565,21 +570,46 @@ export function ChatsClient() {
         ) : (
           <>
             <div style={{ padding: '.8rem 1rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
-              {/* IZQUIERDA: nombre + selector de estado pegado */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', minWidth: 0 }}>
-                <strong style={{ fontSize: '1.05rem', whiteSpace: 'nowrap' }}>{detail.name || detail.phone}</strong>
-                {detail.username && <span title="Usuario del portal" style={{ fontSize: '.78rem', fontWeight: 700, color: 'var(--accent,#7c5cff)', whiteSpace: 'nowrap' }}>@{detail.username}</span>}
-                <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }} title="Cambiar estado">
-                  <select
-                    value={detail.step ?? ''}
-                    disabled={busy}
-                    onChange={(e) => act('set_step', undefined, e.target.value)}
-                    style={{ background: stepInfo(detail.step).color, color: '#fff', fontWeight: 700, fontSize: '.75rem', border: 'none', borderRadius: 8, padding: '.3rem 1.8rem .3rem .65rem', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none' }}>
-                    {STEP_ORDER.map((st) => (
-                      <option key={st} value={st} style={{ background: '#1b1f28', color: '#fff' }}>{STEP[st].label}</option>
-                    ))}
-                  </select>
-                  <span aria-hidden style={{ position: 'absolute', right: '.55rem', color: '#fff', fontSize: '.62rem', pointerEvents: 'none' }}>▼</span>
+              {/* IZQUIERDA: icono, nombre + selector de estado, y campaña */}
+              <div style={{ display: 'flex', gap: '.7rem', minWidth: 0 }}>
+                <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--card-3)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', flexShrink: 0 }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', minWidth: 0, justifyContent: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap' }}>
+                    <strong style={{ fontSize: '1.05rem', whiteSpace: 'nowrap' }}>{detail.name || detail.phone}</strong>
+                    {detail.username && <span title="Usuario del portal" style={{ fontSize: '.78rem', fontWeight: 700, color: 'var(--accent,#7c5cff)', whiteSpace: 'nowrap' }}>@{detail.username}</span>}
+                    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }} title="Cambiar estado">
+                      <select
+                        value={detail.step ?? ''}
+                        disabled={busy}
+                        onChange={(e) => act('set_step', undefined, e.target.value)}
+                        style={{ background: stepInfo(detail.step).color, color: '#fff', fontWeight: 700, fontSize: '.75rem', border: 'none', borderRadius: 8, padding: '.3rem 1.8rem .3rem .65rem', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none' }}>
+                        {STEP_ORDER.map((st) => (
+                          <option key={st} value={st} style={{ background: '#1b1f28', color: '#fff' }}>{STEP[st].label}</option>
+                        ))}
+                      </select>
+                      <span aria-hidden style={{ position: 'absolute', right: '.55rem', color: '#fff', fontSize: '.62rem', pointerEvents: 'none' }}>▼</span>
+                    </div>
+                  </div>
+                  {/* Contexto de Campaña / Bono */}
+                  {(() => {
+                    const c = items.find(i => i.sessionKey === sel)?.campaign;
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', fontSize: '.68rem', marginTop: 1 }}>
+                        <span style={{ color: '#e8a050', fontWeight: 750, textTransform: 'uppercase', letterSpacing: '.05em' }}>Livechat</span>
+                        {c && (
+                          <>
+                            <span style={{ color: 'var(--border-2)' }}>|</span>
+                            <span style={{ color: 'var(--muted)', display: 'inline-flex', alignItems: 'center', gap: '.3rem' }}>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.6 }}><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                              {c}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
               {/* DERECHA: contacto */}
