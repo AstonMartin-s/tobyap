@@ -84,7 +84,11 @@ export async function POST(req: NextRequest) {
     sentAt: new Date(),
   });
 
-  // 2) Token de atribución (reintentar si choca el code, muy improbable).
+  // 2) Token de atribución — omitir si la landing pidió noCode (soporte/walink sin CRM).
+  if (b.noCode === true || b.noCode === 'true') {
+    return NextResponse.json({ ok: true, noCode: true, bono, campaignId }, { headers: CORS });
+  }
+
   let code = generateCode();
   for (let i = 0; i < 3; i++) {
     try {

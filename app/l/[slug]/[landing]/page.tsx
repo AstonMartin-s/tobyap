@@ -86,7 +86,7 @@ export default async function NamedLanding({
     // Si la landing tiene chatSlug, redirige al chat web en vez de wa.me.
     chatSlug: c.chatSlug != null ? String(c.chatSlug) : null,
     chatOrigin: process.env.CHAT_ORIGIN || '', // ej https://chat.fichaslibres.online
-    noCode: c.noCode === true,
+    noCode: c.noCode === true || lp.type === 'soporte',
   };
 
   return <LandingView {...cfg} />;
