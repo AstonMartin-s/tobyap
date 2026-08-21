@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fmtChatTime } from '@/lib/datetime/ar';
-import { BANDEJA_LIMIT } from '@/lib/chat/bandeja-config';
 import OperationsPanel from './OperationsPanel';
 
 type Item = {
@@ -576,11 +575,6 @@ export function ChatsClient() {
             );
           })}
         </div>
-        {filter === 'inbox' && (
-          <div style={{ fontSize: '.62rem', color: 'var(--muted-2,#5d6478)', padding: '0 .6rem .4rem', lineHeight: 1.35 }}>
-            No archivados · orden por último mensaje · máx. {BANDEJA_LIMIT} en curso (cargo, no cargó y revisar no se archivan solos)
-          </div>
-        )}
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
           {shown.length === 0 && <div className="empty" style={{ padding: '2rem' }}>Sin chats.</div>}
           {shown.map((i) => {
