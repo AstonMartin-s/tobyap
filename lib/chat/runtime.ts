@@ -177,9 +177,9 @@ export function offerWelcomeLine(cfg: ChatRuntimeConfig): string {
 
 export function offerCbuLine(cfg: ChatRuntimeConfig): string {
   if (cfg.offerType === 'bonus') {
-    return `Desde *$${money(cfg.minDeposit)}* y te sumo *${cfg.offerValue}%* 🎁 Cuando transfieras, mandame el comprobante 📸 y te acredito.`;
+    return `Desde *$${money(cfg.minDeposit)}* y te sumo *${cfg.offerValue}%* 🎁 Espero tu comprobante!`;
   }
-  return `Desde *$${money(cfg.minDeposit)}* y te sumamos *${cfg.offerValue} fichas gratis* 🎁 Cuando transfieras, mandame el comprobante 📸 y te acredito.`;
+  return `Desde *$${money(cfg.minDeposit)}* y te sumamos *${cfg.offerValue} fichas gratis* 🎁 Espero tu comprobante!`;
 }
 
 export function offerDepositLine(cfg: ChatRuntimeConfig): string {
