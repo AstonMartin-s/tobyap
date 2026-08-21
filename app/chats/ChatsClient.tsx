@@ -607,9 +607,6 @@ export function ChatsClient() {
                 </div>
                 <div style={{ display: 'flex', gap: '.35rem', alignItems: 'center', margin: '.28rem 0' }}>
                   <span style={{ fontSize: '.62rem', fontWeight: 700, color: '#fff', background: si.color, padding: '.05rem .4rem', borderRadius: 5 }}>{si.label}</span>
-                  {i.hasComprobante && i.step !== 'done' && i.step !== 'closed' && (
-                    <span title="Envió comprobante — requiere revisión" style={{ fontSize: '.6rem', fontWeight: 700, color: '#4ade80', display: 'inline-flex', alignItems: 'center', gap: '.2rem' }}>{ICONS.receipt} comprob.</span>
-                  )}
                   {i.blocked && <span title="Bloqueado" style={{ fontSize: '.6rem', fontWeight: 700, color: '#fff', background: '#b91c1c', padding: '.05rem .4rem', borderRadius: 5, display: 'inline-flex', alignItems: 'center', gap: '.2rem' }}>{ICONS.block} Bloqueado</span>}
                   {i.campaign && <span style={{ fontSize: '.62rem', color: 'var(--muted-2,#5d6478)' }}>{i.campaign}</span>}
                 </div>
