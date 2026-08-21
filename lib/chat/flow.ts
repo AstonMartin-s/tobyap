@@ -139,7 +139,7 @@ export async function cbuStep(tenant: ResolvedTenant, cfg: ChatRuntimeConfig = D
 // comprobante. Sin eso, no se envía y no puede reclamar el bono.
 export function onComprobante(): BotMsg[] {
   return [
-    { from: 'bot', delayMs: 900, at: now(), text: '¡Recibí tu comprobante! 🧾 Un último paso y lo enviamos 👇' },
+    { from: 'bot', delayMs: 900, at: now(), text: 'Recibimos tu imagen! Último paso y la enviamos a revisión 👇' },
     { from: 'bot', delayMs: 1400, at: now(), text: '📲 Instalá la app y activá las notificaciones — así te acreditamos más rápido y recibís tus bonos cada semana 🎁' },
   ];
 }
@@ -147,7 +147,7 @@ export function onComprobante(): BotMsg[] {
 // Cuando completa los pasos: recién ahí el comprobante entra en revisión.
 export function comprobanteReviewMessages(): BotMsg[] {
   return [
-    { from: 'bot', delayMs: 700, at: now(), text: '✅ ¡Listo! Tu comprobante entró en revisión 🔎 En breve validamos y te acreditamos tu saldo + bono 🎉' },
+    { from: 'bot', delayMs: 700, at: now(), text: '✅ ¡Listo! Tu imagen entró en revisión 🔎 En breve validamos y te acreditamos tu saldo + bono 🎉' },
   ];
 }
 
@@ -254,12 +254,12 @@ export function onFreeText(step: string, text?: string, cfg: ChatRuntimeConfig =
   // mandarlo a WhatsApp (fricción extra), le damos la salida DENTRO del chat:
   // puede saltear el paso y mandar el comprobante igual.
   if (step === 'app_onboarding' && !(text && REAL_ISSUE_RE.test(text))) {
-    return [{ from: 'bot', delayMs: 600, at: now(), text: '📲 No hace falta instalar nada ahora, es opcional. Tocá *"Enviar mi comprobante"* ahí abajo y seguimos con tu acreditación 🎁' }];
+    return [{ from: 'bot', delayMs: 600, at: now(), text: '📲 No hace falta instalar nada ahora, es opcional. Tocá *"Enviar mi imagen"* ahí abajo y seguimos con tu acreditación 🎁' }];
   }
   // Misma confusión, pero DESPUÉS de mandar el comprobante (ya pasó el gate):
   // tranquilizamos, no hace falta nada más de la app.
   if (asksAboutApp && step !== 'app_onboarding') {
-    return [{ from: 'bot', delayMs: 600, at: now(), text: '✅ Tranquilo/a, no hace falta nada más con la app. Tu comprobante ya quedó en proceso y en breve te acreditamos 🎉' }];
+    return [{ from: 'bot', delayMs: 600, at: now(), text: '✅ Tranquilo/a, no hace falta nada más con la app. Tu imagen ya quedó en proceso y en breve te acreditamos 🎉' }];
   }
   // Si pide ayuda en cualquier paso → soporte (no lo dejamos dando vueltas).
   if (text && HELP_RE.test(text)) return supportReply(cfg);

@@ -201,7 +201,7 @@ export function buildConversationPreview(cfg: ChatRuntimeConfig, sampleName = 'M
     { step: 'credenciales', who: 'bot', text: `✅ Tu usuario ya está creado:\n👤 Usuario: *martin123*\n🔑 Contraseña: *••••*\n\n🔗 Entrá acá:\n${L.portal_login}`, linkSlot: 'portal_login' },
     { step: 'cbu', who: 'bot', text: `Perfecto 🙌 Datos para tu carga:\n🏦 Titular: *Titular CBU*\n[CBU del panel]\n${offerCbuLine(cfg)}` },
     { step: 'comprobante', who: 'user', text: '📷 [comprobante]' },
-    { step: 'validando', who: 'bot', text: '✅ Tu comprobante entró en revisión 🔎 En breve validamos y te acreditamos…' },
+    { step: 'validando', who: 'bot', text: '✅ Tu imagen entró en revisión 🔎 En breve validamos y te acreditamos…' },
     { step: 'done', who: 'bot', text: `✅ *¡Acreditado con éxito!*\n🎉 ¡Gracias por elegir ${cfg.brandName}!\n\n🎮 Entrá directo a jugar acá 👇\n${m('portal_play')}`, linkSlot: 'portal_play', linkMagic: isM('portal_play') },
     ...(cfg.postAccreditCajera ? [{ step: 'done' as const, who: 'bot' as const, text: postAccreditCajeraText(cfg), linkSlot: 'support' as const }] : []),
     { step: 'forgot', who: 'bot', text: `🔐 Tus datos de acceso:\n\n👤 Usuario: *martin123*\n🔑 Contraseña: *••••*\n\n🔗 Entrá directo acá 👇\n${m('portal_forgot')}`, linkSlot: 'portal_forgot', linkMagic: isM('portal_forgot') },

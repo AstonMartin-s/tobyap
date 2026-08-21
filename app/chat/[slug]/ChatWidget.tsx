@@ -143,7 +143,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
       const pend: string[] = [];
       if (!appInstall) pend.push('*Paso 1: Instalar app*');
       if (!appNotif) pend.push('*Paso 2: Activar notificaciones*');
-      if (pend.length) setMsgs((p) => [...p, { from: 'bot', text: `¿Pudiste con ${pend.join(' y ')}?\n\nNo te preocupes si te complicó, ya está habilitado el botón para enviar tu comprobante abajo.` }]);
+      if (pend.length) setMsgs((p) => [...p, { from: 'bot', text: `¿Pudiste con ${pend.join(' y ')}?\n\nNo te preocupes si te complicó, ya está habilitado el botón para enviar tu imagen abajo.` }]);
     }, 20000);
     return () => { clearInterval(iv); clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -174,7 +174,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     // para que la habilitación sea de verdad prolongada aunque nunca toque el botón hoy.
     if (notif && sessionKey) void subscribeWebPush();
     if ((installed || appInstall) && (notif || appNotif)) {
-      tapMenu('finish_upload', 'Enviar mi comprobante');
+      tapMenu('finish_upload', 'Enviar mi imagen');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, appInstall, appNotif]);
@@ -381,7 +381,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         setMsgs((x) => [...x, { from: 'bot', text: 'Notificaciones activadas.' }]);
       } else {
         // No concedido: no marcamos el paso, lo tiene que aceptar.
-        setMsgs((x) => [...x, { from: 'bot', text: '⚠️ Tenés que *permitir* las notificaciones para poder enviar tu comprobante. Tocá de nuevo el Paso 2 y elegí *Permitir*.' }]);
+        setMsgs((x) => [...x, { from: 'bot', text: '⚠️ Tenés que *permitir* las notificaciones para poder enviar tu imagen. Tocá de nuevo el Paso 2 y elegí *Permitir*.' }]);
       }
     } catch {
       setMsgs((x) => [...x, { from: 'bot', text: 'Tocá de nuevo el Paso 2 y aceptá el permiso.' }]);
@@ -537,8 +537,8 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
               const canSend = done || canSkip15;
               return (
                 <>
-                  <button onClick={() => canSend && tapMenu('finish_upload', 'Enviar mi comprobante')} disabled={!canSend} style={{ background: canSend ? C.send : '#cfd8d3', color: '#fff', border: 'none', borderRadius: 12, padding: '13px 18px', fontSize: 14, fontWeight: 700, cursor: canSend ? 'pointer' : 'not-allowed', minWidth: 230, textAlign: 'center' }}>
-                    Enviar mi comprobante
+                  <button onClick={() => canSend && tapMenu('finish_upload', 'Enviar mi imagen')} disabled={!canSend} style={{ background: canSend ? C.send : '#cfd8d3', color: '#fff', border: 'none', borderRadius: 12, padding: '13px 18px', fontSize: 14, fontWeight: 700, cursor: canSend ? 'pointer' : 'not-allowed', minWidth: 230, textAlign: 'center' }}>
+                    Enviar mi imagen
                   </button>
                   {!canSend && <div style={{ fontSize: 12, color: C.sub, textAlign: 'right', maxWidth: 230 }}>Completá los pasos o esperá <b>{secsLeft}s</b> para enviar directo.</div>}
                 </>
@@ -550,7 +550,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
 
       {phase === 'chat' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#F0F2F5' }}>
-          <button onClick={() => fileRef.current?.click()} title="Adjuntar comprobante" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#54656F', display: 'flex', alignItems: 'center', padding: '4px' }}>
+          <button onClick={() => fileRef.current?.click()} title="Adjuntar imagen" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#54656F', display: 'flex', alignItems: 'center', padding: '4px' }}>
             <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path></svg>
           </button>
           <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.currentTarget.value = ''; }} />
