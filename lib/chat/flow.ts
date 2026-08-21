@@ -126,10 +126,10 @@ export async function cbuStep(tenant: ResolvedTenant, cfg: ChatRuntimeConfig = D
   const cbu = s?.accountCbu ?? '';
   const titular = s?.accountName ?? '';
   const messages: BotMsg[] = [
-    { from: 'bot', delayMs: 500, at: now(), text: `Perfecto 🙌 Datos para tu carga:\n🏦 Titular: *${titular}*` },
+    { from: 'bot', delayMs: 750, at: now(), text: `Perfecto 🙌 Datos para tu carga:\n🏦 Titular: *${titular}*` },
   ];
-  if (cbu) messages.push({ from: 'bot', delayMs: 800, at: now(), text: cbu, copy: cbu }); // CBU solo + botón copiar
-  messages.push({ from: 'bot', delayMs: 900, at: now(), text: offerCbuLine(cfg) });
+  if (cbu) messages.push({ from: 'bot', delayMs: 1100, at: now(), text: cbu, copy: cbu }); // CBU solo + botón copiar
+  messages.push({ from: 'bot', delayMs: 1000, at: now(), text: offerCbuLine(cfg) });
   return { messages, data: { cbu, titular }, step: 'comprobante' };
 }
 

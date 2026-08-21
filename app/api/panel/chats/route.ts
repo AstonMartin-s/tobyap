@@ -21,6 +21,7 @@ import {
   supportMessage,
   postActionMessages,
 } from '@/lib/chat/flow';
+import { prepareBotBatch } from '@/lib/chat/stagger';
 
 export const dynamic = 'force-dynamic';
 
@@ -362,23 +363,23 @@ export async function POST(req: NextRequest) {
       note = '✅ Comprobante APROBADO manualmente desde el panel (ficha entregada en el chat).';
       break;
     case 'pending':
-      newMsgs = comprobantePendingMessages().map((m) => ({ from: 'bot', text: m.text, at: m.at }));
+      newMsgs = prepareBotBatch(comprobantePendingMessages(), { op: true });
       note = '⏳ Comprobante marcado PENDIENTE desde el panel.';
       break;
     case 'reject':
-      newMsgs = comprobanteRejectedMessages().map((m) => ({ from: 'bot', text: m.text, at: m.at }));
+      newMsgs = prepareBotBatch(comprobanteRejectedMessages(), { op: true });
       newStep = 'comprobante';
       note = '⚠️ Comprobante RECHAZADO desde el panel (se le pidió reenviar).';
       break;
     case 'support':
-      newMsgs = supportMessage(runtime).map((m) => ({ from: 'bot', text: m.text, at: m.at }));
+      newMsgs = prepareBotBatch(supportMessage(runtime), { op: true });
       note = '🙋 Se le pasó el link de soporte (walink) desde el panel.';
       break;
     case 'deposit':
     case 'withdraw':
     case 'forgot_user': {
       const r = postActionMessages(b.op, data, runtime);
-      newMsgs = r.messages.map((m) => ({ from: 'bot', text: m.text, image: m.image, at: m.at }));
+      newMsgs = prepareBotBatch(r.messages, { op: true });
       break;
     }
     case 'custom': {
@@ -406,7 +407,7 @@ export async function POST(req: NextRequest) {
   // Marcamos como del OPERADOR (op:true) todo lo que se dispara desde el panel,
   // para distinguirlo de los mensajes automáticos (BOT) en la vista. Append atómico
   // para no pisar mensajes que entren en paralelo (otro operario / supervisor / poll).
-  const opMsgs = newMsgs.map((m) => ({ ...m, op: true as const }));
+  const opMsgs = newMsgs;
   const opAppend: { step?: string; dataMerge?: Record<string, unknown> } = {};
   if (newStep) opAppend.step = newStep;
   if (operatorTookOver) opAppend.dataMerge = { operatorTookOver: true };

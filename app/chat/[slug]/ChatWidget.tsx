@@ -216,13 +216,19 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   }, [step, sessionKey, phase]);
 
   async function play(list: Msg[], nextButtons: Btn[] = []) {
+    if (!list.length) {
+      setButtons(nextButtons);
+      return;
+    }
     setButtons([]);
     for (const m of list) {
       setTyping(true);
-      await new Promise((r) => setTimeout(r, Math.min(m.delayMs ?? 900, 2200)));
+      const base = Math.min(Math.max(m.delayMs ?? 750, 450), 4000);
+      const jitter = Math.floor(Math.random() * 220);
+      await new Promise((r) => setTimeout(r, base + jitter));
       setTyping(false);
       setMsgs((p) => [...p, m]);
-      await new Promise((r) => setTimeout(r, 220));
+      await new Promise((r) => setTimeout(r, 280));
     }
     setButtons(nextButtons);
   }

@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { accountStep, cbuStep, postActionMessages, comprobanteReviewMessages } from '@/lib/chat/flow';
+import { prepareBotBatch } from '@/lib/chat/stagger';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadFields, updateLeadName, addLeadTags, updateLeadStatus } from '@/lib/kommo';
@@ -29,7 +30,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   if (b.action === 'want_account') {
     const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name }, runtime);
-    const history = [...(s.messages ?? []), ...r.messages.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }))];
+    const botMsgs = prepareBotBatch(r.messages);
+    const history = [...(s.messages ?? []), ...botMsgs];
     await db.update(chatSessions).set({ step: r.step, data: { ...(s.data ?? {}), ...r.data }, messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
     // Espejo Kommo — MISMA paridad que el bot de WhatsApp: campos PORTAL_* +
     // título del lead = username creado.
@@ -45,36 +47,39 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       updateLeadName(tenant, s.kommoLeadId, String(r.data.username)).catch(() => {});
       addLeadNote(tenant, s.kommoLeadId, `👤 Usuario Pagoda ${r.data.existing ? '(existente, recordado)' : 'creado'}: ${r.data.username}`);
     }
-    return NextResponse.json({ ok: true, messages: r.messages, buttons: r.buttons, step: r.step, total: history.length });
+    return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length });
   }
 
   if (b.action === 'want_cbu') {
     const r = await cbuStep(tenant, runtime);
-    const history = [...(s.messages ?? []), ...r.messages.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }))];
+    const botMsgs = prepareBotBatch(r.messages);
+    const history = [...(s.messages ?? []), ...botMsgs];
     // Persistimos cbu/titular en la sesión para poder re-enviarlos en los recordatorios.
     await db.update(chatSessions).set({ step: r.step, data: { ...(s.data ?? {}), ...r.data }, messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
     if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, '💳 Pidió CBU — datos entregados.');
-    return NextResponse.json({ ok: true, messages: r.messages, buttons: [], step: r.step, total: history.length });
+    return NextResponse.json({ ok: true, messages: botMsgs, buttons: [], step: r.step, total: history.length });
   }
 
   // FINALIZAR envío del comprobante: recién ahora (tras instalar app + notifs) el
   // comprobante entra en revisión y el lead se mueve a "Revisar imagen" en Kommo.
   if (b.action === 'finish_upload') {
     const msgs = comprobanteReviewMessages();
-    const history = [...(s.messages ?? []), ...msgs.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }))];
+    const botMsgs = prepareBotBatch(msgs);
+    const history = [...(s.messages ?? []), ...botMsgs];
     await db.update(chatSessions).set({ step: 'validando', messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
     if (s.kommoLeadId && tenant.statusRevisarImagenId) {
       updateLeadStatus(tenant, s.kommoLeadId, tenant.statusRevisarImagenId).catch(() => {});
       addLeadNote(tenant, s.kommoLeadId, '🔎 Comprobante en revisión (app instalada). ➡️ Chequealo y mové a Cargo$ para acreditar.');
     }
-    return NextResponse.json({ ok: true, messages: msgs, buttons: [], step: 'validando', total: history.length });
+    return NextResponse.json({ ok: true, messages: botMsgs, buttons: [], step: 'validando', total: history.length });
   }
 
   // Opciones POST-acreditación (depositar / retirar / soporte / olvidé usuario / cancelar).
   const POST_ACTIONS = ['deposit', 'withdraw', 'support', 'forgot_user', 'cancel'];
   if (POST_ACTIONS.includes(b.action)) {
     const r = postActionMessages(b.action, (s.data ?? {}) as Record<string, unknown>, runtime);
-    const history = [...(s.messages ?? []), ...r.messages.map((m) => ({ from: 'bot' as const, text: m.text, image: m.image, at: m.at }))];
+    const botMsgs = prepareBotBatch(r.messages);
+    const history = [...(s.messages ?? []), ...botMsgs];
     const patch: Record<string, unknown> = { messages: history, updatedAt: new Date() };
     if (r.step) patch.step = r.step;
     await db.update(chatSessions).set(patch).where(eq(chatSessions.id, s.id));
@@ -89,7 +94,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         updateLeadStatus(tenant, s.kommoLeadId, atencionManual, clientesPipe).catch(() => {});
       }
     }
-    return NextResponse.json({ ok: true, messages: r.messages, buttons: [], step: r.step ?? s.step, total: history.length });
+    return NextResponse.json({ ok: true, messages: botMsgs, buttons: [], step: r.step ?? s.step, total: history.length });
   }
 
   return NextResponse.json({ ok: true, messages: [], buttons: [], total: (s.messages ?? []).length });

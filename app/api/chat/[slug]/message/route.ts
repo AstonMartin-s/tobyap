@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { onFreeText, accountStep, WANT_ACCOUNT_RE } from '@/lib/chat/flow';
+import { prepareBotBatch } from '@/lib/chat/stagger';
 import { appendChatMessages } from '@/lib/chat/mutations';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // El cliente tipeó "quiero mi cuenta" en vez de tocar el botón (muy común en mobile).
   if ((s.step ?? 'welcome') === 'welcome' && WANT_ACCOUNT_RE.test(b.text)) {
     const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name }, runtime);
-    const botMsgs = r.messages.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }));
+    const botMsgs = prepareBotBatch(r.messages);
     await appendChatMessages(s.id, [userMsg, ...botMsgs], { step: r.step, dataMerge: r.data, markUnread: true });
     const history = [...(s.messages ?? []), userMsg, ...botMsgs];
     if (s.kommoLeadId && r.data.username) {
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       updateLeadName(tenant, s.kommoLeadId, String(r.data.username)).catch(() => {});
       addLeadNote(tenant, s.kommoLeadId, `👤 Usuario Pagoda ${r.data.existing ? '(existente, recordado)' : 'creado'} (por texto): ${r.data.username}`);
     }
-    return NextResponse.json({ ok: true, messages: r.messages, buttons: r.buttons, step: r.step, total: history.length });
+    return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length });
   }
 
   let replies = onFreeText(s.step ?? 'comprobante', b.text, runtime);
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (replies.length === 1 && lastBot && (lastBot.text ?? '') === (replies[0].text ?? '')) {
     replies = [];
   }
-  const botMsgs = replies.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at }));
+  const botMsgs = prepareBotBatch(replies);
   // Inbound del cliente → marca NO LEÍDO (pendiente de responder) y, si estaba
   // archivado, se reabre solo (vuelve a la bandeja). Append atómico (no pisa lo que
   // escriba el scheduler de recordatorios o el operador en paralelo).
@@ -72,5 +73,5 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, `👤 Lead: ${b.text}`);
 
-  return NextResponse.json({ ok: true, messages: replies, total: history.length });
+  return NextResponse.json({ ok: true, messages: botMsgs, total: history.length });
 }

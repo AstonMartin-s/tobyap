@@ -6,6 +6,7 @@ import { chatSessions, metaEvents, attributions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { checkWhatsApp } from '@/lib/chat/wachecker';
 import { welcomeStep } from '@/lib/chat/flow';
+import { prepareBotBatch } from '@/lib/chat/stagger';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { createChatLead, addLeadNote } from '@/lib/chat/kommoMirror';
 import { sendCapiEvent, CAPI_VALUE } from '@/lib/meta';
@@ -46,12 +47,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       const msgs = existing.messages ?? [];
       return NextResponse.json({ ok: true, resumed: true, sessionKey: existing.sessionKey, messages: msgs, buttons: [], step: existing.step ?? 'welcome', total: msgs.length, leadId: existing.kommoLeadId ?? null });
     }
-    const bot = (m: { text?: string; at: number }) => ({ from: 'bot' as const, text: m.text, at: m.at });
     const terminal = ['closed', 'no_cargo'].includes(existing.step ?? '');
     if (terminal) {
       // Vuelve tras cerrar/no-cargar: reabrimos EN LA MISMA fila con una bienvenida.
       const w = welcomeStep(b.name ?? existing.name, runtime);
-      const history = [...(existing.messages ?? []), ...w.messages.map(bot)];
+      const welcomeMsgs = prepareBotBatch(w.messages);
+      const history = [...(existing.messages ?? []), ...welcomeMsgs];
       await db.update(chatSessions).set({ step: 'welcome', messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, existing.id));
       return NextResponse.json({ ok: true, resumed: true, sessionKey: existing.sessionKey, messages: history, buttons: w.buttons, step: 'welcome', total: history.length, leadId: existing.kommoLeadId ?? null });
     }
@@ -70,6 +71,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
 
   const { messages, buttons } = welcomeStep(b.name, runtime);
+  const welcomeMsgs = prepareBotBatch(messages);
 
   await db.insert(chatSessions).values({
     tenantId: tenant.id,
@@ -83,7 +85,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     step: 'welcome',
     kommoLeadId: leadId,
     data: {},
-    messages: messages.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at })),
+    messages: welcomeMsgs,
     updatedAt: new Date(),
   });
 
@@ -124,5 +126,5 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     }
   }
 
-  return NextResponse.json({ ok: true, sessionKey, messages, buttons, step: 'welcome', leadId: leadId ?? null });
+  return NextResponse.json({ ok: true, sessionKey, messages: welcomeMsgs, buttons, step: 'welcome', leadId: leadId ?? null });
 }

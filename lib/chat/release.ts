@@ -2,6 +2,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { accreditedMessages } from '@/lib/chat/flow';
+import { prepareBotBatch } from '@/lib/chat/stagger';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import type { ResolvedTenant } from '@/lib/types';
 
@@ -80,8 +81,8 @@ export async function acreditarChat(
     if (opts.requireComprobanteStep && !['comprobante', 'app_onboarding', 'validando'].includes(s.step ?? '')) return false;
 
     const cfg = await loadChatRuntime(tenant.id, tenant.name, s.phone);
-    const acc = accreditedMessages(data.loginUrl as string | undefined, cfg);
-    const accJson = JSON.stringify(acc.map((m) => ({ from: 'bot', text: m.text, at: m.at })));
+    const acc = prepareBotBatch(accreditedMessages(data.loginUrl as string | undefined, cfg));
+    const accJson = JSON.stringify(acc.map((m) => ({ from: 'bot', text: m.text, at: m.at, delayMs: m.delayMs })));
     const now = Date.now();
 
     // UPDATE atómico con CANDADO: agrega los mensajes y marca accreditedAt solo si

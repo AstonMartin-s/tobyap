@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fmtChatTime } from '@/lib/datetime/ar';
+import { TZ_AR } from '@/lib/datetime/ar';
 import OperationsPanel from './OperationsPanel';
 
 type Item = {
@@ -26,7 +26,7 @@ type Item = {
   updatedAt: string | null;
 };
 
-type Msg = { from: 'bot' | 'user'; text?: string; image?: string; at: number; op?: boolean };
+type Msg = { from: 'bot' | 'user'; text?: string; image?: string; at: number; op?: boolean; delayMs?: number };
 
 // Nombres IGUALES al embudo de Kommo (para que el operario no traduzca).
 const STEP: Record<string, { label: string; color: string }> = {
@@ -98,7 +98,13 @@ function playChime() {
     });
   } catch { /* sin audio */ }
 }
-const fmtTime = fmtChatTime;
+const fmtTime = (at: number) => {
+  const d = new Date(at < 1e12 ? at * 1000 : at);
+  const now = new Date();
+  const sameDay = d.toLocaleDateString('es-AR', { timeZone: TZ_AR }) === now.toLocaleDateString('es-AR', { timeZone: TZ_AR });
+  const hh = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: TZ_AR });
+  return sameDay ? hh : `${d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', timeZone: TZ_AR })} ${hh}`;
+};
 const timeAgo = (iso: string | null) => {
   if (!iso) return '';
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -201,6 +207,9 @@ export function ChatsClient() {
   const atBottomRef = useRef(true);
   const scrollSelRef = useRef<string | null>(null);
   const scrollCountRef = useRef(0);
+  const visibleMsgCountRef = useRef(0);
+  const [visibleMsgCount, setVisibleMsgCount] = useState(0);
+  const revealTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   // Forzar bajada SOLO cuando el operador manda algo (no cuando entra un mensaje
   // por el poll: ahí no queremos mover al que está leyendo).
   const forceScrollRef = useRef(false);
@@ -264,13 +273,61 @@ export function ChatsClient() {
       if (s) setSel(s);
     } catch { /* ignore */ }
   }, []);
-  useEffect(() => { if (sel) loadDetail(sel); }, [sel, loadDetail]);
+  useEffect(() => {
+    revealTimersRef.current.forEach(clearTimeout);
+    revealTimersRef.current = [];
+    visibleMsgCountRef.current = 0;
+    setVisibleMsgCount(0);
+    setDetail(null);
+    if (sel) loadDetail(sel);
+  }, [sel, loadDetail]);
   useEffect(() => { setOpsOpen(false); }, [sel]); // el drawer de fichas arranca cerrado en cada chat
   useEffect(() => {
     if (!sel) return;
     const t = setInterval(() => loadDetail(sel), 6000);
     return () => clearInterval(t);
   }, [sel, loadDetail]);
+
+  // Historial al abrir: todo de una. Mensajes nuevos en vivo: de a uno (más humano).
+  useEffect(() => {
+    if (!detail) return;
+    const n = detail.messages.length;
+    const prev = visibleMsgCountRef.current;
+
+    if (n === 0) {
+      setVisibleMsgCount(0);
+      visibleMsgCountRef.current = 0;
+      return;
+    }
+    if (prev === 0) {
+      setVisibleMsgCount(n);
+      visibleMsgCountRef.current = n;
+      return;
+    }
+    if (n <= prev) {
+      setVisibleMsgCount(n);
+      visibleMsgCountRef.current = n;
+      return;
+    }
+
+    revealTimersRef.current.forEach(clearTimeout);
+    revealTimersRef.current = [];
+    let delay = 0;
+    for (let i = prev; i < n; i++) {
+      const msg = detail.messages[i];
+      const gap = msg.from === 'bot' && !msg.op
+        ? Math.min(msg.delayMs ?? 700, 1800)
+        : msg.from === 'bot' ? 450 : 80;
+      delay += gap;
+      const target = i + 1;
+      const t = setTimeout(() => {
+        setVisibleMsgCount(target);
+        visibleMsgCountRef.current = target;
+      }, delay);
+      revealTimersRef.current.push(t);
+    }
+  }, [detail]);
+
   useEffect(() => {
     const el = bodyRef.current;
     if (!el) return;
@@ -716,7 +773,7 @@ export function ChatsClient() {
             <div ref={bodyRef}
               onScroll={(e) => { const el = e.currentTarget; atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}
               style={{ flex: 1, overflowY: 'auto', padding: '1.1rem 1.2rem', paddingRight: showOpsPanel && !opsOpen ? '3.2rem' : '1.2rem', transition: 'padding-right .2s ease', display: 'flex', flexDirection: 'column', gap: '.7rem', minHeight: 0, backgroundColor: 'var(--bg, rgba(0,0,0,.18))', backgroundImage: 'radial-gradient(circle, rgba(124, 92, 255, 0.15) 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
-              {detail.messages.map((m, idx) => {
+              {detail.messages.slice(0, visibleMsgCount).map((m, idx) => {
                 // Vista de operador: el LEAD (cliente) va a la izquierda, NOSOTROS
                 // (bot/operador) a la derecha — estilo Black Dragon.
                 const mine = m.from === 'bot';

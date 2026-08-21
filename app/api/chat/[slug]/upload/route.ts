@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { onComprobante } from '@/lib/chat/flow';
+import { prepareBotBatch } from '@/lib/chat/stagger';
 import { appendChatMessages } from '@/lib/chat/mutations';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { saveComprobante } from '@/lib/storage';
@@ -41,10 +42,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // caemos a base64 en la sesión (comportamiento anterior).
   const storedPath = await saveComprobante(sessionKey, buf, mime).catch(() => null);
 
-  const replies = onComprobante();
+  const botMsgs = prepareBotBatch(onComprobante());
   const newMsgs = [
     { from: 'user' as const, image: fileUrl, at: Date.now() },
-    ...replies.map((m) => ({ from: 'bot' as const, text: m.text, at: m.at })),
+    ...botMsgs,
   ];
   // Append atómico + merge de data (no pisa mensajes ni flags concurrentes).
   await appendChatMessages(s.id, newMsgs, {
@@ -67,5 +68,5 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     addLeadNote(tenant, s.kommoLeadId, `📸 Comprobante recibido (${file.name}).\nVerlo: ${base}${fileUrl}\n(El cliente está completando la instalación de la app para enviarlo.)`);
   }
 
-  return NextResponse.json({ ok: true, messages: replies, step: 'app_onboarding', fileUrl, total: history.length });
+  return NextResponse.json({ ok: true, messages: botMsgs, step: 'app_onboarding', fileUrl, total: history.length });
 }
