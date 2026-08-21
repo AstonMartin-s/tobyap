@@ -176,10 +176,19 @@ export function supportMessage(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg
 export function accreditedMessages(loginUrl?: string | null, cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg[] {
   const useMagic = cfg.magicLinks.includes('portal_play');
   const link = (useMagic && loginUrl) ? loginUrl : cfg.links.portal_play;
-  return [
+  const msgs: BotMsg[] = [
     { from: 'bot', delayMs: 600, at: now(), text: `✅ *¡Acreditado con éxito!*\n🎉 ¡Gracias por elegir ${cfg.brandName}! Ya tenés tu saldo.\n\n🎮 Entrá directo a jugar acá 👇\n${link}` },
-    { from: 'bot', delayMs: 1200, at: now(), text: '¿Necesitás algo más? Elegí una opción 👇' },
   ];
+  if (cfg.postAccreditCajera) {
+    msgs.push({
+      from: 'bot',
+      delayMs: 900,
+      at: now(),
+      text: `💖 ¡Gracias por elegirnos!\n📲 Agendá a tu cajera para no perderte las promos activas 🔥\n📞 Número: ${cfg.links.support}`,
+    });
+  }
+  msgs.push({ from: 'bot', delayMs: 1200, at: now(), text: '¿Necesitás algo más? Elegí una opción 👇' });
+  return msgs;
 }
 
 // Opciones post-acreditación: todo empuja a operar desde el PORTAL.

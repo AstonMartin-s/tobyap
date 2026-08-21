@@ -53,7 +53,7 @@ async function main() {
   const chatConfig = (row?.chatConfig ?? {}) as Record<string, unknown>;
   const links = { ...(chatConfig.links as Record<string, string> | undefined) };
   links.support = supportLandingUrl;
-  const next = { ...chatConfig, links };
+  const next = { ...chatConfig, links, postAccreditCajera: true };
   await db
     .insert(clientSettings)
     .values({ tenantId: t.id, chatConfig: next })

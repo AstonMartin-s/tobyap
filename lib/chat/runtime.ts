@@ -22,6 +22,8 @@ export interface ChatRuntimeConfig {
   portalRefImg: string;
   links: Record<LinkSlotId, string>;
   magicLinks: LinkSlotId[];
+  /** Mensaje extra post-acreditación (cajera + link soporte). */
+  postAccreditCajera?: boolean;
 }
 
 export const DEFAULT_PORTAL_URL = 'https://greenbet.uno/login';
@@ -152,6 +154,7 @@ export function parseChatRuntime(raw: unknown, fallbackBrand = 'King'): ChatRunt
     portalRefImg: refImg.startsWith('/') ? refImg : DEFAULT_PORTAL_REF_IMG,
     links: parseLinks(o),
     magicLinks,
+    postAccreditCajera: o.postAccreditCajera === true,
   };
 }
 
@@ -194,6 +197,7 @@ export function buildConversationPreview(cfg: ChatRuntimeConfig, sampleName = 'M
     { step: 'comprobante', who: 'user', text: '📷 [comprobante]' },
     { step: 'validando', who: 'bot', text: '✅ Tu comprobante entró en revisión 🔎 En breve validamos y te acreditamos…' },
     { step: 'done', who: 'bot', text: `✅ *¡Acreditado con éxito!*\n🎉 ¡Gracias por elegir ${cfg.brandName}!\n\n🎮 Entrá directo a jugar acá 👇\n${m('portal_play')}`, linkSlot: 'portal_play', linkMagic: isM('portal_play') },
+    ...(cfg.postAccreditCajera ? [{ step: 'done' as const, who: 'bot' as const, text: `💖 ¡Gracias por elegirnos!\n📲 Agendá a tu cajera para no perderte las promos activas 🔥\n📞 Número: ${L.support}`, linkSlot: 'support' as const }] : []),
     { step: 'forgot', who: 'bot', text: `🔐 Tus datos de acceso:\n\n👤 Usuario: *martin123*\n🔑 Contraseña: *••••*\n\n🔗 Entrá directo acá 👇\n${m('portal_forgot')}`, linkSlot: 'portal_forgot', linkMagic: isM('portal_forgot') },
     { step: 'deposit', who: 'bot', text: `💰 *Cargar saldo*\nEntrá al portal y tocá *"Cargar saldo"* 👇\n${m('portal_deposit')}\n\n${offerDepositLine(cfg)}`, linkSlot: 'portal_deposit', linkMagic: isM('portal_deposit') },
     { step: 'withdraw', who: 'bot', text: `💸 *Retirar saldo*\nEntrá al portal 👇\n${m('portal_withdraw')}`, linkSlot: 'portal_withdraw', linkMagic: isM('portal_withdraw') },
