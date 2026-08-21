@@ -21,7 +21,6 @@ const BONO_OPTS = [
 ];
 
 export default function OperationsPanel({ sessionKey, onDone }: { sessionKey: string; onDone?: () => void }) {
-  const [open, setOpen] = useState(true);
   const [balance, setBalance] = useState<number | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [amount, setAmount] = useState('');
@@ -82,17 +81,8 @@ export default function OperationsPanel({ sessionKey, onDone }: { sessionKey: st
   const lbl: React.CSSProperties = { fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--muted-2,#5d6478)' };
 
   return (
-    <div style={{ ...box, display: 'flex', flexDirection: 'column', gap: '.55rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => setOpen((o) => !o)}>
-        <span style={{ fontSize: '.72rem', fontWeight: 800, color: 'var(--accent,#7c5cff)', display: 'flex', alignItems: 'center', gap: '.35rem' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-          Panel de operaciones (fichas)
-        </span>
-        <span style={{ fontSize: '.7rem', color: 'var(--muted)' }}>{open ? '▾' : '▸'}</span>
-      </div>
-
-      {open && (
-        <>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+      <>
           {/* Saldo + balance */}
           <div style={{ display: 'flex', gap: '.5rem' }}>
             <div style={{ ...box, flex: 1 }}>
@@ -151,8 +141,7 @@ export default function OperationsPanel({ sessionKey, onDone }: { sessionKey: st
           {msg && (
             <div style={{ fontSize: '.75rem', fontWeight: 600, color: msg.kind === 'ok' ? '#16a34a' : '#ef4444' }}>{msg.text}</div>
           )}
-        </>
-      )}
+      </>
     </div>
   );
 }

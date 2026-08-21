@@ -248,22 +248,39 @@ export async function POST(req: NextRequest) {
       : await withdrawOp(tenant, { username, amount: b.amount ?? 0, operator: session.slug, sessionId: s.id });
 
     if (res.ok) {
-      // Mensaje al cliente en el chat (op del operador). Atómico (contrato mutations).
-      const verb = res.type === 'deposit' ? 'acreditamos' : 'procesamos el retiro de';
-      const bonusTxt = res.type === 'deposit' && bonusPercent ? ` + ${bonusPercent}% de bono 🎁` : '';
-      const text = res.type === 'deposit'
-        ? `✅ ¡Listo! Te ${verb} $${(b.amount ?? 0).toLocaleString('es-AR')}${bonusTxt}. ¡A jugar! 🎮`
-        : `✅ ${verb} $${(b.amount ?? 0).toLocaleString('es-AR')}.`;
-      await appendChatMessages(s.id, [{ from: 'bot', text, at: Date.now(), op: true }]);
-      const tenant2 = tenant;
+      const montoTxt = `$${(b.amount ?? 0).toLocaleString('es-AR')}`;
       if (s.kommoLeadId) {
-        addLeadNote(tenant2, s.kommoLeadId, `💰 ${res.type === 'deposit' ? 'CARGA' : 'RETIRO'} $${(b.amount ?? 0).toLocaleString('es-AR')} vía panel (${session.slug}). Saldo: $${res.balance}.`);
+        addLeadNote(tenant, s.kommoLeadId, `💰 ${res.type === 'deposit' ? 'CARGA' : 'RETIRO'} ${montoTxt} vía panel (${session.slug}). Saldo: $${res.balance}.`);
       }
-      void sendPushToSession(s.id, data.pushSub, {
-        title: res.type === 'deposit' ? '¡Fichas acreditadas!' : 'Retiro procesado',
-        body: text.replace(/[✅🎁🎮]/g, '').trim(),
-        url: `/chat/${session.slug}`,
-      });
+
+      if (res.type === 'deposit') {
+        // CARGAR = ACREDITAR: misma función que "Aprobar". Acredita el chat (mensaje
+        // estándar + candado atómico), mueve el lead a Cargo$ y dispara CargoCRM a
+        // Meta. Todo idempotente: si ya se aprobó/cargó antes, no duplica.
+        await acreditarChat(tenant, { sessionKey: s.sessionKey });
+        if (s.kommoLeadId && tenant.statusCargoId) {
+          updateLeadStatus(tenant, s.kommoLeadId, tenant.statusCargoId).catch(() => {});
+        }
+        if (panelApproveEmitsCargo()) {
+          await emitCargo(tenant, {
+            kommoLeadId: s.kommoLeadId,
+            sessionKey: s.sessionKey,
+            source: 'panel',
+            operator: session.slug,
+            skipKommoStatus: true,
+            skipChatRelease: true,
+          }).catch((e) => console.error(`[panel/chats ${session.slug}] emitCargo (pa_deposit):`, e));
+        }
+        void sendPushToSession(s.id, data.pushSub, {
+          title: '¡Fichas acreditadas!',
+          body: `Te acreditamos ${montoTxt}. ¡A jugar!`,
+          url: `/chat/${session.slug}`,
+        });
+      } else {
+        // Retiro: solo mensaje informativo (no es una acreditación).
+        await appendChatMessages(s.id, [{ from: 'bot', text: `✅ Procesamos tu retiro de ${montoTxt}.`, at: Date.now(), op: true }]);
+        void sendPushToSession(s.id, data.pushSub, { title: 'Retiro procesado', body: `Procesamos tu retiro de ${montoTxt}.`, url: `/chat/${session.slug}` });
+      }
     }
     return NextResponse.json(res);
   }

@@ -126,9 +126,18 @@ export function buildPlayerUsername(name?: string | null, phone?: string, attemp
   return `${base}${suffix}`.slice(0, 18);
 }
 
+// Contraseña SIMPLE y fácil de tipear: sílabas pronunciables (consonante+vocal,
+// todo en minúscula, sin caracteres ambiguos) + 3 dígitos. Ej: "mekabu482".
+// Cumple el mínimo de 6 chars de la plataforma y es mucho más fácil que una
+// contraseña con mayúsculas/símbolos.
 export function randomPlayerPassword(): string {
-  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  const cons = 'bcdfgjkmnprstv'; // sin l/q/x/z/h/w (ambiguas o raras al dictar)
+  const vow = 'aeiou';
+  const pick = (s: string) => s[Math.floor(Math.random() * s.length)];
+  let word = '';
+  for (let i = 0; i < 3; i++) word += pick(cons) + pick(vow); // 3 sílabas = 6 letras
+  const digits = String(Math.floor(100 + Math.random() * 900)); // 3 dígitos
+  return word + digits; // 9 chars, todo minúscula, pronunciable
 }
 
 // Crea el jugador reintentando con otro username si el elegido ya existe.

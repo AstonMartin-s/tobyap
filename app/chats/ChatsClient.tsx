@@ -152,6 +152,8 @@ export function ChatsClient() {
   const [delLead, setDelLead] = useState(false);
   const [stats, setStats] = useState<Array<{ step: string | null; createdAt: string | null }>>([]);
   const [tenantProvider, setTenantProvider] = useState<string>('pagoda');
+  const [opsOpen, setOpsOpen] = useState(false);
+  const showOpsPanel = tenantProvider === 'partner_api' && !!sel && !!detail?.username;
   // Ancho de la lista (barra divisora arrastrable, estilo Black Dragon).
   const [listW, setListW] = useState(380);
   const listWRef = useRef(380);
@@ -263,6 +265,7 @@ export function ChatsClient() {
     } catch { /* ignore */ }
   }, []);
   useEffect(() => { if (sel) loadDetail(sel); }, [sel, loadDetail]);
+  useEffect(() => { setOpsOpen(false); }, [sel]); // el drawer de fichas arranca cerrado en cada chat
   useEffect(() => {
     if (!sel) return;
     const t = setInterval(() => loadDetail(sel), 6000);
@@ -622,7 +625,7 @@ export function ChatsClient() {
       </div>
 
       {/* DETALLE */}
-      <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+      <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', position: 'relative' }}>
         {!detail ? (
           <div className="empty" style={{ padding: '3rem', margin: 'auto' }}>Elegí un chat para ver la conversación.</div>
         ) : (
@@ -709,7 +712,7 @@ export function ChatsClient() {
 
             <div ref={bodyRef}
               onScroll={(e) => { const el = e.currentTarget; atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}
-              style={{ flex: 1, overflowY: 'auto', padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '.7rem', minHeight: 0, backgroundColor: 'var(--bg, rgba(0,0,0,.18))', backgroundImage: 'radial-gradient(circle, rgba(124, 92, 255, 0.15) 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
+              style={{ flex: 1, overflowY: 'auto', padding: '1.1rem 1.2rem', paddingRight: showOpsPanel && !opsOpen ? '3.2rem' : '1.2rem', transition: 'padding-right .2s ease', display: 'flex', flexDirection: 'column', gap: '.7rem', minHeight: 0, backgroundColor: 'var(--bg, rgba(0,0,0,.18))', backgroundImage: 'radial-gradient(circle, rgba(124, 92, 255, 0.15) 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
               {detail.messages.map((m, idx) => {
                 // Vista de operador: el LEAD (cliente) va a la izquierda, NOSOTROS
                 // (bot/operador) a la derecha — estilo Black Dragon.
@@ -789,16 +792,53 @@ export function ChatsClient() {
                   </>
                 );
               })()}
-              {/* Panel de operaciones (saldo real) — solo clientes Partner API (bblack). */}
-              {tenantProvider === 'partner_api' && detail.username && sel && (
-                <OperationsPanel sessionKey={sel} onDone={() => sel && loadDetail(sel)} />
-              )}
               <div style={{ display: 'flex', gap: '.4rem', marginTop: '.1rem' }}>
                 <input className="input" placeholder="Mensaje libre al cliente…" value={custom}
                   onChange={(e) => setCustom(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && custom.trim()) { act('custom', custom); setCustom(''); } }}
                   style={{ flex: 1, padding: '.5rem .7rem', fontSize: '.85rem' }} />
                 <button disabled={busy || !custom.trim()} onClick={() => { act('custom', custom); setCustom(''); }} style={abtn('var(--accent)', true)}>Enviar</button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* DRAWER LATERAL de operaciones — se desliza desde la derecha, dentro del
+            chat. Solo clientes Partner API (bblack) con usuario creado. */}
+        {showOpsPanel && detail && sel && (
+          <>
+            {/* Handle para abrir (pestaña en el borde derecho, visible al cerrar) */}
+            <button onClick={() => setOpsOpen(true)}
+              title="Panel de fichas"
+              style={{
+                position: 'absolute', top: '50%', right: 0, transform: `translateY(-50%) translateX(${opsOpen ? '120%' : '0'})`,
+                zIndex: 8, transition: 'transform .28s cubic-bezier(.4,0,.2,1)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.35rem',
+                padding: '.7rem .45rem', border: '1px solid var(--accent)', borderRight: 'none',
+                borderRadius: '10px 0 0 10px', background: 'var(--accent-soft, rgba(124,92,255,.12))',
+                color: 'var(--accent,#7c5cff)', cursor: 'pointer', fontWeight: 700, fontSize: '.68rem',
+              }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+              <span style={{ writingMode: 'vertical-rl', letterSpacing: '.05em' }}>FICHAS</span>
+            </button>
+
+            {/* Panel deslizante */}
+            <div style={{
+              position: 'absolute', top: 0, right: 0, bottom: 0, width: 340, maxWidth: '85%',
+              transform: opsOpen ? 'translateX(0)' : 'translateX(100%)',
+              transition: 'transform .28s cubic-bezier(.4,0,.2,1)', zIndex: 9,
+              background: 'var(--card, #14151b)', borderLeft: '1px solid var(--border)',
+              boxShadow: '-10px 0 30px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column', minHeight: 0,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.7rem .9rem', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                <span style={{ fontSize: '.8rem', fontWeight: 800, color: 'var(--accent,#7c5cff)', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                  Panel de fichas
+                </span>
+                <button onClick={() => setOpsOpen(false)} title="Cerrar" style={{ border: 'none', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1, padding: '.1rem .3rem' }}>✕</button>
+              </div>
+              <div style={{ padding: '.8rem', overflowY: 'auto', minHeight: 0, flex: 1 }}>
+                <OperationsPanel sessionKey={sel} onDone={() => sel && loadDetail(sel)} />
               </div>
             </div>
           </>
