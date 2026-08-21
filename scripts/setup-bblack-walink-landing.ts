@@ -22,7 +22,8 @@ async function main() {
   const config: Record<string, string | number | boolean | null> = {
     ...prev,
     noCode: true,
-    useFixedNumber: prev.useFixedNumber ?? true,
+    useFixedNumber: false, // rotación en categoría soporte (números activos del panel)
+    waNumber: '',
     ccpp: '',
     campaign: 'Soporte',
     message: supportMessage,

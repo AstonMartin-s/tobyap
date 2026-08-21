@@ -63,13 +63,15 @@ export default async function NamedLanding({
 
   const [s] = await db.select().from(clientSettings).where(eq(clientSettings.tenantId, t.id));
   const c = (lp.config ?? {}) as Record<string, string | number | boolean | null>;
-  // waNumber manual en la landing = solo fallback si no hay números en la categoría.
-  const fixedWa = c.waNumber != null && String(c.waNumber).replace(/\D/g, '') !== '' ? c.waNumber : null;
+  const fixedWa =
+    c.waNumber != null && String(c.waNumber).replace(/\D/g, '') !== ''
+      ? String(c.waNumber).replace(/\D/g, '')
+      : null;
   // Rotación round-robin entre los números ACTIVOS de la categoría (tipo) de la
-  // landing (sección Números de contacto). Se puede desactivar con
-  // config.useFixedNumber = true, para que la landing use SIEMPRE su número fijo
-  // sin importar qué números activos haya en esa categoría.
-  const rotated = c.useFixedNumber ? null : await pickNumberByCategory(t.id, lp.type);
+  // landing. useFixedNumber solo bloquea rotación si hay waNumber configurado;
+  // si está vacío, cae a rotación (evita "No disponible" con números soporte activos).
+  const wantsFixed = c.useFixedNumber === true && fixedWa;
+  const rotated = wantsFixed ? null : await pickNumberByCategory(t.id, lp.type);
   const cfg: LandingConfig = {
     tenantSlug: t.slug,
     pixelId: String(c.pixelId ?? t.metaPixelId ?? ''),

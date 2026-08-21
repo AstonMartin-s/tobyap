@@ -74,11 +74,12 @@ export default async function Landing({
   const [s] = await db.select().from(clientSettings).where(eq(clientSettings.tenantId, t.id));
   const lp = found.landing;
   const c = (lp?.config ?? {}) as Record<string, string | number | boolean | null>;
-  // Rotación entre los números activos de la categoría (tipo) de la landing,
-  // salvo que la landing pida número fijo (config.useFixedNumber).
-  const rotated = c.useFixedNumber ? null : await pickNumberByCategory(t.id, lp?.type);
-  // waNumber manual = solo fallback si no hay números en la categoría.
-  const fixedWa = c.waNumber != null && String(c.waNumber).replace(/\D/g, '') !== '' ? c.waNumber : null;
+  const fixedWa =
+    c.waNumber != null && String(c.waNumber).replace(/\D/g, '') !== ''
+      ? String(c.waNumber).replace(/\D/g, '')
+      : null;
+  const wantsFixed = c.useFixedNumber === true && fixedWa;
+  const rotated = wantsFixed ? null : await pickNumberByCategory(t.id, lp?.type);
   const cfg: LandingConfig = {
     tenantSlug: t.slug,
     pixelId: String(c.pixelId ?? t.metaPixelId ?? ''),
