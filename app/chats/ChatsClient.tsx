@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fmtChatTime } from '@/lib/datetime/ar';
+import { BANDEJA_LIMIT } from '@/lib/chat/bandeja';
 import OperationsPanel from './OperationsPanel';
 
 type Item = {
@@ -114,7 +115,7 @@ const isActive = (i: Item): boolean => !i.archived && i.step !== 'done' && i.ste
 // antigüedad pero con comprobante o mensaje sin leer).
 const isOpen = (i: Item): boolean => !i.blocked && i.step !== 'done' && i.step !== 'no_cargo' && i.step !== 'closed';
 // "Activos" (bandeja) = activo Y con actividad en los últimos 30 min. Si pasa ese
-// tiempo sin movimiento, sale de Activos (sigue en su etapa / Todos).
+// tiempo sin movimiento, sale de Activos (sigue en su etapa / Inbox).
 const within30 = (iso: string | null): boolean => !!iso && (Date.now() - new Date(iso).getTime()) <= 30 * 60000;
 const isActivoReciente = (i: Item): boolean => isActive(i) && within30(i.updatedAt);
 // Predicado a nivel módulo (para detectar atención nueva en el poll).
@@ -139,7 +140,7 @@ export function ChatsClient() {
   const [detail, setDetail] = useState<{ messages: Msg[]; phone: string | null; name: string | null; username: string | null; step: string | null; kommoLeadId: number | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [custom, setCustom] = useState('');
-  const [filter, setFilter] = useState<'todos' | 'revisar' | 'no_leidos' | 'activos' | 'acreditados' | 'no_cargo' | 'archivadas'>('todos');
+  const [filter, setFilter] = useState<'inbox' | 'revisar' | 'no_leidos' | 'activos' | 'acreditados' | 'no_cargo' | 'archivadas'>('inbox');
   const [q, setQ] = useState('');
   const [kpiRange, setKpiRange] = useState<'hoy' | 'ayer' | 'siempre'>('hoy');
   const [exportOpen, setExportOpen] = useState(false);
@@ -388,7 +389,8 @@ export function ChatsClient() {
   // En pestañas terminales la fuente es la lista dedicada del server (no las 200
   // recientes), así que no quedan vacías aunque el estado sea viejo.
   const source = termView ? termItems : items;
-  const shown = source.filter((i) => {
+  const shown = source
+    .filter((i) => {
     if (ql) {
       const hay = `${i.name ?? ''} ${i.username ?? ''} ${i.phone ?? ''} ${i.campaign ?? ''}`.toLowerCase();
       if (!hay.includes(ql)) return false;
@@ -402,9 +404,14 @@ export function ChatsClient() {
     if (filter === 'revisar') return needsReview(i);
     if (filter === 'no_leidos') return noLeido(i);
     if (filter === 'activos') return isActivoReciente(i);
-    if (i.archived) return false; // Todos y Activos ocultan archivados
+    if (i.archived) return false; // Inbox y Activos ocultan archivados
     return true;
-  });
+  })
+    .sort((a, b) => {
+      const ta = new Date(a.lastAt ?? a.updatedAt ?? 0).getTime();
+      const tb = new Date(b.lastAt ?? b.updatedAt ?? 0).getTime();
+      return tb - ta;
+    });
 
   const counts = {
     atencion: items.filter(needsAttention).length,
@@ -552,7 +559,7 @@ export function ChatsClient() {
         </div>
         <div style={{ display: 'flex', gap: '.3rem', padding: '0 .6rem .6rem', borderBottom: '1px solid var(--border)', flexShrink: 0, flexWrap: 'wrap' }}>
           {([
-            ['todos', 'Todos', null, '#8b93a9'],
+            ['inbox', 'Inbox', null, '#8b93a9'],
             ['no_leidos', 'No leídos', counts.noLeidos, '#22c55e'],
             ['revisar', 'Revisar', counts.revisar, '#f97316'],
             ['activos', 'Activos', counts.activos, '#8b93a9'],
@@ -569,6 +576,11 @@ export function ChatsClient() {
             );
           })}
         </div>
+        {filter === 'inbox' && (
+          <div style={{ fontSize: '.62rem', color: 'var(--muted-2,#5d6478)', padding: '0 .6rem .4rem', lineHeight: 1.35 }}>
+            No archivados · orden por último mensaje · máx. {BANDEJA_LIMIT} en curso (cargo, no cargó y revisar no se archivan solos)
+          </div>
+        )}
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
           {shown.length === 0 && <div className="empty" style={{ padding: '2rem' }}>Sin chats.</div>}
           {shown.map((i) => {

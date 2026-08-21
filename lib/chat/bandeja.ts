@@ -2,16 +2,40 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 
-/** Máximo de chats no archivados en la bandeja "Todos". El resto se archiva solo. */
-export const BANDEJA_LIMIT = 30;
+/** Máximo de chats “en curso” en Inbox. Cargo$, No cargó y Revisar no cuentan para este tope. */
+export const BANDEJA_LIMIT = 50;
+
+type Msg = { from?: string; image?: string };
+
+function hasUserComprobante(messages: unknown): boolean {
+  if (!Array.isArray(messages)) return false;
+  return messages.some((m) => {
+    const x = m as Msg;
+    return x?.from === 'user' && !!x.image;
+  });
+}
+
+/** No se auto-archivan: Cargo$ (done), No cargó, o cola Revisar (validando / comprobante pendiente). */
+export function isBandejaProtected(step: string | null | undefined, messages: unknown): boolean {
+  if (step === 'done' || step === 'no_cargo') return true;
+  if (step === 'validando') return true;
+  if (step === 'closed') return false;
+  const open = step !== 'done' && step !== 'no_cargo' && step !== 'closed';
+  return open && hasUserComprobante(messages);
+}
 
 /**
- * Mantiene solo los N chats más recientes sin archivar. Los demás se archivan
- * automáticamente (vuelven si el cliente escribe — ver /message y /upload).
+ * Mantiene Inbox acotado: archiva automáticamente los chats en curso más viejos
+ * cuando pasan de BANDEJA_LIMIT. Cargo$, No cargó y Revisar quedan siempre en Inbox.
+ * Reapertura: cliente escribe o manda comprobante → archived false (message/upload).
  */
 export async function trimBandeja(tenantId: string): Promise<number> {
   const rows = await db
-    .select({ id: chatSessions.id })
+    .select({
+      id: chatSessions.id,
+      step: chatSessions.step,
+      messages: chatSessions.messages,
+    })
     .from(chatSessions)
     .where(
       and(
@@ -21,9 +45,14 @@ export async function trimBandeja(tenantId: string): Promise<number> {
     )
     .orderBy(desc(chatSessions.updatedAt));
 
-  if (rows.length <= BANDEJA_LIMIT) return 0;
+  const trimmable: string[] = [];
+  for (const r of rows) {
+    if (!isBandejaProtected(r.step, r.messages)) trimmable.push(r.id);
+  }
 
-  const ids = rows.slice(BANDEJA_LIMIT).map((r) => r.id);
+  if (trimmable.length <= BANDEJA_LIMIT) return 0;
+
+  const ids = trimmable.slice(BANDEJA_LIMIT);
   await db
     .update(chatSessions)
     .set({

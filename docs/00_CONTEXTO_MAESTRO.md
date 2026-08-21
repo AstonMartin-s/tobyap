@@ -116,9 +116,16 @@ apunta a prod) → correr off-hours; impacto = una fila temporal.
 - **Sesión de panel stateless (cookie HMAC 8h)**: login multi-compu OK, sin límite.
 - Pendiente Fase D (opcional): señal visual de qué chat tiene abierto cada operario.
 
-### 2026-08-20 — Bandeja Todos: máx 30 chats + auto-archivo
+### 2026-08-21 — Inbox (antes “Todos”): máx 50 en curso + exentos
 
-- Regla: en "Todos" solo los 30 chats no archivados más recientes. El resto se archiva
+- Pestaña **Inbox** (no archivados, orden por último mensaje / `updatedAt`).
+- Auto-archivo: solo chats **en curso** más viejos cuando pasan de 50 (`BANDEJA_LIMIT`).
+- **Exentos** (nunca auto-archivan): Cargo$ (`done`), No cargó (`no_cargo`), Revisar (`validando` o comprobante pendiente).
+- Archivados solo en pestaña Archivadas; cliente que vuelve a escribir → `archived: false` (ya existía).
+
+### 2026-08-20 — Bandeja Todos: máx 30 chats + auto-archivo (superseded por Inbox 50)
+
+- Regla anterior: en "Todos" solo los 30 chats no archivados más recientes. El resto se archiva
   automáticamente (`lib/chat/bandeja.ts`, `trimBandeja` en GET panel/chats).
 - Reapertura: ya existía — cliente escribe o manda comprobante → `archived: false`.
 - Revisar / No leídos siguen mostrando archivados con comprobante pendiente o sin leer.

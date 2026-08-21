@@ -27,7 +27,7 @@ export const dynamic = 'force-dynamic';
 type Msg = { from: 'bot' | 'user'; text?: string; image?: string; at: number; op?: boolean };
 
 // GET /api/panel/chats  → lista de sesiones del tenant logueado (panel operador).
-// Por defecto devuelve las 200 más recientes (bandeja de trabajo). Las pestañas
+// Por defecto devuelve las 200 más recientes (Inbox de trabajo). Las pestañas
 // terminales (Acreditados / No cargó / Archivadas) son estados viejos que caen
 // fuera de esas 200, así que se piden aparte con ?view= para que la lista no
 // quede vacía aunque el contador (calculado sobre toda la base) diga que hay.
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
   let where = base;
   let limit = 200;
 
-  // Bandeja principal: auto-archivar lo que cae fuera del top 30 recientes.
+  // Bandeja Inbox: auto-archivar chats en curso que exceden el tope (cargo/no cargo/revisar exentos).
   if (!view) await trimBandeja(session.tenantId);
 
   if (view === 'done' || view === 'no_cargo') {
