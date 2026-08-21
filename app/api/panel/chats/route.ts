@@ -87,11 +87,12 @@ export async function GET(req: NextRequest) {
   );
 
   // Stats sobre TODA la base (solo step + fecha, liviano) para que los KPIs no
-  // queden capados por el límite de 200 de la lista.
-  const statRows = await db
-    .select({ step: chatSessions.step, createdAt: chatSessions.createdAt })
+  // queden capados por el límite de 200 de la lista. Excluye campaña Test (testeo).
+  const statRowsRaw = await db
+    .select({ step: chatSessions.step, createdAt: chatSessions.createdAt, campaign: chatSessions.campaign })
     .from(chatSessions)
     .where(eq(chatSessions.tenantId, session.tenantId));
+  const statRows = statRowsRaw.filter((s) => (s.campaign ?? '').toLowerCase() !== 'test');
 
   const items = allRows.map((s) => {
     const msgs = (s.messages ?? []) as Msg[];

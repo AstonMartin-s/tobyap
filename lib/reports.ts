@@ -8,6 +8,14 @@ const AR_TZ = 'America/Argentina/Buenos_Aires';
 // MISMA expresión; si fuera $param, Postgres las ve distintas y falla el group by.
 const dayExpr = sql<string>`to_char(${metaEvents.sentAt} AT TIME ZONE 'America/Argentina/Buenos_Aires', 'YYYY-MM-DD')`;
 
+/** Campañas de testeo interno — las filas quedan en DB pero NO suman en reportes. */
+export const REPORT_EXCLUDE_CAMPAIGNS = ['test'];
+
+/** SQL: excluye eventos de campañas de prueba (case-insensitive). */
+function notTestCampaign() {
+  return sql`(lower(${metaEvents.campaignId}) not in ('test') OR ${metaEvents.campaignId} is null)`;
+}
+
 export function todayAR(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: AR_TZ }).format(new Date()); // YYYY-MM-DD
 }
@@ -73,7 +81,7 @@ export async function getClientKpis(
   tenantId: string,
   opts: { campaign?: string; start?: string; end?: string } = {},
 ): Promise<ClientKpis> {
-  const conds = [eq(metaEvents.tenantId, tenantId), ...range(opts.start, opts.end)];
+  const conds = [eq(metaEvents.tenantId, tenantId), notTestCampaign(), ...range(opts.start, opts.end)];
   if (opts.campaign) conds.push(eq(metaEvents.campaignId, opts.campaign));
 
   const rows = await db
@@ -134,7 +142,7 @@ export async function getAdminReport(start?: string, end?: string): Promise<Clie
       n: sql<number>`count(${metaEvents.id})::int`,
     })
     .from(tenants)
-    .leftJoin(metaEvents, and(eq(metaEvents.tenantId, tenants.id), ...range(start, end)))
+    .leftJoin(metaEvents, and(eq(metaEvents.tenantId, tenants.id), notTestCampaign(), ...range(start, end)))
     .where(eq(tenants.role, 'client'))
     .groupBy(tenants.id, tenants.slug, tenants.name, metaEvents.eventType);
 
@@ -177,7 +185,7 @@ export async function getDayCards(day = todayAR()): Promise<DayCard[]> {
   const ev = await db
     .select({ tenantId: metaEvents.tenantId, type: metaEvents.eventType, n: sql<number>`count(*)::int` })
     .from(metaEvents)
-    .where(sql`${dayExpr} = ${day}`)
+    .where(sql`${dayExpr} = ${day} AND ${notTestCampaign()}`)
     .groupBy(metaEvents.tenantId, metaEvents.eventType);
 
   const ts = await db.select({ id: tenants.id, slug: tenants.slug, name: tenants.name }).from(tenants).where(eq(tenants.role, 'client'));
@@ -237,6 +245,7 @@ export async function getDailyReport(opts: { start?: string; end?: string; tenan
   if (opts.start) conds.push(gte(metaEvents.sentAt, shift(opts.start, -1)));
   if (opts.end) conds.push(lte(metaEvents.sentAt, shift(opts.end, +2)));
   if (opts.tenantId) conds.push(eq(metaEvents.tenantId, opts.tenantId));
+  conds.push(notTestCampaign());
 
   const ev = await db
     .select({ tenantId: metaEvents.tenantId, day: dayExpr, type: metaEvents.eventType, n: sql<number>`count(*)::int` })
