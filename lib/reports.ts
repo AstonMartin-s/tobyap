@@ -286,6 +286,46 @@ export async function getDailyReport(opts: { start?: string; end?: string; tenan
     }
   }
 
+  // Días sin eventos (p. ej. tras reset de contadores) deben aparecer con 0/0.
+  if (opts.tenantId) {
+    const t = tById.get(opts.tenantId);
+    if (t) {
+      const rangeEnd = opts.end ?? todayAR();
+      const tenantDays = [...map.values()].filter((r) => r.tenantId === opts.tenantId).map((r) => r.day);
+      let fillStart: string | null = null;
+      if (opts.start && opts.end) {
+        fillStart = opts.start;
+      } else if (opts.start) {
+        fillStart = opts.start;
+      } else if (tenantDays.length > 0) {
+        const newest = tenantDays.reduce((a, b) => (a > b ? a : b));
+        fillStart = shiftDayAR(newest, 1);
+      }
+      if (fillStart && fillStart <= rangeEnd) {
+        for (let d = fillStart; d <= rangeEnd; d = shiftDayAR(d, 1)) {
+          if (!inRange(d)) continue;
+          const key = `${opts.tenantId}|${d}`;
+          if (map.has(key)) continue;
+          const l = ledByKey.get(key);
+          map.set(key, {
+            tenantId: opts.tenantId,
+            slug: t.slug,
+            name: t.name,
+            day: d,
+            chats: 0,
+            cargas: 0,
+            gasto: l?.gasto ?? 0,
+            recarga: l?.ingreso ?? 0,
+            conversion: 0,
+            costPerChat: 0,
+            costPerCarga: 0,
+            saldo: 0,
+          });
+        }
+      }
+    }
+  }
+
   const rows = [...map.values()];
   // Saldo corriente por cliente: Σ(recarga − gasto) de TODO el ledger del cliente
   // hasta ese día (incluye historia previa al rango mostrado).

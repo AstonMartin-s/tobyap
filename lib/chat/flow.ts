@@ -13,6 +13,7 @@ import {
   offerCbuLine,
   offerDepositLine,
   type ChatRuntimeConfig,
+  postAccreditCajeraText,
 } from '@/lib/chat/runtime';
 
 export interface Btn { id: string; label: string }
@@ -184,7 +185,7 @@ export function accreditedMessages(loginUrl?: string | null, cfg: ChatRuntimeCon
       from: 'bot',
       delayMs: 900,
       at: now(),
-      text: `💖 ¡Gracias por elegirnos!\n📲 Agendá a tu cajera para no perderte las promos activas 🔥\n📞 Número: ${cfg.links.support}`,
+      text: postAccreditCajeraText(cfg),
     });
   }
   msgs.push({ from: 'bot', delayMs: 1200, at: now(), text: '¿Necesitás algo más? Elegí una opción 👇' });

@@ -17,6 +17,7 @@ async function main() {
     .from(landings)
     .where(and(eq(landings.tenantId, t.id), eq(landings.landingSlug, landingSlug)));
 
+  const supportMessage = 'Hola! vengo del chat y quiero mi promo 🎰';
   const prev = (existing?.config ?? {}) as Record<string, string | number | boolean | null>;
   const config: Record<string, string | number | boolean | null> = {
     ...prev,
@@ -24,7 +25,7 @@ async function main() {
     useFixedNumber: prev.useFixedNumber ?? true,
     ccpp: '',
     campaign: 'Soporte',
-    message: String(prev.message || 'Hola, vengo por soporte'),
+    message: supportMessage,
     headline: String(prev.headline || 'Te redirigimos a soporte…'),
     subtext: String(prev.subtext || 'WhatsApp · atención 24hs'),
     redirectDelayMs: prev.redirectDelayMs ?? 1200,

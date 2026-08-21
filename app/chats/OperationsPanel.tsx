@@ -88,7 +88,7 @@ export default function OperationsPanel({ sessionKey, onDone }: { sessionKey: st
             <div style={{ ...box, flex: 1 }}>
               <div style={lbl}>Saldo actual</div>
               <div style={{ fontSize: '1.05rem', fontWeight: 800 }}>{balance == null ? '—' : money(balance)}</div>
-              <button className="tt" data-tt="Consulta el saldo en vivo en la plataforma" disabled={busy} onClick={consult}
+              <button className="tt tt--down tt--down-left" data-tt="Consulta el saldo en vivo en la plataforma" disabled={busy} onClick={consult}
                 style={{ marginTop: '.25rem', fontSize: '.7rem', padding: '.2rem .5rem', border: '1px solid var(--border)', borderRadius: 6, background: 'transparent', color: 'var(--muted)', cursor: 'pointer' }}>
                 ↻ Consultar
               </button>
