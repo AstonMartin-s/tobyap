@@ -38,12 +38,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let b: Record<string, string | undefined>;
+  let raw: Record<string, unknown>;
   try {
-    b = await req.json();
+    raw = await req.json();
   } catch {
     return NextResponse.json({ error: 'JSON inválido' }, { status: 400, headers: CORS });
   }
+  const b = raw as Record<string, string | undefined>;
+  const skipCode = raw.noCode === true || raw.noCode === 'true';
   if (!b.slug) return NextResponse.json({ error: 'slug requerido' }, { status: 400, headers: CORS });
 
   const tenant = await getTenantBySlug(b.slug);
@@ -85,7 +87,7 @@ export async function POST(req: NextRequest) {
   });
 
   // 2) Token de atribución — omitir si la landing pidió noCode (soporte/walink sin CRM).
-  if (b.noCode === true || b.noCode === 'true') {
+  if (skipCode) {
     return NextResponse.json({ ok: true, noCode: true, bono, campaignId }, { headers: CORS });
   }
 
