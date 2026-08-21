@@ -349,7 +349,7 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
         )}
 
         {(tab === 'identidad' || tab === 'oferta' || tab === 'links') && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: 0, width: '100%', maxWidth: 460 }}>
             <section className="card">
               <div className="card__title">Cabecera del chat</div>
               <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)', fontFamily: 'system-ui, sans-serif' }}>
