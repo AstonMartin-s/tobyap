@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fmtChatTime } from '@/lib/datetime/ar';
-import { BANDEJA_LIMIT } from '@/lib/chat/bandeja';
+import { BANDEJA_LIMIT } from '@/lib/chat/bandeja-config';
 import OperationsPanel from './OperationsPanel';
 
 type Item = {

@@ -2,8 +2,7 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 
-/** Máximo de chats “en curso” en Inbox. Cargo$, No cargó y Revisar no cuentan para este tope. */
-export const BANDEJA_LIMIT = 50;
+import { BANDEJA_LIMIT } from '@/lib/chat/bandeja-config';
 
 type Msg = { from?: string; image?: string };
 
