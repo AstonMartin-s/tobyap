@@ -173,23 +173,15 @@ export function supportMessage(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg
 }
 
 // ── Paso 5: CARGO (se emite recién cuando el operador mueve el lead) ───────
-// Acá SÍ usamos el magic-link de Pagoda (primer acceso directo, loguea de una).
+// Un solo mensaje: acreditado + jugar + walink cajera (sin bloque de 3 burbujas).
 export function accreditedMessages(loginUrl?: string | null, cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg[] {
   const useMagic = cfg.magicLinks.includes('portal_play');
   const link = (useMagic && loginUrl) ? loginUrl : cfg.links.portal_play;
-  const msgs: BotMsg[] = [
-    { from: 'bot', delayMs: 600, at: now(), text: `✅ *¡Acreditado con éxito!*\n🎉 ¡Gracias por elegir ${cfg.brandName}! Ya tenés tu saldo.\n\n🎮 Entrá directo a jugar acá 👇\n${link}` },
-  ];
+  let text = `✅ *¡Acreditado con éxito!*\n🎉 ¡Gracias por elegir ${cfg.brandName}! Ya tenés tu saldo.\n\n🎮 Entrá directo a jugar acá 👇\n${link}`;
   if (cfg.postAccreditCajera) {
-    msgs.push({
-      from: 'bot',
-      delayMs: 900,
-      at: now(),
-      text: postAccreditCajeraText(cfg),
-    });
+    text += `\n\n${postAccreditCajeraText(cfg)}`;
   }
-  msgs.push({ from: 'bot', delayMs: 1200, at: now(), text: '¿Necesitás algo más? Elegí una opción 👇' });
-  return msgs;
+  return [{ from: 'bot', delayMs: 800, at: now(), text }];
 }
 
 // Opciones post-acreditación: todo empuja a operar desde el PORTAL.

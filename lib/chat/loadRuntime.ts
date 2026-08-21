@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { clientSettings } from '@/db/schema';
 import { phoneCandidates } from '@/lib/phone';
-import { parseChatRuntime, type ChatRuntimeConfig, type OfferType } from '@/lib/chat/runtime';
+import { parseChatRuntime, type ChatRuntimeConfig, type OfferType, walinkSupportUrl } from '@/lib/chat/runtime';
 
 function clampNum(v: unknown, min: number, max: number, fallback: number): number {
   const n = typeof v === 'number' ? v : Number(v);
@@ -41,6 +41,7 @@ export async function loadChatRuntime(
   tenantId: string,
   fallbackBrand: string,
   phone?: string | null,
+  tenantSlug?: string,
 ): Promise<ChatRuntimeConfig> {
   try {
     const [row] = await db
@@ -50,8 +51,15 @@ export async function loadChatRuntime(
       .limit(1);
     const raw = row?.chatConfig;
     const base = parseChatRuntime(raw, fallbackBrand);
+    if (tenantSlug) {
+      const o = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+      const ld = typeof o.landingDomain === 'string' ? o.landingDomain : '';
+      base.links = { ...base.links, support: walinkSupportUrl(tenantSlug, ld || undefined) };
+    }
     return applyPhoneTestRuntime(base, raw, phone);
   } catch {
-    return parseChatRuntime({}, fallbackBrand);
+    const base = parseChatRuntime({}, fallbackBrand);
+    if (tenantSlug) base.links = { ...base.links, support: walinkSupportUrl(tenantSlug) };
+    return base;
   }
 }

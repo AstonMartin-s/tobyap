@@ -9,6 +9,7 @@ import {
   LINK_SLOTS,
   LINK_SLOT_IDS,
   parseChatRuntime,
+  walinkSupportUrl,
   type LinkSlotId,
   type OfferType,
 } from '@/lib/chat/runtime';
@@ -28,6 +29,8 @@ export async function GET() {
     const row = await loadRow(session.tenantId);
     const brand = parseChatConfig(row?.chatConfig, session.slug, session.slug);
     const runtime = parseChatRuntime(row?.chatConfig, brand.brandName);
+    const ld = (row?.chatConfig as Record<string, unknown> | null)?.landingDomain;
+    runtime.links.support = walinkSupportUrl(session.slug, typeof ld === 'string' ? ld : undefined);
     const landingDomain = (row?.chatConfig as Record<string, unknown> | null)?.landingDomain;
     return NextResponse.json({
       ok: true,

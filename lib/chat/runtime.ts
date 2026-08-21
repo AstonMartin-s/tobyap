@@ -105,9 +105,15 @@ export const DEFAULT_RUNTIME: ChatRuntimeConfig = {
   postAccreditCajera: true,
 };
 
-/** Mensaje post-acreditación: agendar cajera (antes de las opciones del menú). */
 export function postAccreditCajeraText(cfg: ChatRuntimeConfig): string {
-  return `💖 ¡Gracias por elegirnos!\n📲 Agendá a tu cajera para no perderte las promos activas 🔥\n📞 Número: ${cfg.links.support}`;
+  return `📲 Agendá a tu cajera para no perderte las promos activas 🔥\n📞 Número: ${cfg.links.support}`;
+}
+
+/** Link de soporte del chat: siempre landing walink (rotación), nunca wa.me directo. */
+export function walinkSupportUrl(slug: string, landingOrigin?: string): string {
+  const raw = (landingOrigin || process.env.NEXT_PUBLIC_LANDING_ORIGIN || 'https://go.fichaslibres.online').trim();
+  const host = raw.replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
+  return `https://${host}/l/${slug}/walink?campaign=Soporte`;
 }
 
 function clampNum(v: unknown, min: number, max: number, fallback: number): number {
@@ -202,8 +208,11 @@ export function buildConversationPreview(cfg: ChatRuntimeConfig, sampleName = 'M
     { step: 'cbu', who: 'bot', text: `Perfecto 🙌 Datos para tu carga:\n🏦 Titular: *Titular CBU*\n[CBU del panel]\n${offerCbuLine(cfg)}` },
     { step: 'comprobante', who: 'user', text: '📷 [comprobante]' },
     { step: 'validando', who: 'bot', text: '✅ Tu imagen entró en revisión 🔎 En breve validamos y te acreditamos…' },
-    { step: 'done', who: 'bot', text: `✅ *¡Acreditado con éxito!*\n🎉 ¡Gracias por elegir ${cfg.brandName}!\n\n🎮 Entrá directo a jugar acá 👇\n${m('portal_play')}`, linkSlot: 'portal_play', linkMagic: isM('portal_play') },
-    ...(cfg.postAccreditCajera ? [{ step: 'done' as const, who: 'bot' as const, text: postAccreditCajeraText(cfg), linkSlot: 'support' as const }] : []),
+    { step: 'done', who: 'bot', text: (() => {
+      const play = m('portal_play');
+      const base = `✅ *¡Acreditado con éxito!*\n🎉 ¡Gracias por elegir ${cfg.brandName}!\n\n🎮 Entrá directo a jugar acá 👇\n${play}`;
+      return cfg.postAccreditCajera ? `${base}\n\n${postAccreditCajeraText(cfg)}` : base;
+    })(), linkSlot: 'portal_play', linkMagic: isM('portal_play') },
     { step: 'forgot', who: 'bot', text: `🔐 Tus datos de acceso:\n\n👤 Usuario: *martin123*\n🔑 Contraseña: *••••*\n\n🔗 Entrá directo acá 👇\n${m('portal_forgot')}`, linkSlot: 'portal_forgot', linkMagic: isM('portal_forgot') },
     { step: 'deposit', who: 'bot', text: `💰 *Cargar saldo*\nEntrá al portal y tocá *"Cargar saldo"* 👇\n${m('portal_deposit')}\n\n${offerDepositLine(cfg)}`, linkSlot: 'portal_deposit', linkMagic: isM('portal_deposit') },
     { step: 'withdraw', who: 'bot', text: `💸 *Retirar saldo*\nEntrá al portal 👇\n${m('portal_withdraw')}`, linkSlot: 'portal_withdraw', linkMagic: isM('portal_withdraw') },

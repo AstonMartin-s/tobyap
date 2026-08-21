@@ -33,7 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ ok: false, error: wa.reason === 'sin WhatsApp' ? 'Ese número no tiene WhatsApp. Poné el correcto para recibir tu bonificación.' : 'Número inválido. Revisá que esté completo.' }, { status: 422 });
   }
 
-  const runtime = await loadChatRuntime(tenant.id, tenant.name, wa.phone);
+  const runtime = await loadChatRuntime(tenant.id, tenant.name, wa.phone, tenant.slug);
 
   // DEDUPE POR TELÉFONO
   const existing = await db.query.chatSessions.findFirst({

@@ -24,7 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // Bloqueado: ignoramos el mensaje (no se guarda, no reabre la bandeja).
   if ((s.data as Record<string, unknown> | null)?.blocked) return NextResponse.json({ ok: true, messages: [], blocked: true });
 
-  const runtime = await loadChatRuntime(tenant.id, tenant.name, s.phone);
+  const runtime = await loadChatRuntime(tenant.id, tenant.name, s.phone, tenant.slug);
 
   const userMsg = { from: 'user' as const, text: b.text, at: Date.now() };
 

@@ -80,7 +80,7 @@ export async function acreditarChat(
     // approve del panel es explícito → pasa requireComprobanteStep=false.
     if (opts.requireComprobanteStep && !['comprobante', 'app_onboarding', 'validando'].includes(s.step ?? '')) return false;
 
-    const cfg = await loadChatRuntime(tenant.id, tenant.name, s.phone);
+    const cfg = await loadChatRuntime(tenant.id, tenant.name, s.phone, tenant.slug);
     const acc = prepareBotBatch(accreditedMessages(data.loginUrl as string | undefined, cfg));
     const accJson = JSON.stringify(acc.map((m) => ({ from: 'bot', text: m.text, at: m.at, delayMs: m.delayMs })));
     const now = Date.now();
