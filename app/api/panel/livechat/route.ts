@@ -13,6 +13,7 @@ import {
   type LinkSlotId,
   type OfferType,
 } from '@/lib/chat/runtime';
+import { parsePanelQuick, parseTemplates } from '@/lib/chat/templates';
 import { saveBrandAvatar } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
@@ -70,6 +71,8 @@ export async function PUT(req: NextRequest) {
     links?: Partial<Record<LinkSlotId, string>>;
     magicLinks?: LinkSlotId[];
     landingDomain?: string;
+    templates?: Record<string, string>;
+    panelQuick?: { barPlaceholder?: string; barPresets?: string[] };
   };
 
   // Normaliza el dominio del landing del cliente a un origin https limpio (sin
@@ -102,6 +105,12 @@ export async function PUT(req: NextRequest) {
     portalUrl: mergedLinks.portal_login,
     supportUrl: mergedLinks.support,
     landingDomain: typeof body.landingDomain === 'string' ? normDomain(body.landingDomain) : prev.landingDomain,
+    templates: body.templates && typeof body.templates === 'object'
+      ? parseTemplates(body.templates)
+      : parseTemplates(prev.templates),
+    panelQuick: body.panelQuick && typeof body.panelQuick === 'object'
+      ? parsePanelQuick(body.panelQuick)
+      : parsePanelQuick(prev.panelQuick),
   };
   const [saved] = await db
     .insert(clientSettings)

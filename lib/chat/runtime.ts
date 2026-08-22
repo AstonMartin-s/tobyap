@@ -1,6 +1,9 @@
 // Config de guion del chat (oferta, links). Vive en client_settings.chat_config.
 // flow.ts lee esto con fallback a los valores actuales de King — sin config = igual que hoy.
 
+import type { MessageTemplateId, PanelQuickTexts } from '@/lib/chat/templates';
+import { DEFAULT_TEMPLATES, parsePanelQuick, parseTemplates } from '@/lib/chat/templates';
+
 export type OfferType = 'bonus' | 'fichas';
 
 export const LINK_SLOT_IDS = [
@@ -24,6 +27,10 @@ export interface ChatRuntimeConfig {
   magicLinks: LinkSlotId[];
   /** Mensaje extra post-acreditación (cajera + link soporte). */
   postAccreditCajera?: boolean;
+  /** Textos del guion (override por tenant). */
+  templates?: Partial<Record<MessageTemplateId, string>>;
+  /** Placeholder y atajos de la barra del operador en Chats. */
+  panelQuick?: PanelQuickTexts;
 }
 
 export const DEFAULT_PORTAL_URL = 'https://greenbet.uno/login';
@@ -106,7 +113,34 @@ export const DEFAULT_RUNTIME: ChatRuntimeConfig = {
 };
 
 export function postAccreditCajeraText(cfg: ChatRuntimeConfig): string {
-  return `Queres un EXTRA? 📲 Agendá a tu cajera para no perderte las promos activas 🔥\n📞 Número: ${cfg.links.support}\n📸 Pasale la captura y recibí +1000 EXTRAS de regalo 🎁🤑`;
+  return renderTemplate('accredited_cajera', cfg);
+}
+
+export function renderTemplate(
+  id: MessageTemplateId,
+  cfg: ChatRuntimeConfig,
+  vars: Record<string, string> = {},
+): string {
+  const raw = cfg.templates?.[id]?.trim() || DEFAULT_TEMPLATES[id];
+  const map: Record<string, string> = {
+    brand: cfg.brandName,
+    support: cfg.links.support,
+    portal_login: cfg.links.portal_login,
+    portal_play: vars.portal_play ?? cfg.links.portal_play,
+    portal_deposit: vars.portal_deposit ?? cfg.links.portal_deposit,
+    portal_withdraw: vars.portal_withdraw ?? cfg.links.portal_withdraw,
+    portal_forgot: vars.portal_forgot ?? cfg.links.portal_forgot,
+    offer_welcome: offerWelcomeLine(cfg),
+    offer_deposit: offerDepositLine(cfg),
+    offer_cbu: offerCbuLine(cfg),
+    titular: vars.titular ?? '',
+    cbu: vars.cbu ?? '',
+    username: vars.username ?? '',
+    password: vars.password ?? '',
+    creds_block: vars.creds_block ?? '',
+    ...vars,
+  };
+  return raw.replace(/\{(\w+)\}/g, (_, key: string) => map[key] ?? `{${key}}`);
 }
 
 /** Link de soporte del chat: siempre landing walink (rotación), nunca wa.me directo. */
@@ -167,6 +201,8 @@ export function parseChatRuntime(raw: unknown, fallbackBrand = 'King'): ChatRunt
     links: parseLinks(o),
     magicLinks,
     postAccreditCajera: o.postAccreditCajera !== false,
+    templates: parseTemplates(o.templates),
+    panelQuick: parsePanelQuick(o.panelQuick),
   };
 }
 

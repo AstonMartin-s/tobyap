@@ -363,11 +363,11 @@ export async function POST(req: NextRequest) {
       note = '✅ Comprobante APROBADO manualmente desde el panel (ficha entregada en el chat).';
       break;
     case 'pending':
-      newMsgs = prepareBotBatch(comprobantePendingMessages(), { op: true });
+      newMsgs = prepareBotBatch(comprobantePendingMessages(runtime), { op: true });
       note = '⏳ Comprobante marcado PENDIENTE desde el panel.';
       break;
     case 'reject':
-      newMsgs = prepareBotBatch(comprobanteRejectedMessages(), { op: true });
+      newMsgs = prepareBotBatch(comprobanteRejectedMessages(runtime), { op: true });
       newStep = 'comprobante';
       note = '⚠️ Comprobante RECHAZADO desde el panel (se le pidió reenviar).';
       break;

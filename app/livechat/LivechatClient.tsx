@@ -11,6 +11,13 @@ import {
   type OfferType,
   type PreviewBubble,
 } from '@/lib/chat/runtime';
+import {
+  DEFAULT_PANEL_QUICK,
+  DEFAULT_TEMPLATES,
+  TEMPLATE_UI_GROUPS,
+  type MessageTemplateId,
+  type PanelQuickTexts,
+} from '@/lib/chat/templates';
 
 type Brand = { brandName: string; primaryColor: string; avatarUrl: string | null };
 
@@ -18,6 +25,7 @@ const TABS = [
   { id: 'identidad', label: 'Identidad' },
   { id: 'oferta', label: 'Oferta' },
   { id: 'links', label: 'Links' },
+  { id: 'guion', label: 'Guion' },
   { id: 'preview', label: 'Vista previa' },
 ] as const;
 
@@ -73,7 +81,16 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
   const [linkBono, setLinkBono] = useState('A2');
   const [linkCampaign, setLinkCampaign] = useState('');
   const [landingDomain, setLandingDomain] = useState('');
+  const [panelQuick, setPanelQuick] = useState<PanelQuickTexts>(DEFAULT_PANEL_QUICK);
+  const [presetDraft, setPresetDraft] = useState('');
   const [copied, setCopied] = useState(false);
+
+  function templateVal(id: MessageTemplateId): string {
+    return runtime.templates?.[id] ?? DEFAULT_TEMPLATES[id];
+  }
+  function setTemplate(id: MessageTemplateId, value: string) {
+    setRuntime({ ...runtime, templates: { ...runtime.templates, [id]: value } });
+  }
 
   const genLink = (() => {
     // Prioridad: dominio propio del cliente (subdominio) → dominio público
@@ -89,11 +106,18 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
   const preview = useMemo(() => buildConversationPreview(runtime, 'Martín'), [runtime]);
 
   useEffect(() => {
+    try {
+      const p = new URL(window.location.href).searchParams.get('tab');
+      if (p === 'guion' || p === 'mensajes') setTab('guion');
+    } catch { /* ignore */ }
     fetch('/api/panel/livechat')
       .then((r) => r.json())
       .then((d) => {
         if (d.brand) setBrand(d.brand);
-        if (d.runtime) setRuntime(d.runtime);
+        if (d.runtime) {
+          setRuntime(d.runtime);
+          if (d.runtime.panelQuick) setPanelQuick({ ...DEFAULT_PANEL_QUICK, ...d.runtime.panelQuick });
+        }
         if (typeof d.landingDomain === 'string') setLandingDomain(d.landingDomain.replace(/^https?:\/\//, ''));
       })
       .catch(() => setMsg('No se pudo leer la config (¿falta columna chat_config en DB?)'));
@@ -116,12 +140,17 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
           links: runtime.links,
           magicLinks: runtime.magicLinks,
           landingDomain,
+          templates: runtime.templates,
+          panelQuick,
         }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error ?? 'error');
       if (d.brand) setBrand(d.brand);
-      if (d.runtime) setRuntime(d.runtime);
+      if (d.runtime) {
+        setRuntime(d.runtime);
+        if (d.runtime.panelQuick) setPanelQuick({ ...DEFAULT_PANEL_QUICK, ...d.runtime.panelQuick });
+      }
       if (typeof d.landingDomain === 'string') setLandingDomain(d.landingDomain.replace(/^https?:\/\//, ''));
       setMsg('✓ Guardado. Los chats nuevos toman esta configuración.');
     } catch (e) {
@@ -142,7 +171,10 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
       const d = await r.json();
       if (!r.ok) throw new Error(d.error ?? 'error');
       if (d.brand) setBrand(d.brand);
-      if (d.runtime) setRuntime(d.runtime);
+      if (d.runtime) {
+        setRuntime(d.runtime);
+        if (d.runtime.panelQuick) setPanelQuick({ ...DEFAULT_PANEL_QUICK, ...d.runtime.panelQuick });
+      }
       setMsg('✓ Foto actualizada');
     } catch (e) {
       setMsg('Error: ' + (e as Error).message);
@@ -158,7 +190,7 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
       <div className="page-head" style={{ marginBottom: '1rem' }}>
         <div className="page-head__text">
           <h1>Ajustes de chat</h1>
-          <p>Piel del widget + guion configurable (oferta y links). Sin config guardada = valores actuales de King.</p>
+          <p>Piel del widget + guion editable (oferta, links y mensajes). Sin config guardada = valores actuales de King.</p>
         </div>
       </div>
 
@@ -348,7 +380,68 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
           </section>
         )}
 
-        {(tab === 'identidad' || tab === 'oferta' || tab === 'links') && (
+        {tab === 'guion' && (
+          <section className="card" style={{ maxWidth: 920 }}>
+            <div className="card__title">Guion del bot + barra del operador</div>
+            <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '0 0 .85rem', lineHeight: 1.45 }}>
+              Editá cada mensaje del flujo. Variables: <code>{'{support}'}</code>, <code>{'{portal_play}'}</code>, <code>{'{brand}'}</code>, etc. (se reemplazan con los Links al enviar).
+            </p>
+            {TEMPLATE_UI_GROUPS.map((group) => (
+              <div key={group.title} style={{ marginBottom: '1.1rem' }}>
+                <div style={{ fontWeight: 700, fontSize: '.82rem', marginBottom: '.35rem' }}>{group.title}</div>
+                {group.hint && <p style={{ color: 'var(--muted-2)', fontSize: '.72rem', margin: '0 0 .5rem' }}>{group.hint}</p>}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '.65rem' }}>
+                  {group.items.map((item) => (
+                    <div key={item.id} className="field" style={{ margin: 0 }}>
+                      <label style={{ display: 'flex', justifyContent: 'space-between', gap: '.5rem' }}>
+                        <span>{item.label}</span>
+                        <span style={{ color: 'var(--muted-2)', fontSize: '.68rem', fontFamily: 'monospace' }}>{item.vars.join(' ') || '—'}</span>
+                      </label>
+                      <textarea
+                        className="input"
+                        rows={Math.min(8, Math.max(3, templateVal(item.id).split('\n').length + 1))}
+                        value={templateVal(item.id)}
+                        onChange={(e) => setTemplate(item.id, e.target.value)}
+                        style={{ fontSize: '.8rem', lineHeight: 1.45, resize: 'vertical' }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '.9rem' }}>
+              <div style={{ fontWeight: 700, fontSize: '.82rem', marginBottom: '.45rem' }}>Barra de texto (panel Chats)</div>
+              <div className="field">
+                <label>Placeholder</label>
+                <input className="input" value={panelQuick.barPlaceholder ?? ''} onChange={(e) => setPanelQuick({ ...panelQuick, barPlaceholder: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Atajos del operador</label>
+                {(panelQuick.barPresets ?? []).map((p, i) => (
+                  <div key={i} style={{ display: 'flex', gap: '.4rem', marginBottom: '.35rem' }}>
+                    <input className="input" value={p} onChange={(e) => {
+                      const next = [...(panelQuick.barPresets ?? [])];
+                      next[i] = e.target.value;
+                      setPanelQuick({ ...panelQuick, barPresets: next });
+                    }} style={{ flex: 1, fontSize: '.8rem' }} />
+                    <button type="button" className="btn" style={{ padding: '.35rem .6rem' }} onClick={() => {
+                      setPanelQuick({ ...panelQuick, barPresets: (panelQuick.barPresets ?? []).filter((_, j) => j !== i) });
+                    }}>✕</button>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: '.4rem', marginTop: '.35rem' }}>
+                  <input className="input" placeholder="Nuevo atajo…" value={presetDraft} onChange={(e) => setPresetDraft(e.target.value)} style={{ flex: 1, fontSize: '.8rem' }} />
+                  <button type="button" className="btn" disabled={!presetDraft.trim()} onClick={() => {
+                    setPanelQuick({ ...panelQuick, barPresets: [...(panelQuick.barPresets ?? []), presetDraft.trim()] });
+                    setPresetDraft('');
+                  }}>+ Agregar</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {(tab === 'identidad' || tab === 'oferta' || tab === 'links' || tab === 'guion') && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: 0, width: '100%', maxWidth: 460 }}>
             <section className="card">
               <div className="card__title">Cabecera del chat</div>

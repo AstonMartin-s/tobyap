@@ -6,6 +6,7 @@ import { getTenantBySlug } from '@/lib/tenants';
 import { onComprobante } from '@/lib/chat/flow';
 import { prepareBotBatch } from '@/lib/chat/stagger';
 import { appendChatMessages } from '@/lib/chat/mutations';
+import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { saveComprobante } from '@/lib/storage';
 import { signFilePath } from '@/lib/chat/fileToken';
@@ -42,7 +43,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // caemos a base64 en la sesión (comportamiento anterior).
   const storedPath = await saveComprobante(sessionKey, buf, mime).catch(() => null);
 
-  const botMsgs = prepareBotBatch(onComprobante());
+  const runtime = await loadChatRuntime(tenant.id, tenant.name, s.phone, tenant.slug);
+
+  const botMsgs = prepareBotBatch(onComprobante(runtime));
   const newMsgs = [
     { from: 'user' as const, image: fileUrl, at: Date.now() },
     ...botMsgs,

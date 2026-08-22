@@ -1,7 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TZ_AR } from '@/lib/datetime/ar';
+import { DEFAULT_PANEL_QUICK, type PanelQuickTexts } from '@/lib/chat/templates';
 import OperationsPanel from './OperationsPanel';
 
 type Item = {
@@ -201,6 +203,7 @@ export function ChatsClient() {
     if (next) { playChime(); if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {}); }
   }
   const [toast, setToast] = useState<string | null>(null);
+  const [panelQuick, setPanelQuick] = useState<PanelQuickTexts>(DEFAULT_PANEL_QUICK);
   const bodyRef = useRef<HTMLDivElement>(null);
   // Autoscroll SOLO si el operador ya está al fondo (o abrió otro chat). Si está
   // leyendo hacia arriba, el poll no lo debe arrastrar hacia abajo.
@@ -265,6 +268,14 @@ export function ChatsClient() {
     }
   }, []);
 
+  useEffect(() => {
+    fetch('/api/panel/livechat')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.runtime?.panelQuick) setPanelQuick({ ...DEFAULT_PANEL_QUICK, ...d.runtime.panelQuick });
+      })
+      .catch(() => { /* sin config */ });
+  }, []);
   useEffect(() => { loadList(); const t = setInterval(loadList, 8000); return () => clearInterval(t); }, [loadList]);
   // Si llegamos desde el Embudo con ?s=<sessionKey>, abrimos ese chat.
   useEffect(() => {
@@ -837,7 +848,14 @@ export function ChatsClient() {
                 return (
                   <>
                     <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span style={{ fontSize: '.6rem', fontWeight: 700, color: 'var(--muted-2,#5d6478)', textTransform: 'uppercase', letterSpacing: '.04em', marginRight: '.15rem' }}>Comprob.</span>
+                      <Link href="/livechat?tab=guion" className="tt" data-tt="Editar guion y mensajes del bot (Ajustes de chat)"
+                        style={{
+                          fontSize: '.6rem', fontWeight: 700, color: 'var(--accent,#7c5cff)', textTransform: 'uppercase',
+                          letterSpacing: '.04em', marginRight: '.15rem', textDecoration: 'none', padding: '.2rem .35rem',
+                          borderRadius: 6, border: '1px solid rgba(124,92,255,.35)', background: 'rgba(124,92,255,.08)',
+                        }}>
+                        Editar
+                      </Link>
                       <button className="tt" data-tt="Comprobante válido → acredita y pasa a Cargo$ (dispara la conversión a Meta)" disabled={busy} onClick={() => act('approve')} style={opStyle('#16a34a', true)}>{ICONS.approve} Aprobar</button>
                       <button className="tt" data-tt="En revisión — le avisa que estamos validando" disabled={busy} onClick={() => act('pending')} style={opStyle()}>{ICONS.pending} Pendiente</button>
                       <button className="tt" data-tt="Comprobante ilegible/incompleto — le pide reenviarlo" disabled={busy} onClick={() => act('reject')} style={opStyle('#f59e0b')}>{ICONS.reject} Erróneo</button>
@@ -852,12 +870,24 @@ export function ChatsClient() {
                   </>
                 );
               })()}
-              <div style={{ display: 'flex', gap: '.4rem', marginTop: '.1rem' }}>
-                <input className="input" placeholder="Mensaje libre al cliente…" value={custom}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem', marginTop: '.1rem' }}>
+                {(panelQuick.barPresets ?? []).length > 0 && (
+                  <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>
+                    {(panelQuick.barPresets ?? []).map((p) => (
+                      <button key={p} type="button" disabled={busy} onClick={() => setCustom(p)}
+                        style={{ fontSize: '.72rem', padding: '.28rem .55rem', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--card-2)', color: 'var(--muted)', cursor: 'pointer', maxWidth: '100%', textAlign: 'left' }}>
+                        {p.length > 48 ? `${p.slice(0, 48)}…` : p}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '.4rem' }}>
+                <input className="input" placeholder={panelQuick.barPlaceholder ?? 'Mensaje libre al cliente…'} value={custom}
                   onChange={(e) => setCustom(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && custom.trim()) { act('custom', custom); setCustom(''); } }}
                   style={{ flex: 1, padding: '.5rem .7rem', fontSize: '.85rem' }} />
                 <button disabled={busy || !custom.trim()} onClick={() => { act('custom', custom); setCustom(''); }} style={abtn('var(--accent)', true)}>Enviar</button>
+                </div>
               </div>
             </div>
           </>

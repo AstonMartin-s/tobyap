@@ -63,7 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // FINALIZAR envío del comprobante: recién ahora (tras instalar app + notifs) el
   // comprobante entra en revisión y el lead se mueve a "Revisar imagen" en Kommo.
   if (b.action === 'finish_upload') {
-    const msgs = comprobanteReviewMessages();
+    const msgs = comprobanteReviewMessages(runtime);
     const botMsgs = prepareBotBatch(msgs);
     const history = [...(s.messages ?? []), ...botMsgs];
     await db.update(chatSessions).set({ step: 'validando', messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));

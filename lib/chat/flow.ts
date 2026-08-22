@@ -9,11 +9,11 @@ import {
   DEFAULT_PORTAL_URL,
   DEFAULT_SUPPORT_URL,
   DEFAULT_PORTAL_REF_IMG,
-  offerWelcomeLine,
   offerCbuLine,
   offerDepositLine,
   type ChatRuntimeConfig,
   postAccreditCajeraText,
+  renderTemplate,
 } from '@/lib/chat/runtime';
 
 export interface Btn { id: string; label: string }
@@ -46,7 +46,7 @@ export function welcomeStep(name?: string | null, cfg: ChatRuntimeConfig = DEFAU
   return {
     messages: [{
       from: 'bot', delayMs: 500, at: now(),
-      text: `${hi} Un gusto atenderte 🎰\nBienvenido a *${cfg.brandName}*.\n\n${offerWelcomeLine(cfg)}`,
+      text: `${hi} ${renderTemplate('welcome_body', cfg)}`,
     }],
     buttons: [{ id: 'want_account', label: 'Quiero mi cuenta 🎁' }],
   };
@@ -66,7 +66,7 @@ export async function accountStep(
     acc = await createPortalAccount(tenant, { phone: session.phone, name: portalName });
   } catch {
     return {
-      messages: [{ from: 'bot', delayMs: 1200, at: now(), text: 'Uy, tuve un problemita con tu usuario. Un asesor te ayuda en un momento 🙌' }],
+      messages: [{ from: 'bot', delayMs: 1200, at: now(), text: renderTemplate('account_error', cfg) }],
       buttons: [], data: { credsError: true }, step: 'error',
     };
   }
@@ -74,12 +74,12 @@ export async function accountStep(
   const creds = `\n\n👤 Usuario: *${acc.username}*\n🔑 Contraseña: *${acc.password}*\n\n🔗 Entrá acá:\n${cfg.links.portal_login}`;
   const messages: BotMsg[] = acc.existing
     ? [
-        { from: 'bot', delayMs: 600, at: now(), text: 'Dejame chequear tu cuenta… 👀' },
-        { from: 'bot', delayMs: 1500, at: now(), text: `👋 *¡Ya tenés cuenta con nosotros!* Te la recuerdo:${creds}` },
+        { from: 'bot', delayMs: 600, at: now(), text: renderTemplate('account_checking', cfg) },
+        { from: 'bot', delayMs: 1500, at: now(), text: renderTemplate('account_existing', cfg, { creds_block: creds }) },
       ]
     : [
-        { from: 'bot', delayMs: 600, at: now(), text: 'Genial 🙌 Te estoy creando tu usuario, dame un segundo…' },
-        { from: 'bot', delayMs: 1800, at: now(), text: `✅ *¡Felicitaciones!* Tu usuario ya está creado:${creds}` },
+        { from: 'bot', delayMs: 600, at: now(), text: renderTemplate('account_creating', cfg) },
+        { from: 'bot', delayMs: 1800, at: now(), text: renderTemplate('account_done', cfg, { creds_block: creds }) },
       ];
 
   return {
@@ -105,8 +105,8 @@ async function accountStepPartnerApi(
     const creds = `\n\n👤 Usuario: *${username}*\n🔑 Contraseña: *${password}*\n\n🔗 Entrá acá:\n${cfg.links.portal_login}`;
     return {
       messages: [
-        { from: 'bot', delayMs: 600, at: now(), text: 'Genial 🙌 Te estoy creando tu usuario, dame un segundo…' },
-        { from: 'bot', delayMs: 1800, at: now(), text: `✅ *¡Felicitaciones!* Tu usuario ya está creado:${creds}` },
+        { from: 'bot', delayMs: 600, at: now(), text: renderTemplate('account_creating', cfg) },
+        { from: 'bot', delayMs: 1800, at: now(), text: renderTemplate('account_done', cfg, { creds_block: creds }) },
       ],
       buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
       data: { username, password, loginUrl: null, portalName: username, existing: false },
@@ -114,7 +114,7 @@ async function accountStepPartnerApi(
     };
   } catch {
     return {
-      messages: [{ from: 'bot', delayMs: 1200, at: now(), text: 'Uy, tuve un problemita con tu usuario. Un asesor te ayuda en un momento 🙌' }],
+      messages: [{ from: 'bot', delayMs: 1200, at: now(), text: renderTemplate('account_error', cfg) }],
       buttons: [], data: { credsError: true }, step: 'error',
     };
   }
@@ -126,7 +126,7 @@ export async function cbuStep(tenant: ResolvedTenant, cfg: ChatRuntimeConfig = D
   const cbu = s?.accountCbu ?? '';
   const titular = s?.accountName ?? '';
   const messages: BotMsg[] = [
-    { from: 'bot', delayMs: 750, at: now(), text: `Perfecto 🙌 Datos para tu carga:\n🏦 Titular: *${titular}*` },
+    { from: 'bot', delayMs: 750, at: now(), text: renderTemplate('cbu_intro', cfg, { titular }) },
   ];
   if (cbu) messages.push({ from: 'bot', delayMs: 1100, at: now(), text: cbu, copy: cbu }); // CBU solo + botón copiar
   messages.push({ from: 'bot', delayMs: 1000, at: now(), text: offerCbuLine(cfg) });
@@ -137,38 +137,34 @@ export async function cbuStep(tenant: ResolvedTenant, cfg: ChatRuntimeConfig = D
 // Al subir la foto NO entra directo a revisión: primero el usuario debe instalar
 // la app y activar notificaciones (paso a paso) para "terminar de enviar" el
 // comprobante. Sin eso, no se envía y no puede reclamar el bono.
-export function onComprobante(): BotMsg[] {
+export function onComprobante(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg[] {
   return [
-    { from: 'bot', delayMs: 900, at: now(), text: 'Recibimos tu imagen! Último paso y la enviamos a revisión 👇' },
-    { from: 'bot', delayMs: 1400, at: now(), text: '📲 Instalá la app y activá las notificaciones — así te acreditamos más rápido y recibís tus bonos cada semana 🎁' },
+    { from: 'bot', delayMs: 900, at: now(), text: renderTemplate('comprobante_upload_1', cfg) },
+    { from: 'bot', delayMs: 1400, at: now(), text: renderTemplate('comprobante_upload_2', cfg) },
   ];
 }
 
-// Cuando completa los pasos: recién ahí el comprobante entra en revisión.
-export function comprobanteReviewMessages(): BotMsg[] {
+export function comprobanteReviewMessages(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg[] {
   return [
-    { from: 'bot', delayMs: 700, at: now(), text: '✅ ¡Listo! Tu imagen entró en revisión 🔎 En breve validamos y te acreditamos tu saldo + bono 🎉' },
+    { from: 'bot', delayMs: 700, at: now(), text: renderTemplate('comprobante_review', cfg) },
   ];
 }
 
-// Acciones manuales del operador desde el panel: comprobante pendiente / erróneo.
-// (El "aprobado" reutiliza accreditedMessages.)
-export function comprobantePendingMessages(): BotMsg[] {
+export function comprobantePendingMessages(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg[] {
   return [
-    { from: 'bot', delayMs: 500, at: now(), text: '⏳ Estamos revisando tu comprobante. Aguardá unos minutos que ya te confirmamos la acreditación 🙌' },
+    { from: 'bot', delayMs: 500, at: now(), text: renderTemplate('comprobante_pending', cfg) },
   ];
 }
 
-export function comprobanteRejectedMessages(): BotMsg[] {
+export function comprobanteRejectedMessages(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg[] {
   return [
-    { from: 'bot', delayMs: 500, at: now(), text: '⚠️ No pudimos validar el comprobante. Reenvialo por acá 📸 pero que se vea *completo y legible*:\n\n• *Nombre de quien envía* (titular de la cuenta)\n• *Nombre de quien recibe* (destinatario)\n• *Fecha* e *importe*\n\nAsí lo acreditamos al toque 🎁' },
+    { from: 'bot', delayMs: 500, at: now(), text: renderTemplate('comprobante_rejected', cfg) },
   ];
 }
 
-// Mensaje de soporte / walink suelto (lo entrega el operador cuando hace falta).
 export function supportMessage(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg[] {
   return [
-    { from: 'bot', delayMs: 400, at: now(), text: `🙋 Para ayudarte mejor, escribinos por WhatsApp y te atendemos al toque, 24hs 👇\n${cfg.links.support}` },
+    { from: 'bot', delayMs: 400, at: now(), text: renderTemplate('support', cfg) },
   ];
 }
 
@@ -177,7 +173,7 @@ export function accreditedMessages(loginUrl?: string | null, cfg: ChatRuntimeCon
   const useMagic = cfg.magicLinks.includes('portal_play');
   const link = (useMagic && loginUrl) ? loginUrl : cfg.links.portal_play;
   const msgs: BotMsg[] = [
-    { from: 'bot', delayMs: 700, at: now(), text: `✅ *¡Acreditado con éxito!*\n🎉 ¡Gracias por elegir ${cfg.brandName}! Ya tenés tu saldo.\n\n🎮 Entrá directo a jugar acá 👇\n${link}` },
+    { from: 'bot', delayMs: 700, at: now(), text: renderTemplate('accredited', cfg, { portal_play: link }) },
   ];
   if (cfg.postAccreditCajera) {
     msgs.push({ from: 'bot', delayMs: 1100, at: now(), text: postAccreditCajeraText(cfg) });
@@ -201,13 +197,13 @@ export function postActionMessages(action: string, data: Record<string, unknown>
   ];
   switch (action) {
     case 'deposit':
-      return { messages: ref(`💰 *Cargar saldo*\nEntrá al portal y tocá *"Cargar saldo"* 👇\n${portalUrl('portal_deposit')}\n\n${offerDepositLine(cfg)}`) };
+      return { messages: ref(renderTemplate('post_deposit', cfg, { portal_deposit: portalUrl('portal_deposit') })) };
     case 'withdraw':
-      return { messages: ref(`💸 *Retirar saldo*\nEntrá al portal y tocá *"Retirar saldo"* 👇\n${portalUrl('portal_withdraw')}\n\nCargá tu CBU en "Mi cuenta bancaria" y listo.`) };
+      return { messages: ref(renderTemplate('post_withdraw', cfg, { portal_withdraw: portalUrl('portal_withdraw') })) };
     case 'support':
-      return { messages: [{ from: 'bot', delayMs: 600, at: now(), text: `🙋 *Soporte*\nEscribinos por WhatsApp y te atendemos al toque, 24hs 👇\n${cfg.links.support}` }] };
+      return { messages: [{ from: 'bot', delayMs: 600, at: now(), text: renderTemplate('support', cfg) }] };
     case 'forgot_user':
-      return { messages: [{ from: 'bot', delayMs: 600, at: now(), text: `🔐 Tus datos de acceso:\n\n👤 Usuario: *${user}*\n🔑 Contraseña: *${pass}*\n\n🔗 Entrá directo acá 👇\n${portalUrl('portal_forgot')}` }] };
+      return { messages: [{ from: 'bot', delayMs: 600, at: now(), text: renderTemplate('post_forgot', cfg, { username: user, password: pass, portal_forgot: portalUrl('portal_forgot') }) }] };
     case 'cancel':
       return { messages: [{ from: 'bot', delayMs: 500, at: now(), text: '¡Gracias! Cerramos la consulta 👋 Cuando quieras, escribinos de nuevo.' }], step: 'closed' };
     default:
@@ -219,7 +215,7 @@ export function postActionMessages(action: string, data: Record<string, unknown>
 // no resuelve → lo mandamos directo al soporte de WhatsApp.
 const HELP_RE = /(ayuda|no entiendo|no comprendo|no puedo|no me (anda|funciona|sale)|problema|c[oó]mo hago|como funciona|no s[eé]|duda|consulta|hablar con|una persona|un humano|asesor|operador|reclamo|estafa|no me lleg|error)/i;
 function supportReply(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg[] {
-  return [{ from: 'bot', delayMs: 600, at: now(), text: `🙋 Para ayudarte mejor, escribinos por WhatsApp y te atendemos al toque, 24hs 👇\n${cfg.links.support}` }];
+  return [{ from: 'bot', delayMs: 600, at: now(), text: renderTemplate('support', cfg) }];
 }
 
 // Palabras que indican un problema real (no solo confusión con el paso de la
