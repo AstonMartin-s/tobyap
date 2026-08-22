@@ -342,6 +342,8 @@ input[type='date']:hover::-webkit-calendar-picker-indicator { opacity: 0.9; }
 /* Alineadas a la derecha: botón del extremo derecho (no se salen de pantalla). */
 .tt--right[data-tt]:hover::after { left: auto; right: 0; transform: none; text-align: right; }
 .tt--right[data-tt]:hover::before { left: auto; right: 12px; transform: none; }
+.tt--down.tt--right[data-tt]:hover::after { left: auto; right: 0; transform: none; text-align: right; }
+.tt--down.tt--right[data-tt]:hover::before { left: auto; right: 12px; transform: none; }
 /* Abajo + alineado a la izquierda: paneles angostos (no se sale por el borde). */
 .tt--down-left[data-tt]:hover::after { left: 0; transform: none; }
 .tt--down-left[data-tt]:hover::before { left: 12px; transform: none; }
