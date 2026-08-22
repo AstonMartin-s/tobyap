@@ -854,8 +854,6 @@ export function ChatsClient() {
                 <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   {(panelQuick.barPresets ?? []).map((p) => (
                     <button key={p} type="button" disabled={busy} onClick={() => setCustom(p)}
-                      className="tt tt--down"
-                      data-tt="Atajo del guion — rellena el mensaje (editar y Enviar)"
                       style={{
                         fontSize: '.72rem', padding: '.28rem .55rem', borderRadius: 8,
                         border: '1px solid rgba(124,92,255,.35)', background: 'rgba(124,92,255,.08)',
