@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TZ_AR } from '@/lib/datetime/ar';
+import { DEFAULT_PANEL_QUICK, type PanelQuickTexts } from '@/lib/chat/templates';
 import OperationsPanel from './OperationsPanel';
 
 type Item = {
@@ -202,6 +203,7 @@ export function ChatsClient() {
     if (next) { playChime(); if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {}); }
   }
   const [toast, setToast] = useState<string | null>(null);
+  const [panelQuick, setPanelQuick] = useState<PanelQuickTexts>({ barPresets: [] });
   const bodyRef = useRef<HTMLDivElement>(null);
   // Autoscroll SOLO si el operador ya está al fondo (o abrió otro chat). Si está
   // leyendo hacia arriba, el poll no lo debe arrastrar hacia abajo.
@@ -264,6 +266,22 @@ export function ChatsClient() {
       const s = r.session;
       setDetail({ messages: (s.messages ?? []) as Msg[], phone: s.phone, name: s.name, username: (s.data?.username as string) ?? null, step: s.step, kommoLeadId: s.kommoLeadId });
     }
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/panel/livechat')
+      .then((r) => r.json())
+      .then((d) => {
+        const pq = d?.runtime?.panelQuick;
+        if (!pq || typeof pq !== 'object') return;
+        setPanelQuick({
+          barPlaceholder: typeof pq.barPlaceholder === 'string' ? pq.barPlaceholder : undefined,
+          barPresets: Array.isArray(pq.barPresets)
+            ? pq.barPresets.map((x: unknown) => String(x).trim()).filter(Boolean)
+            : [],
+        });
+      })
+      .catch(() => { /* sin config */ });
   }, []);
 
   useEffect(() => { loadList(); const t = setInterval(loadList, 8000); return () => clearInterval(t); }, [loadList]);
@@ -832,6 +850,22 @@ export function ChatsClient() {
 
             {/* ACCIONES */}
             <div style={{ borderTop: '1px solid var(--border)', padding: '.7rem .9rem', display: 'flex', flexDirection: 'column', gap: '.5rem', background: 'var(--bg-2, rgba(255,255,255,.012))', flexShrink: 0, overflow: 'visible', position: 'relative', zIndex: 4 }}>
+              {(panelQuick.barPresets ?? []).length > 0 && (
+                <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {(panelQuick.barPresets ?? []).map((p) => (
+                    <button key={p} type="button" disabled={busy} onClick={() => setCustom(p)}
+                      className="tt tt--down"
+                      data-tt="Atajo del guion — rellena el mensaje (editar y Enviar)"
+                      style={{
+                        fontSize: '.72rem', padding: '.28rem .55rem', borderRadius: 8,
+                        border: '1px solid rgba(124,92,255,.35)', background: 'rgba(124,92,255,.08)',
+                        color: 'var(--accent,#7c5cff)', cursor: 'pointer', maxWidth: '100%', textAlign: 'left', fontWeight: 600,
+                      }}>
+                      {p.length > 48 ? `${p.slice(0, 48)}…` : p}
+                    </button>
+                  ))}
+                </div>
+              )}
               {(() => {
                 const cur = items.find((i) => i.sessionKey === sel);
                 const isArch = cur?.archived;
@@ -861,7 +895,7 @@ export function ChatsClient() {
                 );
               })()}
               <div style={{ display: 'flex', gap: '.4rem' }}>
-                <input className="input" placeholder="Mensaje libre al cliente…" value={custom}
+                <input className="input" placeholder={panelQuick.barPlaceholder?.trim() || DEFAULT_PANEL_QUICK.barPlaceholder || 'Mensaje libre al cliente…'} value={custom}
                   onChange={(e) => setCustom(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && custom.trim()) { act('custom', custom); setCustom(''); } }}
                   style={{ flex: 1, padding: '.5rem .7rem', fontSize: '.85rem' }} />
