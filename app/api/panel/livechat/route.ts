@@ -5,6 +5,7 @@ import { clientSettings } from '@/db/schema';
 import { getSession } from '@/lib/session';
 import { parseChatConfig } from '@/lib/chat/brand';
 import {
+  applyTenantRuntimeOverrides,
   buildConversationPreview,
   LINK_SLOTS,
   LINK_SLOT_IDS,
@@ -29,9 +30,10 @@ export async function GET() {
   try {
     const row = await loadRow(session.tenantId);
     const brand = parseChatConfig(row?.chatConfig, session.slug, session.slug);
-    const runtime = parseChatRuntime(row?.chatConfig, brand.brandName);
+    let runtime = parseChatRuntime(row?.chatConfig, brand.brandName);
     const ld = (row?.chatConfig as Record<string, unknown> | null)?.landingDomain;
-    runtime.links.support = walinkSupportUrl(session.slug, typeof ld === 'string' ? ld : undefined);
+    runtime.links = { ...runtime.links, support: walinkSupportUrl(session.slug, typeof ld === 'string' ? ld : undefined) };
+    runtime = applyTenantRuntimeOverrides(runtime, session.slug);
     const landingDomain = (row?.chatConfig as Record<string, unknown> | null)?.landingDomain;
     return NextResponse.json({
       ok: true,

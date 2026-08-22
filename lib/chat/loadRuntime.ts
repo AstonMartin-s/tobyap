@@ -2,7 +2,13 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { clientSettings } from '@/db/schema';
 import { phoneCandidates } from '@/lib/phone';
-import { parseChatRuntime, type ChatRuntimeConfig, type OfferType, walinkSupportUrl } from '@/lib/chat/runtime';
+import {
+  applyTenantRuntimeOverrides,
+  parseChatRuntime,
+  type ChatRuntimeConfig,
+  type OfferType,
+  walinkSupportUrl,
+} from '@/lib/chat/runtime';
 
 function clampNum(v: unknown, min: number, max: number, fallback: number): number {
   const n = typeof v === 'number' ? v : Number(v);
@@ -56,10 +62,10 @@ export async function loadChatRuntime(
       const ld = typeof o.landingDomain === 'string' ? o.landingDomain : '';
       base.links = { ...base.links, support: walinkSupportUrl(tenantSlug, ld || undefined) };
     }
-    return applyPhoneTestRuntime(base, raw, phone);
+    return applyPhoneTestRuntime(applyTenantRuntimeOverrides(base, tenantSlug), raw, phone);
   } catch {
     const base = parseChatRuntime({}, fallbackBrand);
     if (tenantSlug) base.links = { ...base.links, support: walinkSupportUrl(tenantSlug) };
-    return base;
+    return applyTenantRuntimeOverrides(base, tenantSlug);
   }
 }

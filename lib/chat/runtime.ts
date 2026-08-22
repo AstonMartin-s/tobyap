@@ -183,6 +183,12 @@ function parseLinks(raw: unknown, legacyPortal?: unknown, legacySupport?: unknow
   return links;
 }
 
+/** Overrides por tenant (sin tocar DB). King: promo cajera post-acreditación deshabilitada por ahora. */
+export function applyTenantRuntimeOverrides(cfg: ChatRuntimeConfig, tenantSlug?: string): ChatRuntimeConfig {
+  if (tenantSlug === 'king') return { ...cfg, postAccreditCajera: false };
+  return cfg;
+}
+
 export function parseChatRuntime(raw: unknown, fallbackBrand = 'King'): ChatRuntimeConfig {
   const o = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
   const brandName = typeof o.brandName === 'string' && o.brandName.trim() ? o.brandName.trim() : fallbackBrand;
