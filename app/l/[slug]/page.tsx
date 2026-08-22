@@ -94,6 +94,7 @@ export default async function Landing({
     campaign: c.campaign != null ? String(c.campaign) : null,
     redirectDelayMs: c.redirectDelayMs != null ? Number(c.redirectDelayMs) : undefined,
     portalUrl: c.portalUrl != null && String(c.portalUrl).trim() !== '' ? String(c.portalUrl) : null,
+    redirectUrl: c.redirectUrl != null && String(c.redirectUrl).trim() !== '' ? String(c.redirectUrl) : null,
     noCode: c.noCode === true,
   };
 

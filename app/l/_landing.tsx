@@ -50,6 +50,7 @@ export interface LandingConfig {
   chatSlug?: string | null; // si está, redirige al chat web /chat/<slug> en vez de wa.me
   chatOrigin?: string | null; // origen del chat (ej https://chat.fichaslibres.online); vacío = relativo
   portalUrl?: string | null; // si está, redirige a un portal externo (ej Vercel del cliente) con el token en la query, en vez de wa.me/chat
+  redirectUrl?: string | null; // si está, redirige TAL CUAL a esa URL (ej wa.link/jugandoconking de soporte). Sin query extra. Igual dispara Pixel + cuenta el clic.
   noCode?: boolean; // no incluir "Codigo Promocion:" en el mensaje (CRM sin webhook, no matchea)
 }
 
@@ -78,6 +79,7 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
     chatSlug: cfg.chatSlug ?? null,
     chatOrigin: cfg.chatOrigin ?? '',
     portalUrl: cfg.portalUrl ?? null,
+    redirectUrl: cfg.redirectUrl ?? null,
     noCode: cfg.noCode ?? false,
     redirectDelayMs: delay,
     // Si el mensaje configurado trae {fichas} o {bono}, se usa como plantilla.
@@ -129,6 +131,13 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
   }
   function go(d){
     var code = d && d.code;
+    // Destino REDIRECT DIRECTO (ej soporte wa.link/jugandoconking): redirige tal
+    // cual a la URL configurada, sin query extra. El Pixel ya disparó y el clic
+    // quedó contado en track/redirect. Ideal para soporte sin CRM/rotación.
+    if(C.redirectUrl){
+      window.location.href=C.redirectUrl;
+      return;
+    }
     // Destino PORTAL EXTERNO (ej Vercel del cliente): redirige al portal con el
     // token + campaña + ccpp en la query. El portal lo inyecta en su livechat de
     // Kommo (primer mensaje) para que el webhook matchee la atribución.

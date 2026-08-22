@@ -90,6 +90,8 @@ export default async function NamedLanding({
     chatOrigin: process.env.CHAT_ORIGIN || '', // ej https://chat.fichaslibres.online
     // Si tiene portalUrl, redirige a un portal externo del cliente con el token.
     portalUrl: c.portalUrl != null && String(c.portalUrl).trim() !== '' ? String(c.portalUrl) : null,
+    // Si tiene redirectUrl, redirige tal cual (ej soporte wa.link) sin query extra.
+    redirectUrl: c.redirectUrl != null && String(c.redirectUrl).trim() !== '' ? String(c.redirectUrl) : null,
     noCode: c.noCode === true || lp.type === 'soporte',
   };
 

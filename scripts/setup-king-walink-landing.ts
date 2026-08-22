@@ -18,6 +18,9 @@ async function main() {
     .from(landings)
     .where(and(eq(landings.tenantId, t.id), eq(landings.landingSlug, landingSlug)));
 
+  // Soporte de king: redirige TAL CUAL al wa.link de soporte (jugandoconking).
+  // No depende de rotación de números `soporte` (no hay activos) ni de wa.me.
+  const supportWalink = 'https://wa.link/jugandoconking';
   const supportMessage = 'Hola! vengo del chat y quiero mi promo 🎰';
   const prev = (existing?.config ?? {}) as Record<string, string | number | boolean | null>;
   const config: Record<string, string | number | boolean | null> = {
@@ -26,6 +29,7 @@ async function main() {
     useFixedNumber: false,
     waNumber: '',
     ccpp: '',
+    redirectUrl: supportWalink,
     campaign: 'Soporte',
     message: supportMessage,
     headline: String(prev.headline || 'Te redirigimos a soporte…'),
