@@ -46,6 +46,11 @@ export interface ResolvedTenant {
   fieldUtmCampaign: number | null;
   fieldUtmSource: number | null;
   fieldUtmContent: number | null;
+  // Match por proximidad temporal (customFields.proximity_match_sec > 0): para
+  // clientes cuyo lead NO transporta el token (ej. livechat de Kommo en portal
+  // externo). Ventana en segundos para atar el lead recién creado a la última
+  // atribución no matcheada del tenant. 0/ausente = desactivado.
+  proximityMatchSec: number | null;
 }
 
 // --- Sub-bloques opcionales del documento de cliente ---

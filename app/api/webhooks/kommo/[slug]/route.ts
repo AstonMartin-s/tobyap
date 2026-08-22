@@ -5,7 +5,7 @@ import { leads, kommoWebhookLog, clientSettings, attributions } from '@/db/schem
 import { getTenantBySlug } from '@/lib/tenants';
 import { sendCapiEvent, eventExists, CAPI_VALUE } from '@/lib/meta';
 import { emitCargo } from '@/lib/cargo/emit';
-import { applyAttributionByCode, CODE_REGEX } from '@/lib/attribution';
+import { applyAttributionByCode, claimProximityAttribution, CODE_REGEX } from '@/lib/attribution';
 import { fetchKommoLead, fetchContactPhone, readLeadField, readPhone, contactId, updateLeadFields, type KommoLead } from '@/lib/kommo';
 import type { ResolvedTenant } from '@/lib/types';
 import { syncChatStepFromKommo } from '@/lib/chat/release';
@@ -161,6 +161,23 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       if (!code && adField) {
         const m = adCurrent?.match(CODE_REGEX);
         if (m) code = m[0];
+      }
+      // MATCH POR PROXIMIDAD TEMPORAL (opción 2): clientes cuyo lead NO trae el
+      // token (livechat de Kommo en portal externo). Solo si el tenant lo activó
+      // (proximity_match_sec > 0) y el lead se creó dentro de la ventana, para no
+      // atar leads viejos que reciben cambios de estado. Reclama atómicamente la
+      // última atribución no matcheada del tenant.
+      if (!code && tenant.proximityMatchSec) {
+        const nowSec = Math.floor(Date.now() / 1000);
+        const leadFresh =
+          lead.created_at == null || nowSec - lead.created_at <= tenant.proximityMatchSec;
+        if (leadFresh) {
+          const prox = await claimProximityAttribution(tenant, sig.leadId, tenant.proximityMatchSec);
+          if (prox) {
+            code = prox.code;
+            results.push({ leadId: sig.leadId, proximityMatch: prox.code });
+          }
+        }
       }
       // RED DE SEGURIDAD: persistimos el token en ad_code (idempotente, nunca readonly).
       if (code && adField && !tenant.readonly && !adCurrent?.match(CODE_REGEX)) {

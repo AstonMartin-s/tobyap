@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull } from 'drizzle-orm';
 import { db } from '@/db';
 import { attributions, type AttributionRow } from '@/db/schema';
 import { addLeadTags, updateLeadFields } from '@/lib/kommo';
@@ -32,6 +32,43 @@ export function generateCode(): string {
 }
 
 export const CODE_REGEX = /PB[A-HJ-NP-Z2-9]{6}/;
+
+// Match por PROXIMIDAD TEMPORAL (opción 2): para clientes cuyo lead no transporta
+// el token en el mensaje (livechat de Kommo en portal externo). Toma la última
+// atribución NO matcheada del tenant creada dentro de la ventana y la reclama de
+// forma atómica para ESTE lead. El claim condicional (matchedLeadId IS NULL en el
+// UPDATE) evita que dos leads concurrentes se lleven la misma atribución.
+// Devuelve el code reclamado, o null si no hay candidata / ya la tomó otro.
+// Es un match probabilístico: fiable con bajo volumen, se degrada con concurrencia.
+export async function claimProximityAttribution(
+  tenant: ResolvedTenant,
+  kommoLeadId: number,
+  windowSec: number,
+): Promise<AttributionRow | null> {
+  if (!windowSec || windowSec <= 0) return null;
+  const cutoff = new Date(Date.now() - windowSec * 1000);
+
+  const [cand] = await db
+    .select()
+    .from(attributions)
+    .where(
+      and(
+        eq(attributions.tenantId, tenant.id),
+        isNull(attributions.matchedLeadId),
+        gte(attributions.createdAt, cutoff),
+      ),
+    )
+    .orderBy(desc(attributions.createdAt))
+    .limit(1);
+  if (!cand) return null;
+
+  const claimed = await db
+    .update(attributions)
+    .set({ matchedLeadId: kommoLeadId, matchedAt: new Date() })
+    .where(and(eq(attributions.id, cand.id), isNull(attributions.matchedLeadId)))
+    .returning();
+  return claimed[0] ?? null; // vacío => lo reclamó otro lead en paralelo
+}
 
 // Aplica una atribución ya guardada (por token) a un lead de Kommo:
 //   - etiquetas: campaña (CC1) + bono (Bono10%)

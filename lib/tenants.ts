@@ -215,6 +215,7 @@ function resolve(row: TenantRow): ResolvedTenant {
     fieldUtmCampaign: num('utm_campaign'),
     fieldUtmSource: num('utm_source'),
     fieldUtmContent: num('utm_content'),
+    proximityMatchSec: num('proximity_match_sec'),
   };
 }
 

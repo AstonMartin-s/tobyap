@@ -11,6 +11,7 @@ export interface KommoLead {
   name?: string;
   status_id?: number;
   pipeline_id?: number;
+  created_at?: number; // epoch seconds (para el match por proximidad temporal)
   custom_fields_values?: Array<{
     field_id: number;
     field_code?: string;
