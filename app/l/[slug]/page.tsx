@@ -93,6 +93,7 @@ export default async function Landing({
     ccpp: c.ccpp != null ? String(c.ccpp) : null,
     campaign: c.campaign != null ? String(c.campaign) : null,
     redirectDelayMs: c.redirectDelayMs != null ? Number(c.redirectDelayMs) : undefined,
+    portalUrl: c.portalUrl != null && String(c.portalUrl).trim() !== '' ? String(c.portalUrl) : null,
     noCode: c.noCode === true,
   };
 

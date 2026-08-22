@@ -49,6 +49,7 @@ export interface LandingConfig {
   redirectDelayMs?: number;
   chatSlug?: string | null; // si está, redirige al chat web /chat/<slug> en vez de wa.me
   chatOrigin?: string | null; // origen del chat (ej https://chat.fichaslibres.online); vacío = relativo
+  portalUrl?: string | null; // si está, redirige a un portal externo (ej Vercel del cliente) con el token en la query, en vez de wa.me/chat
   noCode?: boolean; // no incluir "Codigo Promocion:" en el mensaje (CRM sin webhook, no matchea)
 }
 
@@ -76,6 +77,7 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
     campaign: cfg.campaign ?? null,
     chatSlug: cfg.chatSlug ?? null,
     chatOrigin: cfg.chatOrigin ?? '',
+    portalUrl: cfg.portalUrl ?? null,
     noCode: cfg.noCode ?? false,
     redirectDelayMs: delay,
     // Si el mensaje configurado trae {fichas} o {bono}, se usa como plantilla.
@@ -127,6 +129,17 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
   }
   function go(d){
     var code = d && d.code;
+    // Destino PORTAL EXTERNO (ej Vercel del cliente): redirige al portal con el
+    // token + campaña + ccpp en la query. El portal lo inyecta en su livechat de
+    // Kommo (primer mensaje) para que el webhook matchee la atribución.
+    if(C.portalUrl){
+      var pcamp=p('campaign')||C.campaign||'';
+      var pcc=p('CCPP')||p('ccpp')||C.ccpp||'';
+      var sep=C.portalUrl.indexOf('?')===-1?'?':'&';
+      var pu=C.portalUrl+sep+'code='+encodeURIComponent(code||'')+'&campaign='+encodeURIComponent(pcamp)+'&ccpp='+encodeURIComponent(pcc);
+      window.location.href=pu;
+      return;
+    }
     // Destino CHAT WEB: redirige al chat embebido con el token + campaña + ccpp.
     if(C.chatSlug){
       var camp=p('campaign')||C.campaign||'';
