@@ -25,19 +25,26 @@ export async function POST(req: NextRequest) {
     )
   `);
 
-  // 2. Migrate existing tenant logins as admins (skip if already migrated)
-  const result = await db.execute(sql`
-    INSERT INTO panel_users (tenant_id, username, password_hash, display_name, role, active)
-    SELECT id, panel_user, panel_password_hash, name, 'admin', active
+  // 2. Find tenants that don't have an admin in panel_users yet
+  const candidates = await db.execute(sql`
+    SELECT id, panel_user, panel_password_hash, name, active
     FROM tenants
     WHERE panel_user IS NOT NULL
       AND panel_password_hash IS NOT NULL
-      AND role = 'client'
       AND NOT EXISTS (
         SELECT 1 FROM panel_users pu
         WHERE pu.tenant_id = tenants.id AND pu.role = 'admin'
       )
   `);
 
-  return NextResponse.json({ ok: true, migrated: result.length ?? 0 });
+  let migrated = 0;
+  for (const t of candidates as Array<Record<string, unknown>>) {
+    await db.execute(sql`
+      INSERT INTO panel_users (tenant_id, username, password_hash, display_name, role, active)
+      VALUES (${t.id}, ${t.panel_user}, ${t.panel_password_hash}, ${t.name}, 'admin', ${t.active})
+    `);
+    migrated++;
+  }
+
+  return NextResponse.json({ ok: true, migrated, total_candidates: (candidates as unknown[]).length });
 }
