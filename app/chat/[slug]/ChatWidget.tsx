@@ -621,13 +621,26 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
 
       {waBtnToast && step !== 'done' && (
         <div style={{
-          position: 'fixed', top: 62, left: 10, right: 10,
-          background: '#fff', color: '#111827', borderRadius: 12,
-          padding: '14px 18px', fontSize: 14, lineHeight: 1.45,
-          boxShadow: '0 6px 24px rgba(0,0,0,.25)', zIndex: 91,
-          animation: 'fadeIn .25s ease',
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)',
+          display: 'grid', placeItems: 'center', zIndex: 100,
+          animation: 'fadeIn .2s ease', padding: 20,
         }}>
-          Cuando tengas tu usuario y hayas recibido tu bono, te daremos acceso a soporte
+          <div style={{
+            background: '#fff', borderRadius: 16, padding: '28px 24px',
+            maxWidth: 340, width: '100%', textAlign: 'center',
+            boxShadow: '0 12px 40px rgba(0,0,0,.3)',
+          }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>💬</div>
+            <p style={{ fontSize: 17, lineHeight: 1.5, color: '#111827', margin: '0 0 20px', fontWeight: 500 }}>
+              Cuando tengas tu usuario y hayas recibido tu bono, te daremos acceso a soporte
+            </p>
+            <button
+              onClick={() => setWaBtnToast(false)}
+              style={{ background: header, color: '#fff', border: 'none', borderRadius: 12, padding: '12px 32px', fontSize: 16, fontWeight: 600, cursor: 'pointer', width: '100%' }}
+            >
+              Continuar
+            </button>
+          </div>
         </div>
       )}
 
