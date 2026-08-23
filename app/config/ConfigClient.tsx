@@ -41,6 +41,8 @@ function LiberadorSection() {
   const [key, setKey] = useState('');
   const [hasKey, setHasKey] = useState(false);
   const [enabled, setEnabled] = useState(false);
+  const [providerType, setProviderType] = useState<'partner_api' | 'king'>('partner_api');
+  const [sourceId, setSourceId] = useState('');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -48,7 +50,10 @@ function LiberadorSection() {
     j('/api/settings/liberador').then((d) => {
       setUrl(d.partnerApiUrl ?? '');
       setHasKey(!!d.hasKey);
-      setEnabled(d.provider === 'partner_api');
+      const prov = d.provider ?? 'pagoda';
+      setEnabled(prov === 'partner_api' || prov === 'king');
+      setProviderType(prov === 'king' ? 'king' : 'partner_api');
+      if (d.kingSourceId) setSourceId(String(d.kingSourceId));
     }).catch(() => {});
   }, []);
 
@@ -58,10 +63,16 @@ function LiberadorSection() {
       await j('/api/settings/liberador', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ partnerApiUrl: url.trim(), partnerApiKey: key.trim() || undefined, enabled }),
+        body: JSON.stringify({
+          partnerApiUrl: url.trim(),
+          partnerApiKey: key.trim() || undefined,
+          enabled,
+          providerType,
+          kingSourceId: sourceId.trim() ? Number(sourceId.trim()) : undefined,
+        }),
       });
       setMsg('✓ Guardado');
-      if (key.trim()) { setHasKey(true); setKey(''); } // token cargado, limpiamos el input
+      if (key.trim()) { setHasKey(true); setKey(''); }
       setTimeout(() => setMsg(''), 2500);
     } catch (e) {
       setMsg('Error: ' + (e as Error).message);
@@ -77,20 +88,36 @@ function LiberadorSection() {
         Conecta el panel con la plataforma para cargar/retirar fichas por API. El token es secreto:
         se guarda cifrado y nunca se muestra de vuelta.
       </p>
+      <div className="field" style={{ marginBottom: '.5rem' }}>
+        <label>Tipo de API</label>
+        <select className="input" value={providerType} onChange={(e) => setProviderType(e.target.value as 'partner_api' | 'king')}
+          style={{ maxWidth: 260 }}>
+          <option value="partner_api">Partner API (bblack)</option>
+          <option value="king">King / GreenBet (dat4win)</option>
+        </select>
+      </div>
       <div className="grid-2">
         <div className="field">
           <label>URL de la API</label>
-          <input className="input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://api-…/api/v1" />
+          <input className="input" value={url} onChange={(e) => setUrl(e.target.value)}
+            placeholder={providerType === 'king' ? 'https://greenbet.uno' : 'https://api-…/api/v1'} />
         </div>
         <div className="field">
           <label>Token API {hasKey && <span style={{ color: 'var(--ok,#16a34a)', fontSize: '.72rem' }}>· ✓ configurado</span>}</label>
           <input className="input" type="password" value={key} onChange={(e) => setKey(e.target.value)}
-            placeholder={hasKey ? '•••••••• (dejar vacío para no cambiar)' : 'pk_…'} autoComplete="new-password" />
+            placeholder={hasKey ? '•••••••• (dejar vacío para no cambiar)' : 'token…'} autoComplete="new-password" />
         </div>
       </div>
+      {providerType === 'king' && (
+        <div className="field" style={{ maxWidth: 260 }}>
+          <label>Source ID (agente)</label>
+          <input className="input" value={sourceId} onChange={(e) => setSourceId(e.target.value.replace(/\D/g, ''))}
+            placeholder="129161" inputMode="numeric" />
+        </div>
+      )}
       <label className="field" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '.5rem', marginTop: '.2rem', cursor: 'pointer' }}>
         <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-        <span>Activar Liberador de Fichas para este cliente <span style={{ color: 'var(--muted)', fontSize: '.78rem' }}>(requiere URL y token)</span></span>
+        <span>Activar Liberador de Fichas para este cliente <span style={{ color: 'var(--muted)', fontSize: '.78rem' }}>(requiere URL y token{providerType === 'king' ? ' y Source ID' : ''})</span></span>
       </label>
       <div className="row" style={{ marginTop: '0.4rem' }}>
         <button className="btn" onClick={save} disabled={busy}>Guardar</button>

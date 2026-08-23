@@ -161,7 +161,7 @@ export function ChatsClient() {
   const [stats, setStats] = useState<Array<{ step: string | null; createdAt: string | null }>>([]);
   const [tenantProvider, setTenantProvider] = useState<string>('pagoda');
   const [opsOpen, setOpsOpen] = useState(false);
-  const showOpsPanel = tenantProvider === 'partner_api' && !!sel && !!detail?.username;
+  const showOpsPanel = (tenantProvider === 'partner_api' || tenantProvider === 'king') && !!sel && !!detail?.username;
   // Ancho de la lista (barra divisora arrastrable, estilo Black Dragon).
   const [listW, setListW] = useState(380);
   const listWRef = useRef(380);

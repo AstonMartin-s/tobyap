@@ -15,6 +15,7 @@ import { sendPushToSession } from '@/lib/chat/push';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { emitCargo, panelApproveEmitsCargo } from '@/lib/cargo/emit';
 import { depositOp, withdrawOp, consultBalance, operationsSummary } from '@/lib/partner-ops';
+import { kingDepositOp, kingWithdrawOp, kingConsultBalance } from '@/lib/king-ops';
 import {
   comprobantePendingMessages,
   comprobanteRejectedMessages,
@@ -138,8 +139,6 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  // Provider del tenant: el OperationsPanel (saldo real) solo se monta para
-  // clientes 'partner_api' (bblack/KingPlay). King/pagoda no lo ve.
   const tenantForProvider = await getTenantBySlug(session.slug);
 
   return NextResponse.json({ ok: true, items, stats: statRows, tenantProvider: tenantForProvider?.provider ?? 'pagoda' });
@@ -218,21 +217,21 @@ export async function POST(req: NextRequest) {
   const data = (s.data ?? {}) as Record<string, unknown>;
   const loginUrl = data.loginUrl as string | undefined;
 
-  // ── Operaciones de SALDO REAL (Partner API — bblack/KingPlay) ──────────────
-  // Solo para tenants provider='partner_api'. King/pagoda → { ok:false, skip:true }.
-  // El disparo lo hace SIEMPRE el operario (botón); nunca automático. La carga/
-  // retiro es idempotente (partner-ops deriva la reference del id de la fila).
+  // ── Operaciones de SALDO REAL (Partner API / King API) ─────────────────────
+  // Provider 'partner_api' (bblack) o 'king' (greenbet/dat4win). El disparo lo
+  // hace SIEMPRE el operario (botón); nunca automático.
   if (b.op === 'pa_balance' || b.op === 'pa_deposit' || b.op === 'pa_withdraw') {
     const tenant = await getTenantBySlug(session.slug);
-    if (!tenant || tenant.provider !== 'partner_api') {
-      return NextResponse.json({ ok: false, skip: true, error: 'cliente sin Partner API' });
+    if (!tenant || (tenant.provider !== 'partner_api' && tenant.provider !== 'king')) {
+      return NextResponse.json({ ok: false, skip: true, error: 'cliente sin API de fichas' });
     }
     const username = data.username as string | undefined;
     if (!username) return NextResponse.json({ ok: false, error: 'la sesión no tiene usuario de portal' }, { status: 400 });
 
     if (b.op === 'pa_balance') {
+      const isKing = tenant.provider === 'king';
       const [bal, summary] = await Promise.all([
-        consultBalance(tenant, username),
+        isKing ? kingConsultBalance(tenant, username) : consultBalance(tenant, username),
         operationsSummary(tenant, username),
       ]);
       return NextResponse.json({ ok: bal.ok, balance: bal.balance, error: bal.error, summary });
@@ -245,9 +244,14 @@ export async function POST(req: NextRequest) {
       ? (b.bonusPercent != null ? b.bonusPercent : promoBonus)
       : undefined;
 
-    const res = b.op === 'pa_deposit'
-      ? await depositOp(tenant, { username, amount: b.amount ?? 0, operator: session.slug, sessionId: s.id, bonusPercent })
-      : await withdrawOp(tenant, { username, amount: b.amount ?? 0, operator: session.slug, sessionId: s.id });
+    const opArgs = { username, amount: b.amount ?? 0, operator: session.slug, sessionId: s.id, bonusPercent };
+    const res = tenant.provider === 'king'
+      ? (b.op === 'pa_deposit'
+          ? await kingDepositOp(tenant, opArgs)
+          : await kingWithdrawOp(tenant, opArgs))
+      : (b.op === 'pa_deposit'
+          ? await depositOp(tenant, opArgs)
+          : await withdrawOp(tenant, opArgs));
 
     if (res.ok) {
       const montoTxt = `$${(b.amount ?? 0).toLocaleString('es-AR')}`;
