@@ -12,7 +12,7 @@ export default async function ChatsPage() {
 
   return (
     <>
-      <Nav slug={session.slug} role={session.role} />
+      <Nav slug={session.slug} role={session.role} panelRole={session.panelRole} />
       <main className="shell shell--wide" style={{ paddingTop: '.8rem' }}>
         <ChatsClient />
       </main>

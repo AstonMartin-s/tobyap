@@ -9,10 +9,15 @@ import { cookies } from 'next/headers';
 const COOKIE = 'tobyap_session';
 const MAX_AGE = 60 * 60 * 8; // 8 horas
 
+export type PanelRole = 'admin' | 'supervisor' | 'operador';
+
 interface SessionData {
   tenantId: string;
   slug: string;
-  role: string; // 'client' | 'admin'
+  role: string; // 'client' | 'admin' (tenant-level, legacy)
+  panelRole?: PanelRole; // rol del usuario dentro del tenant
+  userId?: string; // panel_users.id
+  displayName?: string;
   exp: number; // epoch segundos
 }
 
@@ -64,4 +69,21 @@ export async function clearSession() {
 
 export async function getSession(): Promise<SessionData | null> {
   return verifySessionToken(cookies().get(COOKIE)?.value);
+}
+
+// Helpers de permisos por pestaña
+const TAB_ACCESS: Record<string, PanelRole[]> = {
+  chats: ['operador', 'supervisor', 'admin'],
+  reportes: ['supervisor', 'admin'],
+  embudo: ['supervisor', 'admin'],
+  livechat: ['supervisor', 'admin'],
+  config: ['admin'],
+  usuarios: ['admin'],
+};
+
+export function canAccess(panelRole: PanelRole | undefined, tab: string): boolean {
+  if (!panelRole) return true; // sesiones legacy sin panelRole (admin de tenant)
+  const allowed = TAB_ACCESS[tab];
+  if (!allowed) return true;
+  return allowed.includes(panelRole);
 }

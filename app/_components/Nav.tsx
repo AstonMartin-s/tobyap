@@ -59,10 +59,11 @@ const I = {
   ),
 };
 
-export function Nav({ slug, role = 'client' }: { slug: string; role?: string }) {
+export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?: string; panelRole?: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const isAdmin = role === 'admin';
+  const pr = panelRole ?? 'admin'; // legacy sessions without panelRole = full access
 
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   useEffect(() => {
@@ -125,11 +126,12 @@ export function Nav({ slug, role = 'client' }: { slug: string; role?: string }) 
           </>
         ) : (
           <>
-            {NavLink('/reportes', 'Reportes', I.report)}
+            {(pr === 'supervisor' || pr === 'admin') && NavLink('/reportes', 'Reportes', I.report)}
             {NavLink('/chats', 'Chats web', I.chat)}
-            {NavLink('/embudo', 'Embudo', I.funnel)}
-            {NavLink('/livechat', 'Ajustes chat', I.live)}
-            {NavLink('/config', 'Configuración', I.config)}
+            {(pr === 'supervisor' || pr === 'admin') && NavLink('/embudo', 'Embudo', I.funnel)}
+            {(pr === 'supervisor' || pr === 'admin') && NavLink('/livechat', 'Ajustes chat', I.live)}
+            {pr === 'admin' && NavLink('/config', 'Configuración', I.config)}
+            {pr === 'admin' && NavLink('/usuarios', 'Usuarios', I.clients)}
           </>
         )}
       </div>

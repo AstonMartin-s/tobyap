@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/session';
+import { getSession, canAccess } from '@/lib/session';
 import {
   buildDailyChartSeries,
   getClientKpis,
@@ -22,6 +22,7 @@ export default async function ReportesPage({
   const session = await getSession();
   if (!session) redirect('/login');
   if (session.role === 'admin') redirect('/admin');
+  if (!canAccess(session.panelRole, 'reportes')) redirect('/chats');
 
   const chartRange = lastNDaysRangeAR(3);
 
@@ -54,7 +55,7 @@ export default async function ReportesPage({
 
   return (
     <>
-      <Nav slug={session.slug} role={session.role} />
+      <Nav slug={session.slug} role={session.role} panelRole={session.panelRole} />
       <main className="shell">
         <div className="page-head">
           <div className="page-head__text">

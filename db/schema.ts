@@ -483,3 +483,23 @@ export const partnerOperations = pgTable('partner_operations', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 export type PartnerOperationRow = typeof partnerOperations.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// panel_users — operadores y admins del panel. Cada tenant tiene al menos un
+// admin (migrado automáticamente desde tenants.panelUser). Los operadores
+// tienen acceso limitado según su rol.
+// ---------------------------------------------------------------------------
+export const panelUsers = pgTable('panel_users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id')
+    .notNull()
+    .references(() => tenants.id, { onDelete: 'cascade' }),
+  username: text('username').notNull(),
+  passwordHash: text('password_hash').notNull(),
+  displayName: text('display_name'),
+  role: text('role').notNull().default('operador'), // 'admin' | 'supervisor' | 'operador'
+  active: boolean('active').default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+export type PanelUserRow = typeof panelUsers.$inferSelect;
