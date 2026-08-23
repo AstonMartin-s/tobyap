@@ -6,7 +6,7 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans', display: 'swap' });
 
 export const metadata: Metadata = {
-  title: 'TrackerIO — Panel',
+  title: 'TrackerIO',
   description: 'Tracking de conversiones · Kommo → Meta',
 };
 
