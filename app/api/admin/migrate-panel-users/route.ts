@@ -5,6 +5,21 @@ import { isAdmin } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
+export async function GET(req: NextRequest) {
+  if (!(await isAdmin(req))) {
+    return NextResponse.json({ error: 'no autorizado' }, { status: 403 });
+  }
+  const rows = await db.execute(sql`
+    SELECT slug, name, panel_user,
+      (panel_password_hash IS NOT NULL) as has_password,
+      EXISTS(SELECT 1 FROM panel_users pu WHERE pu.tenant_id = tenants.id) as in_panel_users
+    FROM tenants
+    WHERE role = 'client'
+    ORDER BY name
+  `);
+  return NextResponse.json({ ok: true, tenants: rows });
+}
+
 export async function POST(req: NextRequest) {
   if (!(await isAdmin(req))) {
     return NextResponse.json({ error: 'no autorizado' }, { status: 403 });
