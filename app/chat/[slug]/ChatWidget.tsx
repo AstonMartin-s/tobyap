@@ -463,10 +463,20 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         ) : (
           <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#25D366', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 18 }}>{initial}</div>
         )}
-        <div style={{ lineHeight: 1.15 }}>
+        <div style={{ lineHeight: 1.15, flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 600, fontSize: 16 }}>{skin.brand}</div>
           <div style={{ fontSize: 12, opacity: 0.85 }}>{typing ? 'escribiendo…' : 'en línea'}</div>
         </div>
+        {phase === 'chat' && waBtn.enabled && waBtn.url && (
+          <button
+            onClick={handleWaBtn}
+            className={step === 'done' ? 'wa-hdr wa-hdr--fast' : (waBtnClicked ? '' : 'wa-hdr')}
+            title="WhatsApp"
+            style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: '#25D366', color: '#fff', flexShrink: 0 }}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          </button>
+        )}
         {phase === 'chat' && (
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
@@ -608,36 +618,19 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         </div>
       )}
 
-      {phase === 'chat' && waBtn.enabled && waBtn.url && (
-        <>
-          <button
-            onClick={handleWaBtn}
-            className={step === 'done' ? 'wa-fab wa-fab--fast' : (waBtnClicked ? '' : 'wa-fab')}
-            style={{
-              position: 'fixed', bottom: 68, right: 14, width: 52, height: 52, borderRadius: '50%',
-              background: '#25D366', color: '#fff', border: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 14px rgba(0,0,0,.3)', zIndex: 90,
-            }}
-            title="Ir a WhatsApp"
-          >
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-          </button>
-          {waBtnToast && step !== 'done' && (
-            <div style={{
-              position: 'fixed', bottom: 128, right: 14, left: 14,
-              background: '#fff', color: '#111827', borderRadius: 12,
-              padding: '14px 18px', fontSize: 14, lineHeight: 1.45,
-              boxShadow: '0 6px 24px rgba(0,0,0,.25)', zIndex: 91,
-              animation: 'fadeIn .25s ease',
-            }}>
-              Cuando tengas tu usuario y hayas recibido tu bono, te daremos acceso a soporte
-            </div>
-          )}
-        </>
+      {waBtnToast && step !== 'done' && (
+        <div style={{
+          position: 'fixed', top: 62, left: 10, right: 10,
+          background: '#fff', color: '#111827', borderRadius: 12,
+          padding: '14px 18px', fontSize: 14, lineHeight: 1.45,
+          boxShadow: '0 6px 24px rgba(0,0,0,.25)', zIndex: 91,
+          animation: 'fadeIn .25s ease',
+        }}>
+          Cuando tengas tu usuario y hayas recibido tu bono, te daremos acceso a soporte
+        </div>
       )}
 
-      <style>{`.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#9aa;animation:b 1.2s infinite}.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}@keyframes b{0%,60%,100%{opacity:.3}30%{opacity:1}}.wa-fab{animation:waSlide 5s infinite}@keyframes waSlide{0%,90%,100%{transform:scale(1)}93%{transform:scale(1.18)}96%{transform:scale(1)}}.wa-fab--fast{animation:waSlideFast 1s infinite}@keyframes waSlideFast{0%,60%,100%{transform:scale(1)}30%{transform:scale(1.2)}}.hdr-pulse{animation:hp 1.6s infinite}@keyframes hp{0%{box-shadow:0 0 0 0 rgba(255,255,255,.55)}70%{box-shadow:0 0 0 8px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style>
+      <style>{`.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#9aa;animation:b 1.2s infinite}.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}@keyframes b{0%,60%,100%{opacity:.3}30%{opacity:1}}.wa-hdr{animation:waH 5s infinite}@keyframes waH{0%,85%,100%{transform:scale(1)}88%{transform:scale(1.22)}91%{transform:scale(1)}94%{transform:scale(1.15)}97%{transform:scale(1)}}.wa-hdr--fast{animation:waHF 1s infinite}@keyframes waHF{0%,60%,100%{transform:scale(1)}30%{transform:scale(1.25)}}.hdr-pulse{animation:hp 1.6s infinite}@keyframes hp{0%{box-shadow:0 0 0 0 rgba(255,255,255,.55)}70%{box-shadow:0 0 0 8px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style>
     </div>
   );
 }
