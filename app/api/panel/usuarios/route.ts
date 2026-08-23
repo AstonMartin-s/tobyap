@@ -121,6 +121,16 @@ export async function PUT(req: NextRequest) {
 
   if (!target) return NextResponse.json({ error: 'usuario no encontrado' }, { status: 404 });
 
+  // No permitir que el admin se auto-degrade o auto-desactive (se quedaría sin acceso)
+  if (body.id === session.userId) {
+    if (body.role !== undefined && body.role !== 'admin') {
+      return NextResponse.json({ error: 'no podés cambiar tu propio rol de admin' }, { status: 400 });
+    }
+    if (body.active === false) {
+      return NextResponse.json({ error: 'no podés desactivar tu propio usuario' }, { status: 400 });
+    }
+  }
+
   const set: Record<string, unknown> = { updatedAt: new Date() };
 
   if (body.role !== undefined) {

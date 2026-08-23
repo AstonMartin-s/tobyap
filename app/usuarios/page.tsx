@@ -15,7 +15,7 @@ export default async function UsuariosPage() {
     <>
       <Nav slug={session.slug} role={session.role} panelRole={session.panelRole} />
       <main className="shell">
-        <UsuariosClient />
+        <UsuariosClient currentUserId={session.userId ?? ''} />
       </main>
     </>
   );

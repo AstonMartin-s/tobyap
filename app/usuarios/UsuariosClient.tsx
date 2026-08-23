@@ -24,7 +24,7 @@ async function api(url: string, opts?: RequestInit) {
   return d;
 }
 
-export function UsuariosClient() {
+export function UsuariosClient({ currentUserId }: { currentUserId: string }) {
   const [users, setUsers] = useState<User[]>([]);
   const [msg, setMsg] = useState('');
   const [open, setOpen] = useState(false);
@@ -32,17 +32,50 @@ export function UsuariosClient() {
   const [busy, setBusy] = useState(false);
   const [pwEdit, setPwEdit] = useState<string | null>(null);
   const [pwVal, setPwVal] = useState('');
+  // Mi cuenta (admin logueado)
+  const [meUser, setMeUser] = useState('');
+  const [mePass, setMePass] = useState('');
+  const [meBusy, setMeBusy] = useState(false);
+  const [meMsg, setMeMsg] = useState('');
 
   async function load() {
     try {
       const d = await api('/api/panel/usuarios');
       setUsers(d.users ?? []);
+      const me = (d.users ?? []).find((u: User) => u.id === currentUserId);
+      if (me) setMeUser(me.username);
     } catch {
       setMsg('No se pudieron cargar los usuarios. Si es la primera vez, ejecutá la migración.');
     }
   }
 
   useEffect(() => { load(); }, []);
+
+  const me = users.find((u) => u.id === currentUserId);
+
+  async function saveMe() {
+    if (meUser.trim().length < 3) { setMeMsg('El usuario debe tener al menos 3 caracteres'); return; }
+    if (mePass && mePass.trim().length < 6) { setMeMsg('La contraseña debe tener al menos 6 caracteres'); return; }
+    setMeBusy(true);
+    setMeMsg('');
+    try {
+      const patch: Record<string, unknown> = { id: currentUserId, username: meUser.trim() };
+      if (mePass.trim()) patch.password = mePass.trim();
+      await api('/api/panel/usuarios', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      setMePass('');
+      await load();
+      setMeMsg(mePass.trim() ? '✓ Usuario y contraseña actualizados' : '✓ Usuario actualizado');
+      setTimeout(() => setMeMsg(''), 3500);
+    } catch (e) {
+      setMeMsg('Error: ' + (e as Error).message);
+    } finally {
+      setMeBusy(false);
+    }
+  }
 
   async function create() {
     setBusy(true);
@@ -115,6 +148,35 @@ export function UsuariosClient() {
       </div>
 
       {msg && <p style={{ color: 'var(--accent)', fontSize: '.85rem', margin: '0 0 .8rem' }}>{msg}</p>}
+
+      {/* Mi cuenta (admin logueado) */}
+      {me && (
+        <section className="card" style={{ marginBottom: '1.2rem', borderColor: 'var(--accent)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '.9rem' }}>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--accent-soft)', display: 'grid', placeItems: 'center', color: 'var(--accent)' }}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '.9rem' }}>Mi cuenta (Admin)</div>
+              <div style={{ color: 'var(--muted)', fontSize: '.78rem' }}>Cambiá tu usuario y contraseña de acceso al panel</div>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.8rem', maxWidth: 560 }}>
+            <div className="field" style={{ margin: 0 }}>
+              <label style={{ textTransform: 'uppercase', fontSize: '.68rem', fontWeight: 700, letterSpacing: '.04em', color: 'var(--muted)' }}>Usuario</label>
+              <input className="input" value={meUser} onChange={(e) => setMeUser(e.target.value)} placeholder="usuario de acceso" />
+            </div>
+            <div className="field" style={{ margin: 0 }}>
+              <label style={{ textTransform: 'uppercase', fontSize: '.68rem', fontWeight: 700, letterSpacing: '.04em', color: 'var(--muted)' }}>Nueva contraseña</label>
+              <input className="input" type="password" value={mePass} onChange={(e) => setMePass(e.target.value)} placeholder="dejá vacío para no cambiarla" />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '.6rem', alignItems: 'center', marginTop: '.8rem' }}>
+            <button className="btn" onClick={saveMe} disabled={meBusy}>Guardar cambios</button>
+            {meMsg && <span style={{ color: 'var(--accent)', fontSize: '.82rem' }}>{meMsg}</span>}
+          </div>
+        </section>
+      )}
 
       {/* Create user form */}
       <section className="card" style={{ marginBottom: '1.2rem' }}>
@@ -211,26 +273,32 @@ export function UsuariosClient() {
                     fontWeight: 600,
                   }}>{u.active ? 'activo' : 'inactivo'}</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '.75rem', color: 'var(--muted)', fontWeight: 600 }}>ROL</span>
-                  <select
-                    className="input"
-                    value={u.role}
-                    onChange={(e) => updateUser(u.id, { role: e.target.value })}
-                    style={{ width: 130, fontSize: '.82rem' }}
-                  >
-                    {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-                  </select>
-                  <button className="btn" style={{ fontSize: '.78rem', padding: '.35rem .7rem' }} onClick={() => updateUser(u.id, { active: !u.active })}>
-                    {u.active ? 'Desactivar' : 'Activar'}
-                  </button>
-                  <button className="btn" style={{ fontSize: '.78rem', padding: '.35rem .7rem' }} onClick={() => { setPwEdit(u.id); setPwVal(''); }}>
-                    Contraseña
-                  </button>
-                  <button className="btn" style={{ fontSize: '.78rem', padding: '.35rem .7rem', color: '#ff6464', borderColor: '#ff6464' }} onClick={() => deleteUser(u.id, u.username)}>
-                    Borrar
-                  </button>
-                </div>
+                {u.id === currentUserId ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: '.72rem', padding: '3px 10px', borderRadius: 6, background: 'var(--accent-soft)', color: 'var(--accent)', fontWeight: 600 }}>Vos (Admin) · editá en "Mi cuenta" ↑</span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '.75rem', color: 'var(--muted)', fontWeight: 600 }}>ROL</span>
+                    <select
+                      className="input"
+                      value={u.role}
+                      onChange={(e) => updateUser(u.id, { role: e.target.value })}
+                      style={{ width: 130, fontSize: '.82rem' }}
+                    >
+                      {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    </select>
+                    <button className="btn" style={{ fontSize: '.78rem', padding: '.35rem .7rem' }} onClick={() => updateUser(u.id, { active: !u.active })}>
+                      {u.active ? 'Desactivar' : 'Activar'}
+                    </button>
+                    <button className="btn" style={{ fontSize: '.78rem', padding: '.35rem .7rem' }} onClick={() => { setPwEdit(u.id); setPwVal(''); }}>
+                      Contraseña
+                    </button>
+                    <button className="btn" style={{ fontSize: '.78rem', padding: '.35rem .7rem', color: '#ff6464', borderColor: '#ff6464' }} onClick={() => deleteUser(u.id, u.username)}>
+                      Borrar
+                    </button>
+                  </div>
+                )}
               </div>
 
               {pwEdit === u.id && (
