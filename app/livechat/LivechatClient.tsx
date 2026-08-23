@@ -84,6 +84,8 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
   const [panelQuick, setPanelQuick] = useState<PanelQuickTexts>(DEFAULT_PANEL_QUICK);
   const [presetDraft, setPresetDraft] = useState('');
   const [copied, setCopied] = useState(false);
+  const [waBtnEnabled, setWaBtnEnabled] = useState(true);
+  const [waBtnUrl, setWaBtnUrl] = useState('');
 
   function templateVal(id: MessageTemplateId): string {
     return runtime.templates?.[id] ?? DEFAULT_TEMPLATES[id];
@@ -119,6 +121,8 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
           if (d.runtime.panelQuick) setPanelQuick({ ...DEFAULT_PANEL_QUICK, ...d.runtime.panelQuick });
         }
         if (typeof d.landingDomain === 'string') setLandingDomain(d.landingDomain.replace(/^https?:\/\//, ''));
+        if (d.waBtnEnabled === false) setWaBtnEnabled(false);
+        if (typeof d.waBtnUrl === 'string') setWaBtnUrl(d.waBtnUrl);
       })
       .catch(() => setMsg('No se pudo leer la config (¿falta columna chat_config en DB?)'));
   }, []);
@@ -142,6 +146,8 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
           landingDomain,
           templates: runtime.templates,
           panelQuick,
+          waBtnEnabled,
+          waBtnUrl: waBtnUrl.trim() || undefined,
         }),
       });
       const d = await r.json();
@@ -376,6 +382,26 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
                   </div>
                 );
               })}
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '.9rem', marginTop: '1rem' }}>
+              <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '0 0 .65rem', fontWeight: 600 }}>Botón flotante de WhatsApp (visible para el cliente)</p>
+              <div className="field" style={{ margin: '0 0 .6rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="checkbox" checked={waBtnEnabled} onChange={(e) => setWaBtnEnabled(e.target.checked)} />
+                  <span>Mostrar botón de WhatsApp en el chat</span>
+                </label>
+                <p style={{ color: 'var(--muted-2)', fontSize: '.7rem', margin: '4px 0 0', lineHeight: 1.35 }}>
+                  Antes de la acreditación muestra un aviso; después redirige a soporte.
+                </p>
+              </div>
+              {waBtnEnabled && (
+                <div className="field" style={{ margin: 0 }}>
+                  <label>URL del botón <span style={{ color: 'var(--muted)', fontSize: '.72rem' }}>(vacío = link de soporte predeterminado)</span></label>
+                  <input className="input" value={waBtnUrl} onChange={(e) => setWaBtnUrl(e.target.value)}
+                    placeholder="https://wa.link/… (usa el de soporte si queda vacío)" />
+                </div>
+              )}
             </div>
           </section>
         )}

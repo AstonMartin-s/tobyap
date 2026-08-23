@@ -35,6 +35,7 @@ export async function GET() {
     runtime.links = { ...runtime.links, support: walinkSupportUrl(session.slug, typeof ld === 'string' ? ld : undefined) };
     runtime = applyTenantRuntimeOverrides(runtime, session.slug);
     const landingDomain = (row?.chatConfig as Record<string, unknown> | null)?.landingDomain;
+    const cc = (row?.chatConfig ?? {}) as Record<string, unknown>;
     return NextResponse.json({
       ok: true,
       brand,
@@ -42,6 +43,8 @@ export async function GET() {
       landingDomain: typeof landingDomain === 'string' ? landingDomain : '',
       linkSlots: LINK_SLOTS,
       preview: buildConversationPreview(runtime),
+      waBtnEnabled: cc.waBtnEnabled !== false,
+      waBtnUrl: typeof cc.waBtnUrl === 'string' ? cc.waBtnUrl : '',
     });
   } catch {
     const brand = parseChatConfig({}, session.slug, session.slug);
@@ -75,6 +78,8 @@ export async function PUT(req: NextRequest) {
     landingDomain?: string;
     templates?: Record<string, string>;
     panelQuick?: { barPlaceholder?: string; barPresets?: string[] };
+    waBtnEnabled?: boolean;
+    waBtnUrl?: string;
   };
 
   // Normaliza el dominio del landing del cliente a un origin https limpio (sin
@@ -113,6 +118,8 @@ export async function PUT(req: NextRequest) {
     panelQuick: body.panelQuick && typeof body.panelQuick === 'object'
       ? parsePanelQuick(body.panelQuick)
       : parsePanelQuick(prev.panelQuick),
+    waBtnEnabled: typeof body.waBtnEnabled === 'boolean' ? body.waBtnEnabled : prev.waBtnEnabled ?? true,
+    waBtnUrl: typeof body.waBtnUrl === 'string' ? body.waBtnUrl.trim() : (prev.waBtnUrl ?? ''),
   };
   const [saved] = await db
     .insert(clientSettings)
