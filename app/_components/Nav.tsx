@@ -106,10 +106,9 @@ export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?:
   return (
     <nav className="sidebar">
       <div className="sidebar__brand">
-        <button className="sidebar__burger" onClick={toggleCollapse} aria-label="Contraer menú" title="Contraer / expandir menú">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
-          </svg>
+        <button className="sidebar__burger sidebar__burger--logo" onClick={toggleCollapse} aria-label="Contraer menú" title="Contraer / expandir menú">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="TrackerIO" />
         </button>
         <span>
           <span className="sidebar__name">Tracker<b>IO</b></span>

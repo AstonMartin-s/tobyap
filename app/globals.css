@@ -161,6 +161,9 @@ a { color: inherit; }
 }
 .sidebar__burger:hover { border-color: var(--accent); color: var(--accent); }
 .sidebar__burger svg { width: 18px; height: 18px; }
+.sidebar__burger--logo { padding: 0; overflow: hidden; background: transparent; border-color: transparent; }
+.sidebar__burger--logo:hover { border-color: var(--accent); }
+.sidebar__burger--logo img { width: 100%; height: 100%; object-fit: cover; border-radius: 9px; display: block; }
 .shell {
   margin-left: var(--sidebar-w);
   max-width: 1180px;
