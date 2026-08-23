@@ -31,7 +31,7 @@ async function main() {
     subtext: String(prev.subtext || 'WhatsApp · atención 24hs'),
     redirectDelayMs: prev.redirectDelayMs ?? 1200,
     pixelId: String(prev.pixelId ?? t.metaPixelId ?? ''),
-    brandName: String(prev.brandName ?? 'BlackBet Soporte'),
+    brandName: String(prev.brandName ?? 'KingPlay Soporte'),
     primaryColor: String(prev.primaryColor ?? '#c9a227'),
   };
 

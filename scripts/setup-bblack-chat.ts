@@ -16,12 +16,12 @@ async function main() {
   const config = {
     chatSlug: 'bblack',
     pixelId: t.metaPixelId ?? '',
-    brandName: 'BlackBet',
+    brandName: 'KingPlay',
     primaryColor: '#c9a227', // dorado, distinto del verde de King
     ccpp: 'A5', // Bono50% — el mismo que ya usan hoy
     campaign: '',
     headline: 'Un segundo…',
-    subtext: 'Te estamos conectando con BlackBet 🎰',
+    subtext: 'Te estamos conectando con KingPlay 🎰',
     redirectDelayMs: 1200,
     waNumber: '',
   } as Record<string, string | number | null>;
@@ -40,7 +40,7 @@ async function main() {
   // confirmados (el panel admin.kingplay.club es el backoffice de agente, no la
   // URL de login del jugador). Marcar para confirmar antes de ir a producción real.
   const chatConfig = {
-    brandName: 'BlackBet',
+    brandName: 'KingPlay',
     offerType: 'bonus',
     offerValue: 50,
     minDeposit: 1000,
