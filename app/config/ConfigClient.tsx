@@ -251,7 +251,7 @@ function NumbersSection() {
 interface Landing { id: string; landingSlug: string | null; name: string | null; type: string | null; active: boolean | null; config: Record<string, string | number | null> | null }
 const LANDING_TYPES = ['publi', 'regular', 'spam', 'remarketing', 'soporte'];
 
-const emptyForm = { landingSlug: '', name: '', type: 'publi', brandName: '', logoUrl: '', primaryColor: '#25d366', waNumber: '', message: '', ccpp: '', campaign: '' };
+const emptyForm = { landingSlug: '', name: '', type: 'publi', brandName: '', logoUrl: '', primaryColor: '#25d366', waNumber: '', message: '', ccpp: '', campaign: '', destination: 'whatsapp' };
 const cfgStr = (c: Landing['config'], k: string) => (c && c[k] != null ? String(c[k]) : '');
 
 function LandingsSection() {
@@ -305,12 +305,18 @@ function LandingsSection() {
       landingSlug: l.landingSlug ?? '', name: l.name ?? '', type: l.type ?? 'publi',
       brandName: cfgStr(l.config, 'brandName'), logoUrl: cfgStr(l.config, 'logoUrl'), primaryColor: cfgStr(l.config, 'primaryColor') || '#25d366',
       waNumber: cfgStr(l.config, 'waNumber'), message: cfgStr(l.config, 'message'), ccpp: cfgStr(l.config, 'ccpp'), campaign: cfgStr(l.config, 'campaign'),
+      destination: cfgStr(l.config, 'chatSlug') ? 'livechat' : 'whatsapp',
     });
     setOpen(true);
   }
   async function save() {
     setErr('');
-    const config = { brandName: n.brandName, logoUrl: n.logoUrl, primaryColor: n.primaryColor, waNumber: n.waNumber, message: n.message, ccpp: n.ccpp, campaign: n.campaign };
+    const config = {
+      brandName: n.brandName, logoUrl: n.logoUrl, primaryColor: n.primaryColor,
+      waNumber: n.waNumber, message: n.message, ccpp: n.ccpp, campaign: n.campaign,
+      // Destino livechat → redirige a /chat/<slug>; whatsapp → rotación de números.
+      chatSlug: n.destination === 'livechat' ? slug : '',
+    };
     try {
       if (editId) {
         await j('/api/landings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editId, name: n.name, type: n.type, config }) });
@@ -344,7 +350,17 @@ function LandingsSection() {
             <div className="field"><label>Marca (texto)</label><input className="input" value={n.brandName} onChange={(e) => setN({ ...n, brandName: e.target.value })} /></div>
             <div className="field"><label>Logo (URL, ej /logos/x.png)</label><input className="input" value={n.logoUrl} onChange={(e) => setN({ ...n, logoUrl: e.target.value })} /></div>
             <div className="field"><label>Color primario</label><input className="input" value={n.primaryColor} onChange={(e) => setN({ ...n, primaryColor: e.target.value })} /></div>
-            <div className="field"><label>WhatsApp (con código país)</label><input className="input" value={n.waNumber} onChange={(e) => setN({ ...n, waNumber: e.target.value })} placeholder="5491155550000" /></div>
+            <div className="field"><label>Destino</label>
+              <select className="select" value={n.destination} onChange={(e) => setN({ ...n, destination: e.target.value })}>
+                <option value="whatsapp">WhatsApp (número/rotación)</option>
+                <option value="livechat">Livechat (chat web)</option>
+              </select>
+            </div>
+            {n.destination === 'livechat' ? (
+              <div className="field"><label>Destino livechat</label><div className="input" style={{ display: 'flex', alignItems: 'center', color: 'var(--muted)', fontSize: '.82rem' }}>Redirige al chat web <b style={{ margin: '0 .3rem', color: 'var(--text)' }}>/chat/{slug}</b></div></div>
+            ) : (
+              <div className="field"><label>WhatsApp (con código país)</label><input className="input" value={n.waNumber} onChange={(e) => setN({ ...n, waNumber: e.target.value })} placeholder="5491155550000" /></div>
+            )}
             <div className="field"><label>CCPP por defecto</label><input className="input" value={n.ccpp} onChange={(e) => setN({ ...n, ccpp: e.target.value })} placeholder="A5" /></div>
             <div className="field"><label>Campaña por defecto</label><input className="input" value={n.campaign} onChange={(e) => setN({ ...n, campaign: e.target.value })} placeholder="C1" /></div>
             <div className="field" style={{ gridColumn: '1 / -1' }}><label>Mensaje de WhatsApp</label><input className="input" value={n.message} onChange={(e) => setN({ ...n, message: e.target.value })} placeholder="Hola, vi el anuncio y quiero mi beneficio" /></div>
