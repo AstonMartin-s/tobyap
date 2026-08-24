@@ -1,11 +1,13 @@
 import bcrypt from 'bcryptjs';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import {
   tenants,
   clientSettings,
   numbers,
   rules,
+  landings,
+  panelUsers,
   type TenantRow,
 } from '@/db/schema';
 import { encrypt, encryptOptional, decryptOptional } from '@/lib/crypto';
@@ -49,15 +51,21 @@ function tenantValues(input: CreateTenantInput) {
   };
 }
 
-// Reemplaza las sub-entidades del cliente (settings 1:1, numbers/rules N). Idempotente.
+// Reemplaza las sub-entidades del cliente (settings 1:1, numbers/rules N,
+// landings N, panel users N). Idempotente.
 async function replaceChildren(tenantId: string, input: CreateTenantInput) {
-  if (input.settings) {
+  // settings (1:1) + chatConfig van a la misma fila client_settings.
+  if (input.settings || input.chatConfig) {
+    const settingsValues = {
+      ...(input.settings ?? {}),
+      ...(input.chatConfig ? { chatConfig: input.chatConfig } : {}),
+    };
     await db
       .insert(clientSettings)
-      .values({ tenantId, ...input.settings })
+      .values({ tenantId, ...settingsValues })
       .onConflictDoUpdate({
         target: clientSettings.tenantId,
-        set: { ...input.settings, updatedAt: new Date() },
+        set: { ...settingsValues, updatedAt: new Date() },
       });
   }
 
@@ -90,6 +98,63 @@ async function replaceChildren(tenantId: string, input: CreateTenantInput) {
           status: r.status ?? 'active',
         })),
       );
+    }
+  }
+
+  // landings: upsert por (tenant, landingSlug) — no borramos las que no vengan
+  // en el JSON para no pisar landings creadas aparte.
+  if (input.landings) {
+    for (const l of input.landings) {
+      const values = {
+        tenantId,
+        landingSlug: l.landingSlug,
+        alias: l.alias ?? null,
+        name: l.name ?? null,
+        type: l.type ?? 'publi',
+        active: l.active ?? true,
+        config: l.config ?? {},
+      };
+      const [existing] = await db
+        .select()
+        .from(landings)
+        .where(and(eq(landings.tenantId, tenantId), eq(landings.landingSlug, l.landingSlug)));
+      if (existing) {
+        await db.update(landings).set(values).where(eq(landings.id, existing.id));
+      } else {
+        await db.insert(landings).values(values);
+      }
+    }
+  }
+
+  // panel users: upsert por (tenant, username). password en claro -> bcrypt.
+  if (input.panelUsers) {
+    for (const u of input.panelUsers) {
+      const passwordHash = await bcrypt.hash(u.password, 10);
+      const [existing] = await db
+        .select()
+        .from(panelUsers)
+        .where(and(eq(panelUsers.tenantId, tenantId), eq(panelUsers.username, u.username)));
+      if (existing) {
+        await db
+          .update(panelUsers)
+          .set({
+            passwordHash,
+            displayName: u.displayName ?? existing.displayName,
+            role: u.role ?? existing.role,
+            active: u.active ?? existing.active,
+            updatedAt: new Date(),
+          })
+          .where(eq(panelUsers.id, existing.id));
+      } else {
+        await db.insert(panelUsers).values({
+          tenantId,
+          username: u.username,
+          passwordHash,
+          displayName: u.displayName ?? null,
+          role: u.role ?? 'operador',
+          active: u.active ?? true,
+        });
+      }
     }
   }
 }
@@ -216,6 +281,7 @@ function resolve(row: TenantRow): ResolvedTenant {
     fieldUtmSource: num('utm_source'),
     fieldUtmContent: num('utm_content'),
     proximityMatchSec: num('proximity_match_sec'),
+    conversationValue: num('conversation_value_ars'),
   };
 }
 

@@ -19,6 +19,17 @@ const GRAPH_VERSION = 'v21.0';
 // poblar value/currency. Se puede tunear por evento acá.
 export const CAPI_VALUE = { value: 1, currency: 'USD' } as const;
 
+// value/currency para el evento Conversacion. Si el tenant tiene un valor
+// esperado por chat configurado (customFields.conversation_value_ars), lo
+// mandamos en ARS; si no, cae al placeholder CAPI_VALUE. Así Meta puede
+// optimizar campañas por valor también sobre la conversación.
+export function conversationValue(tenant: ResolvedTenant): { value: number; currency: string } {
+  if (tenant.conversationValue != null && tenant.conversationValue > 0) {
+    return { value: tenant.conversationValue, currency: 'ARS' };
+  }
+  return { ...CAPI_VALUE };
+}
+
 export type BaseEventName = 'Conversacion' | 'Cargo';
 
 export interface CapiUserData {

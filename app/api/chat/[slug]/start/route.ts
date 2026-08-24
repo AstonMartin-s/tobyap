@@ -9,7 +9,7 @@ import { welcomeStep } from '@/lib/chat/flow';
 import { prepareBotBatch } from '@/lib/chat/stagger';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { createChatLead, addLeadNote } from '@/lib/chat/kommoMirror';
-import { sendCapiEvent, CAPI_VALUE } from '@/lib/meta';
+import { sendCapiEvent, conversationValue } from '@/lib/meta';
 import { clientIp, rateLimit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         eventName: 'Conversacion',
         eventId: convId,
         userData: { phone: wa.phone, fbc: attr?.fbc, fbp: attr?.fbp, fbclid: attr?.fbclid },
-        customData: { campaign_id: attr?.campaignId ?? b.campaign, internal_event: 'ConversacionCRM', ...CAPI_VALUE },
+        customData: { campaign_id: attr?.campaignId ?? b.campaign, internal_event: 'ConversacionCRM', ...conversationValue(tenant) },
         leadId: null,
       }).catch(() => {});
     }

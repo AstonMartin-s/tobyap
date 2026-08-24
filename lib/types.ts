@@ -51,6 +51,10 @@ export interface ResolvedTenant {
   // externo). Ventana en segundos para atar el lead recién creado a la última
   // atribución no matcheada del tenant. 0/ausente = desactivado.
   proximityMatchSec: number | null;
+  // Valor esperado por conversación (chat) en ARS, para el evento ConversacionCRM.
+  // customFields.conversation_value_ars. Se calcula ~ carga_promedio × tasa_conversión.
+  // Si es null/ausente, el evento cae al placeholder CAPI_VALUE (value 1 USD).
+  conversationValue: number | null;
 }
 
 // --- Sub-bloques opcionales del documento de cliente ---
@@ -77,6 +81,26 @@ export interface TenantRuleInput {
   pipeline?: string;
   priority?: number;
   status?: string;
+}
+
+// Landing declarativa para el alta unificada. Se upsertea por (tenant, landingSlug).
+export interface LandingSeedInput {
+  landingSlug: string;
+  name?: string;
+  type?: 'publi' | 'regular' | 'spam' | 'remarketing' | 'soporte' | string;
+  active?: boolean;
+  alias?: string | null;
+  config?: Record<string, string | number | boolean | null>;
+}
+
+// Usuario de panel para el alta unificada. `password` en claro SOLO local: se
+// hashea con bcrypt al insertar. Se upsertea por (tenant, username).
+export interface PanelUserSeedInput {
+  username: string;
+  password: string;
+  displayName?: string;
+  role?: 'admin' | 'supervisor' | 'operador' | string;
+  active?: boolean;
 }
 
 // Forma del JSON de alta (CreateTenantInput). Secretos en claro SOLO local:
@@ -128,4 +152,11 @@ export interface CreateTenantInput {
   settings?: TenantSettingsInput;
   numbers?: TenantNumberInput[];
   rules?: TenantRuleInput[];
+
+  // Alta unificada (Fase onboarding): piel del chat/livechat, landings y usuarios
+  // del panel se cargan en la misma corrida, sin scripts sueltos.
+  // chatConfig => client_settings.chat_config (ChatRuntimeConfig serializado).
+  chatConfig?: Record<string, unknown>;
+  landings?: LandingSeedInput[];
+  panelUsers?: PanelUserSeedInput[];
 }
