@@ -297,7 +297,13 @@ export async function emitCargo(tenant: ResolvedTenant, input: EmitCargoInput): 
       internal_event: 'CargoCRM',
       cargo_source: input.source,
       ...(input.operator ? { cargo_operator: input.operator } : {}),
-      ...(input.value != null ? { value: input.value, currency: input.currency ?? 'ARS' } : CAPI_VALUE),
+      // value/currency del Cargo. Si hay monto real cargado (ARS), lo mandamos
+      // para que Meta pueda optimizar campañas por VALOR de cargo. Si no lo
+      // conocemos, usamos un placeholder pero SIEMPRE en ARS: mezclar monedas
+      // en un mismo evento rompe la optimización por valor.
+      ...(input.value != null
+        ? { value: input.value, currency: input.currency ?? 'ARS' }
+        : { value: CAPI_VALUE.value, currency: 'ARS' }),
     };
 
     const capi = await sendCapiEvent(tenant, {

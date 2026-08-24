@@ -277,6 +277,10 @@ export async function POST(req: NextRequest) {
             sessionKey: s.sessionKey,
             source: 'panel',
             operator: session.slug,
+            // Valor real cargado (ARS) → Meta puede optimizar campañas por valor
+            // de Cargo, no solo por conversación. Solo si el monto es > 0.
+            value: b.amount && b.amount > 0 ? b.amount : undefined,
+            currency: 'ARS',
             skipKommoStatus: true,
             skipChatRelease: true,
           }).catch((e) => console.error(`[panel/chats ${session.slug}] emitCargo (pa_deposit):`, e));
@@ -472,6 +476,9 @@ export async function POST(req: NextRequest) {
           sessionKey: s.sessionKey,
           source: 'panel',
           operator: session.slug,
+          // Si el operador aprobó indicando el monto cargado, lo mandamos en ARS.
+          value: b.amount && b.amount > 0 ? b.amount : undefined,
+          currency: 'ARS',
           skipKommoStatus: true,
           skipChatRelease: true,
         }).catch((e) => console.error(`[panel/chats ${session.slug}] emitCargo:`, e));
