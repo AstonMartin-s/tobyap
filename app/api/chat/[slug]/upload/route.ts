@@ -3,11 +3,12 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
-import { onComprobante } from '@/lib/chat/flow';
+import { onComprobante, comprobanteReviewMessages } from '@/lib/chat/flow';
 import { prepareBotBatch } from '@/lib/chat/stagger';
 import { appendChatMessages } from '@/lib/chat/mutations';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
+import { updateLeadStatus } from '@/lib/kommo';
 import { saveComprobante } from '@/lib/storage';
 import { signFilePath } from '@/lib/chat/fileToken';
 import { normalizeUploadImage } from '@/lib/chat/image';
@@ -45,20 +46,44 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const runtime = await loadChatRuntime(tenant.id, tenant.name, s.phone, tenant.slug);
 
-  const botMsgs = prepareBotBatch(onComprobante(runtime));
+  // GATE de app SOLO con el primer comprobante. En los siguientes NO volvemos a
+  // condicionar el envío: la imagen entra directo a revisión y, si todavía no
+  // activó la app, se le recuerda una sola vez de forma tranquila (opcional).
+  const data0 = (s.data as Record<string, unknown> | null) ?? {};
+  const firstComprobante = data0.comprobanteSentOnce !== true;
+  const appActivated = data0.appInstall === true || data0.appNotif === true;
+
+  let step: string;
+  let botMsgs: ReturnType<typeof prepareBotBatch>;
+  if (firstComprobante) {
+    step = 'app_onboarding'; // primero instala app + notificaciones, luego entra a revisión
+    botMsgs = prepareBotBatch(onComprobante(runtime));
+  } else {
+    step = 'validando';
+    botMsgs = prepareBotBatch(comprobanteReviewMessages(runtime));
+    if (!appActivated) {
+      botMsgs.push({
+        from: 'bot',
+        text: '📲 Si querés, activá las notificaciones desde el menú para enterarte al toque cuando te acreditamos y de tus bonos semanales. Es opcional 🎁',
+        at: Date.now(),
+      });
+    }
+  }
+
   const newMsgs = [
     { from: 'user' as const, image: fileUrl, at: Date.now() },
     ...botMsgs,
   ];
   // Append atómico + merge de data (no pisa mensajes ni flags concurrentes).
   await appendChatMessages(s.id, newMsgs, {
-    step: 'app_onboarding', // primero instala app + notificaciones, luego entra a revisión
+    step,
     markUnread: true,
     dataMerge: {
       ...(storedPath ? { comprobantePath: storedPath } : { comprobante: buf.toString('base64') }),
       comprobanteMime: mime,
       comprobanteName: file.name,
       comprobanteAt: Date.now(), // para la limpieza automática a las 48h
+      comprobanteSentOnce: true,
     },
     // Si quedó en disco, borramos cualquier base64 viejo de un intento anterior.
     dataRemove: storedPath ? ['comprobante'] : [],
@@ -68,8 +93,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (s.kommoLeadId) {
     // URL pública real (detrás del proxy de Railway, req.nextUrl.origin miente).
     const base = process.env.APP_PUBLIC_URL ?? 'https://tobyap-production.up.railway.app';
-    addLeadNote(tenant, s.kommoLeadId, `📸 Comprobante recibido (${file.name}).\nVerlo: ${base}${fileUrl}\n(El cliente está completando la instalación de la app para enviarlo.)`);
+    if (firstComprobante) {
+      addLeadNote(tenant, s.kommoLeadId, `📸 Comprobante recibido (${file.name}).\nVerlo: ${base}${fileUrl}\n(El cliente está completando la instalación de la app para enviarlo.)`);
+    } else {
+      addLeadNote(tenant, s.kommoLeadId, `📸 Nuevo comprobante recibido (${file.name}).\nVerlo: ${base}${fileUrl}\n🔎 Chequealo y mové a Cargo$ para acreditar.`);
+      if (tenant.statusRevisarImagenId) updateLeadStatus(tenant, s.kommoLeadId, tenant.statusRevisarImagenId).catch(() => {});
+    }
   }
 
-  return NextResponse.json({ ok: true, messages: botMsgs, step: 'app_onboarding', fileUrl, total: history.length });
+  return NextResponse.json({ ok: true, messages: botMsgs, step, fileUrl, total: history.length });
 }
