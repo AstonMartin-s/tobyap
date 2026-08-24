@@ -2,7 +2,8 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { clientSettings } from '@/db/schema';
 import { createPortalAccount, buildPortalName } from '@/lib/pagoda';
-import { createPlayerWithRetry } from '@/lib/partner-api';
+import { createPlayerWithRetry, buildPlayerUsername, randomPlayerPassword } from '@/lib/partner-api';
+import { createUser as kingCreateUser, KingApiError } from '@/lib/king-api';
 import type { ResolvedTenant } from '@/lib/types';
 import {
   DEFAULT_RUNTIME,
@@ -59,6 +60,8 @@ export async function accountStep(
   cfg: ChatRuntimeConfig = DEFAULT_RUNTIME,
 ): Promise<{ messages: BotMsg[]; buttons: Btn[]; data: Record<string, unknown>; step: string }> {
   if (tenant.provider === 'partner_api') return accountStepPartnerApi(tenant, session, cfg);
+  // greenbet SIN Pagoda: la cuenta se crea directo por Green API.
+  if (tenant.provider === 'king' && !tenant.pagodaApiKey) return accountStepKingApi(tenant, session, cfg);
 
   const portalName = portalNameFrom(session.name, session.phone);
   let acc;
@@ -118,6 +121,47 @@ async function accountStepPartnerApi(
       buttons: [], data: { credsError: true }, step: 'error',
     };
   }
+}
+
+// Green API directa (greenbet SIN Pagoda): igual que partner_api, ACÁ generamos
+// username/password y reintentamos con otro username si el elegido ya existe.
+// ⚠️ El endpoint/campos de creación se confirman contra la doc de Green.
+async function accountStepKingApi(
+  tenant: ResolvedTenant,
+  session: { phone: string; name?: string | null },
+  cfg: ChatRuntimeConfig,
+): Promise<{ messages: BotMsg[]; buttons: Btn[]; data: Record<string, unknown>; step: string }> {
+  const password = randomPlayerPassword();
+  const maxAttempts = 4;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const username = buildPlayerUsername(session.name, session.phone, attempt);
+    try {
+      const acc = await kingCreateUser(tenant, { username, password, phone: session.phone, name: session.name ?? undefined });
+      const creds = `\n\n👤 Usuario: *${acc.username}*\n🔑 Contraseña: *${acc.password}*\n\n🔗 Entrá acá:\n${cfg.links.portal_login}`;
+      return {
+        messages: [
+          { from: 'bot', delayMs: 600, at: now(), text: renderTemplate('account_creating', cfg) },
+          { from: 'bot', delayMs: 1800, at: now(), text: renderTemplate('account_done', cfg, { creds_block: creds }) },
+        ],
+        buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
+        data: { username: acc.username, password: acc.password, loginUrl: null, portalName: acc.username, existing: acc.existing },
+        step: 'credenciales',
+      };
+    } catch (e) {
+      // Solo reintentamos si parece "username tomado"; otro error corta.
+      const taken = e instanceof KingApiError && /exist|tomad|ya\s|duplicad|taken/i.test(e.message);
+      if (!taken || attempt === maxAttempts - 1) {
+        return {
+          messages: [{ from: 'bot', delayMs: 1200, at: now(), text: renderTemplate('account_error', cfg) }],
+          buttons: [], data: { credsError: true }, step: 'error',
+        };
+      }
+    }
+  }
+  return {
+    messages: [{ from: 'bot', delayMs: 1200, at: now(), text: renderTemplate('account_error', cfg) }],
+    buttons: [], data: { credsError: true }, step: 'error',
+  };
 }
 
 // ── Paso 3: CBU (número separado + copiar) ─────────────────────────────────

@@ -59,11 +59,26 @@ const I = {
   ),
 };
 
+type Features = { reportes: boolean; embudo: boolean; livechat: boolean; fichas: boolean };
+const ALL_ON: Features = { reportes: true, embudo: true, livechat: true, fichas: true };
+
 export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?: string; panelRole?: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const isAdmin = role === 'admin';
   const pr = panelRole ?? 'admin'; // legacy sessions without panelRole = full access
+
+  // Solapas opcionales por cliente (default: todas on hasta que cargue).
+  const [feat, setFeat] = useState<Features>(ALL_ON);
+  useEffect(() => {
+    if (isAdmin) return; // el panel admin global no usa solapas por cliente
+    let alive = true;
+    fetch('/api/panel/features')
+      .then((r) => r.json())
+      .then((d) => { if (alive && d?.features) setFeat(d.features); })
+      .catch(() => { /* mantiene ALL_ON */ });
+    return () => { alive = false; };
+  }, [isAdmin]);
 
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   useEffect(() => {
@@ -125,10 +140,10 @@ export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?:
           </>
         ) : (
           <>
-            {(pr === 'supervisor' || pr === 'admin') && NavLink('/reportes', 'Reportes', I.report)}
+            {feat.reportes && (pr === 'supervisor' || pr === 'admin') && NavLink('/reportes', 'Reportes', I.report)}
             {NavLink('/chats', 'Chats web', I.chat)}
-            {(pr === 'supervisor' || pr === 'admin') && NavLink('/embudo', 'Embudo', I.funnel)}
-            {(pr === 'supervisor' || pr === 'admin') && NavLink('/livechat', 'Ajustes chat', I.live)}
+            {feat.embudo && (pr === 'supervisor' || pr === 'admin') && NavLink('/embudo', 'Embudo', I.funnel)}
+            {feat.livechat && (pr === 'supervisor' || pr === 'admin') && NavLink('/livechat', 'Ajustes chat', I.live)}
             {pr === 'admin' && NavLink('/config', 'Configuración', I.config)}
             {pr === 'admin' && NavLink('/usuarios', 'Usuarios', I.clients)}
           </>

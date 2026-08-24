@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSession, canAccess } from '@/lib/session';
+import { getTenantBySlug } from '@/lib/tenants';
 import {
   buildDailyChartSeries,
   getClientKpis,
@@ -23,6 +24,8 @@ export default async function ReportesPage({
   if (!session) redirect('/login');
   if (session.role === 'admin') redirect('/admin');
   if (!canAccess(session.panelRole, 'reportes')) redirect('/chats');
+  const tenantF = await getTenantBySlug(session.slug);
+  if (tenantF && !tenantF.features.reportes) redirect('/chats');
 
   const chartRange = lastNDaysRangeAR(3);
 

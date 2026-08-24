@@ -108,6 +108,33 @@ export function ManageClient({ slug }: { slug: string }) {
       </div>
 
       <div className="card">
+        <div className="card__title">Funciones (solapas opcionales) <span className="card__sub">se muestran/ocultan por cliente · Chats, Configuración y Usuarios son fijos</span></div>
+        <div className="row" style={{ gap: '2rem', flexWrap: 'wrap' }}>
+          {([
+            ['feat_reportes', 'Reportes'],
+            ['feat_embudo', 'Embudo'],
+            ['feat_livechat', 'Ajustes chat'],
+            ['feat_fichas', 'Panel de fichas'],
+          ] as const).map(([key, label]) => {
+            const on = t.customFields[key] !== 0;
+            return (
+              <div className="row" key={key}>
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    onChange={(e) => patch({ customFields: { ...t.customFields, [key]: e.target.checked ? 1 : 0 } })}
+                  />
+                  <span />
+                </label>
+                <span style={{ fontSize: '.85rem', color: 'var(--muted)' }}>{label}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="card">
         <div className="card__title">Datos y credenciales <span className="card__sub">dejá un secreto vacío para no cambiarlo</span></div>
         <div className="grid-2">
           <div className="field"><label>Nombre</label><input className="input" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></div>

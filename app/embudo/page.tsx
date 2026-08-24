@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSession, canAccess } from '@/lib/session';
+import { getTenantBySlug } from '@/lib/tenants';
 import { Nav } from '../_components/Nav';
 import { EmbudoClient } from './EmbudoClient';
 
@@ -10,6 +11,8 @@ export default async function EmbudoPage() {
   if (!session) redirect('/login');
   if (session.role === 'admin') redirect('/admin');
   if (!canAccess(session.panelRole, 'embudo')) redirect('/chats');
+  const tenant = await getTenantBySlug(session.slug);
+  if (tenant && !tenant.features.embudo) redirect('/chats');
 
   return (
     <>

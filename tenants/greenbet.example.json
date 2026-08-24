@@ -1,0 +1,109 @@
+{
+  "//": "PLANTILLA ALTA UNIFICADA — cliente estilo King/greenbet (fichas por Green API, sin Pagoda).",
+  "//uso": "Copiar a tenants/<slug>.json (gitignored), completar secretos SOLO local y correr: npm run onboard -- tenants/<slug>.json",
+  "//auto": "kommoPipelineId, status_cargo, status_revisar_imagen y fbclid/utm_*/ad_code/cbu_field/titular_field se AUTODESCUBREN de Kommo (dejar vacío u omitir).",
+
+  "slug": "greenbet2",
+  "name": "NombreInternoDelCliente",
+
+  "kommoSubdomain": "SUBDOMINIO_KOMMO",
+  "kommoToken": "PEGAR_TOKEN_KOMMO_SOLO_LOCAL",
+  "pipelineName": "Embudo de ventas",
+
+  "metaPixelId": "000000000000000",
+  "metaCapiToken": "PEGAR_TOKEN_META_CAPI_SOLO_LOCAL",
+  "eventSuffix": "G1",
+
+  "role": "client",
+  "platform": "meta",
+  "readonly": false,
+  "allowTags": false,
+
+  "//provider": "king = fichas por Green API. SIN pagodaUrl/pagodaApiKey => la cuenta se crea directo por Green API.",
+  "provider": "king",
+  "partnerApiUrl": "https://BASE_API_GREEN",
+  "partnerApiKey": "PEGAR_TOKEN_GREEN_SOLO_LOCAL",
+
+  "customFields": {
+    "king_source_id": 0
+  },
+
+  "panelUsers": [
+    { "username": "cliente@correo.com", "password": "CAMBIAR_SOLO_LOCAL", "role": "admin", "displayName": "Admin Cliente" }
+  ],
+
+  "settings": {
+    "accountName": "Titular de la cuenta bancaria SA",
+    "accountCbu": "0000000000000000000000"
+  },
+
+  "//chatConfig": "Piel del chat web + livechat. magicLinks vacío porque sin Pagoda no hay magic-link: todo apunta al login fijo.",
+  "chatConfig": {
+    "brandName": "MarcaVisible",
+    "primaryColor": "#008069",
+    "offerType": "bonus",
+    "offerValue": 30,
+    "minDeposit": 1000,
+    "portalUrl": "https://PORTAL_DEL_CLIENTE/login",
+    "supportUrl": "https://go.fichaslibres.online/l/greenbet2/walink?campaign=Soporte",
+    "links": {
+      "portal_login": "https://PORTAL_DEL_CLIENTE/login",
+      "portal_play": "https://PORTAL_DEL_CLIENTE/login",
+      "portal_forgot": "https://PORTAL_DEL_CLIENTE/login",
+      "portal_deposit": "https://PORTAL_DEL_CLIENTE/login",
+      "portal_withdraw": "https://PORTAL_DEL_CLIENTE/login",
+      "support": "https://go.fichaslibres.online/l/greenbet2/walink?campaign=Soporte"
+    },
+    "magicLinks": [],
+    "postAccreditCajera": false,
+    "templates": {},
+    "panelQuick": {
+      "barPlaceholder": "Mensaje libre al cliente…",
+      "barPresets": ["Reenviame el comprobante completo y legible 📸"]
+    },
+    "testPhones": []
+  },
+
+  "landings": [
+    {
+      "landingSlug": "go",
+      "name": "Publi Chat",
+      "type": "publi",
+      "active": true,
+      "config": {
+        "chatSlug": "greenbet2",
+        "pixelId": "000000000000000",
+        "brandName": "MarcaVisible",
+        "primaryColor": "#008069",
+        "ccpp": "A2",
+        "campaign": "",
+        "headline": "Un segundo…",
+        "subtext": "Te estamos conectando 🎰",
+        "redirectDelayMs": 1200,
+        "waNumber": ""
+      }
+    },
+    {
+      "landingSlug": "walink",
+      "name": "Soporte",
+      "type": "soporte",
+      "active": true,
+      "config": {
+        "noCode": true,
+        "pixelId": "000000000000000",
+        "brandName": "MarcaVisible Soporte",
+        "primaryColor": "#008069",
+        "campaign": "Soporte",
+        "headline": "Te redirigimos a soporte…",
+        "subtext": "WhatsApp · atención 24hs",
+        "redirectUrl": "https://wa.link/CAMBIAR",
+        "redirectDelayMs": 1200,
+        "useFixedNumber": false
+      }
+    }
+  ],
+
+  "numbers": [
+    { "name": "Publi 1", "phone": "5490000000000", "status": true, "type": "publi" }
+  ]
+}

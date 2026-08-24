@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSession, canAccess } from '@/lib/session';
+import { getTenantBySlug } from '@/lib/tenants';
 import { Nav } from '../_components/Nav';
 import { LivechatClient } from './LivechatClient';
 
@@ -10,6 +11,8 @@ export default async function LivechatPage() {
   if (!session) redirect('/login');
   if (session.role === 'admin') redirect('/admin');
   if (!canAccess(session.panelRole, 'livechat')) redirect('/chats');
+  const tenant = await getTenantBySlug(session.slug);
+  if (tenant && !tenant.features.livechat) redirect('/chats');
 
   return (
     <>

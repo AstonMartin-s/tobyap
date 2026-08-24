@@ -55,6 +55,16 @@ export interface ResolvedTenant {
   // customFields.conversation_value_ars. Se calcula ~ carga_promedio × tasa_conversión.
   // Si es null/ausente, el evento cae al placeholder CAPI_VALUE (value 1 USD).
   conversationValue: number | null;
+  // Solapas/funciones OPCIONALES habilitadas por cliente. Se guardan en
+  // customFields.feat_* (1 = on, 0 = off). Por defecto TODO habilitado (ausente
+  // = on) para no romper clientes existentes. El deploy obligatorio (Chats,
+  // Config, Usuarios) no depende de esto.
+  features: {
+    reportes: boolean;
+    embudo: boolean;
+    livechat: boolean;
+    fichas: boolean;
+  };
 }
 
 // --- Sub-bloques opcionales del documento de cliente ---

@@ -141,7 +141,13 @@ export async function GET(req: NextRequest) {
 
   const tenantForProvider = await getTenantBySlug(session.slug);
 
-  return NextResponse.json({ ok: true, items, stats: statRows, tenantProvider: tenantForProvider?.provider ?? 'pagoda' });
+  return NextResponse.json({
+    ok: true,
+    items,
+    stats: statRows,
+    tenantProvider: tenantForProvider?.provider ?? 'pagoda',
+    fichasEnabled: tenantForProvider ? tenantForProvider.features.fichas : true,
+  });
 }
 
 // GET individual (transcript) via ?sessionKey=... handled in GET? Keep simple:
@@ -228,6 +234,9 @@ export async function POST(req: NextRequest) {
     const tenant = await getTenantBySlug(session.slug);
     if (!tenant || (tenant.provider !== 'partner_api' && tenant.provider !== 'king')) {
       return NextResponse.json({ ok: false, skip: true, error: 'cliente sin API de fichas' });
+    }
+    if (!tenant.features.fichas) {
+      return NextResponse.json({ ok: false, skip: true, error: 'función de fichas deshabilitada para este cliente' });
     }
     const username = data.username as string | undefined;
     if (!username) return NextResponse.json({ ok: false, error: 'la sesión no tiene usuario de portal' }, { status: 400 });

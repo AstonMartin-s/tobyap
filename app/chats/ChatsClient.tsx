@@ -160,8 +160,9 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [delLead, setDelLead] = useState(false);
   const [stats, setStats] = useState<Array<{ step: string | null; createdAt: string | null }>>([]);
   const [tenantProvider, setTenantProvider] = useState<string>('pagoda');
+  const [fichasEnabled, setFichasEnabled] = useState<boolean>(true);
   const [opsOpen, setOpsOpen] = useState(false);
-  const showOpsPanel = (tenantProvider === 'partner_api' || tenantProvider === 'king') && !!sel && !!detail?.username;
+  const showOpsPanel = fichasEnabled && (tenantProvider === 'partner_api' || tenantProvider === 'king') && !!sel && !!detail?.username;
   // Ancho de la lista (barra divisora arrastrable, estilo Black Dragon).
   const [listW, setListW] = useState(380);
   const listWRef = useRef(380);
@@ -253,6 +254,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     setItems(its);
     setStats(r.stats ?? []);
     if (r.tenantProvider) setTenantProvider(r.tenantProvider);
+    if (typeof r.fichasEnabled === 'boolean') setFichasEnabled(r.fichasEnabled);
   }, []);
 
   // Pestañas terminales (Acreditados / No cargó / Archivadas): son estados viejos
