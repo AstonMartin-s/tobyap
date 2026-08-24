@@ -12,9 +12,11 @@ import { invalidateTenant } from '@/lib/tenants';
 //   npx tsx --env-file=.env scripts/set-conversation-value.ts bblack 800
 
 const DEFAULTS: Record<string, number> = {
-  bblack: 800,   // 3703 × 21.6%
-  king: 350,     // 2500 × 13.4%
-  paradise: 400, // provisorio (poca data)
+  bblack: 800,       // 3703 × 21.6%
+  king: 350,         // 2500 × 13.4%
+  paradise: 400,     // provisorio (poca data)
+  ClienteA1: 400,    // provisorio (poca data)
+  cd6239742: 400,    // ClienteA2 · provisorio (poca data)
 };
 
 async function setOne(slug: string, value: number) {
