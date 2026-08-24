@@ -345,7 +345,7 @@ function LandingsSection({ slug, landings, bonos, reload }: { slug: string; land
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [err, setErr] = useState('');
-  const emptyForm = { landingSlug: '', name: '', type: 'publi', brandName: '', primaryColor: '#25d366', waNumber: '', message: '', pixelId: '', ccpp: '', campaign: '' };
+  const emptyForm = { landingSlug: '', name: '', type: 'publi', brandName: '', primaryColor: '#25d366', waNumber: '', message: '', pixelId: '', ccpp: '', campaign: '', destination: 'whatsapp' };
   const [n, setN] = useState(emptyForm);
   // Generador de link con parámetros.
   const [gen, setGen] = useState({ landingSlug: '', ccpp: '', campaign: '' });
@@ -375,12 +375,20 @@ function LandingsSection({ slug, landings, bonos, reload }: { slug: string; land
       brandName: s('brandName'), primaryColor: s('primaryColor') || '#25d366',
       waNumber: s('waNumber'), message: s('message'), pixelId: s('pixelId'),
       ccpp: s('ccpp'), campaign: s('campaign'),
+      // Destino: si la landing tiene chatSlug → livechat; si no → whatsapp.
+      destination: s('chatSlug') ? 'livechat' : 'whatsapp',
     });
     setOpen(true);
   }
   async function save() {
     setErr('');
-    const config = { brandName: n.brandName, primaryColor: n.primaryColor, waNumber: n.waNumber, message: n.message, pixelId: n.pixelId, ccpp: n.ccpp, campaign: n.campaign };
+    const config = {
+      brandName: n.brandName, primaryColor: n.primaryColor, waNumber: n.waNumber,
+      message: n.message, pixelId: n.pixelId, ccpp: n.ccpp, campaign: n.campaign,
+      // Destino livechat → redirige a /chat/<slug> (chatSlug = slug del cliente).
+      // Destino whatsapp → sin chatSlug (rota entre los números activos del tipo).
+      chatSlug: n.destination === 'livechat' ? slug : '',
+    };
     try {
       if (editId) {
         await j(`/api/admin/landings/${editId}`, {
@@ -424,7 +432,19 @@ function LandingsSection({ slug, landings, bonos, reload }: { slug: string; land
             <div className="field"><label>Tipo</label><select className="select" value={n.type} onChange={(e) => setN({ ...n, type: e.target.value })}>{LANDING_TYPES.map((x) => <option key={x} value={x}>{x}</option>)}</select></div>
             <div className="field"><label>Marca (texto)</label><input className="input" value={n.brandName} onChange={(e) => setN({ ...n, brandName: e.target.value })} /></div>
             <div className="field"><label>Color primario</label><input className="input" value={n.primaryColor} onChange={(e) => setN({ ...n, primaryColor: e.target.value })} /></div>
-            <div className="field"><label>Número de WhatsApp</label><div className="input" style={{ display: 'flex', alignItems: 'center', color: 'var(--muted)', fontSize: '.82rem' }}>Rota entre los activos de categoría <b style={{ margin: '0 .3rem', color: 'var(--text)' }}>{n.type}</b> (Números de contacto)</div></div>
+            <div className="field"><label>Destino</label>
+              <select className="select" value={n.destination} onChange={(e) => setN({ ...n, destination: e.target.value })}>
+                <option value="whatsapp">WhatsApp (rotación de números)</option>
+                <option value="livechat">Livechat (chat web)</option>
+              </select>
+            </div>
+            <div className="field"><label>Número de WhatsApp</label>
+              {n.destination === 'livechat' ? (
+                <div className="input" style={{ display: 'flex', alignItems: 'center', color: 'var(--muted)', fontSize: '.82rem' }}>Redirige al chat web <b style={{ margin: '0 .3rem', color: 'var(--text)' }}>/chat/{slug}</b> (no usa números)</div>
+              ) : (
+                <div className="input" style={{ display: 'flex', alignItems: 'center', color: 'var(--muted)', fontSize: '.82rem' }}>Rota entre los activos de categoría <b style={{ margin: '0 .3rem', color: 'var(--text)' }}>{n.type}</b> (Números de contacto)</div>
+              )}
+            </div>
             <div className="field"><label>Pixel ID (override)</label><input className="input" value={n.pixelId} onChange={(e) => setN({ ...n, pixelId: e.target.value })} placeholder="usa el del cliente si vacío" /></div>
             <div className="field"><label>Código bono (CCPP)</label><input className="input" value={n.ccpp} onChange={(e) => setN({ ...n, ccpp: e.target.value })} placeholder="A1" /></div>
             <div className="field"><label>Campaña por defecto</label><input className="input" value={n.campaign} onChange={(e) => setN({ ...n, campaign: e.target.value })} placeholder="CC1" /></div>
