@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { TZ_AR } from '@/lib/datetime/ar';
 import { DEFAULT_PANEL_QUICK, type PanelQuickTexts } from '@/lib/chat/templates';
 import OperationsPanel from './OperationsPanel';
@@ -220,6 +220,18 @@ export function ChatsClient() {
   // mensajes ya están pintados (visibleMsgCount > 0). Este flag posterga la
   // bajada hasta ese momento (si no, el body está vacío y el scroll no baja).
   const pendingBottomRef = useRef(false);
+  const scrollRetriesRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Baja al fondo YA + reintentos: las imágenes del chat (comprobante, portal)
+  // cargan async y cambian la altura después del primer scroll; los reintentos
+  // a 120/350/700 ms garantizan que quede pegado al último mensaje.
+  const scrollToBottomSoon = useCallback(() => {
+    const jump = () => { const e = bodyRef.current; if (e) e.scrollTop = e.scrollHeight; };
+    jump();
+    requestAnimationFrame(jump);
+    scrollRetriesRef.current.forEach(clearTimeout);
+    scrollRetriesRef.current = [120, 350, 700].map((ms) => setTimeout(jump, ms));
+    atBottomRef.current = true;
+  }, []);
 
   const loadList = useCallback(async () => {
     const r = await fetch('/api/panel/chats').then((x) => x.json()).catch(() => null);
@@ -351,9 +363,11 @@ export function ChatsClient() {
     }
   }, [detail]);
 
-  useEffect(() => {
+  // useLayoutEffect: corre tras el commit del DOM y ANTES del paint, así medimos
+  // scrollHeight con los mensajes ya presentes y no hay "flash" arriba.
+  useLayoutEffect(() => {
     // Al cambiar de chat marcamos que hay que bajar al fondo; la bajada real se
-    // hace más abajo recién cuando los mensajes están pintados.
+    // hace recién cuando los mensajes están pintados (visibleMsgCount > 0).
     if (scrollSelRef.current !== sel) {
       scrollSelRef.current = sel;
       pendingBottomRef.current = true;
@@ -362,19 +376,16 @@ export function ChatsClient() {
     if (!el) return;
     scrollCountRef.current = detail?.messages.length ?? 0;
 
-    // Bajar al último mensaje: al abrir un chat (una vez que ya se pintó al menos
-    // un mensaje) o cuando el operador acaba de enviar. Los mensajes que llegan
-    // por el poll NO mueven el scroll del que está leyendo hacia arriba.
+    // Bajar al último mensaje: al abrir un chat (una vez que ya hay ≥1 mensaje
+    // pintado) o cuando el operador acaba de enviar. Los mensajes que llegan por
+    // el poll NO mueven el scroll del que está leyendo hacia arriba.
     const openBottom = pendingBottomRef.current && visibleMsgCount > 0;
     if (openBottom || forceScrollRef.current) {
-      // rAF: esperar a que el layout con los mensajes esté aplicado antes de medir.
-      const target = el;
-      requestAnimationFrame(() => { target.scrollTop = target.scrollHeight; });
-      atBottomRef.current = true;
+      scrollToBottomSoon();
       if (openBottom) pendingBottomRef.current = false;
       forceScrollRef.current = false;
     }
-  }, [detail, sel, visibleMsgCount]);
+  }, [detail, sel, visibleMsgCount, scrollToBottomSoon]);
 
   function openExport() {
     const today = new Date();
