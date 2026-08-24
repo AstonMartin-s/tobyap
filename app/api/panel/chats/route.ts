@@ -389,7 +389,7 @@ export async function POST(req: NextRequest) {
     case 'custom': {
       const t = (b.text ?? '').trim();
       if (!t) return NextResponse.json({ error: 'texto vacío' }, { status: 400 });
-      newMsgs = [{ from: 'bot', text: t, at: Date.now() }];
+      newMsgs = [{ from: 'bot', text: t, at: Date.now(), op: true }];
       note = `✍️ Mensaje manual del operador: "${t.slice(0, 120)}"`;
       operatorTookOver = true;
       break;

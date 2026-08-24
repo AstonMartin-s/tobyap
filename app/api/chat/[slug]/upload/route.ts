@@ -14,7 +14,7 @@ import { normalizeUploadImage } from '@/lib/chat/image';
 
 export const dynamic = 'force-dynamic';
 
-const MAX_BYTES = 4 * 1024 * 1024; // 4MB
+const MAX_BYTES = 10 * 1024 * 1024; // 10MB — cubre fotos grandes y PDFs de comprobante
 
 // POST /api/chat/[slug]/upload  (multipart: sessionKey, image) — guarda la IMAGEN
 // real del comprobante (base64 en la sesión), la sirve vía /file y deja el link
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const sessionKey = form?.get('sessionKey')?.toString();
   const file = form?.get('image');
   if (!sessionKey || !(file instanceof File)) return NextResponse.json({ error: 'sessionKey e image requeridos' }, { status: 400 });
-  if (file.size > MAX_BYTES) return NextResponse.json({ error: 'imagen muy pesada (máx 4MB)' }, { status: 413 });
+  if (file.size > MAX_BYTES) return NextResponse.json({ error: 'archivo muy pesado (máx 10MB)' }, { status: 413 });
 
   const [s] = await db.select().from(chatSessions).where(and(eq(chatSessions.tenantId, tenant.id), eq(chatSessions.sessionKey, sessionKey)));
   if (!s) return NextResponse.json({ error: 'sesión desconocida' }, { status: 404 });

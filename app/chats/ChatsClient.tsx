@@ -216,6 +216,10 @@ export function ChatsClient() {
   // Forzar bajada SOLO cuando el operador manda algo (no cuando entra un mensaje
   // por el poll: ahí no queremos mover al que está leyendo).
   const forceScrollRef = useRef(false);
+  // Al abrir un chat queremos bajar al último mensaje, pero recién cuando los
+  // mensajes ya están pintados (visibleMsgCount > 0). Este flag posterga la
+  // bajada hasta ese momento (si no, el body está vacío y el scroll no baja).
+  const pendingBottomRef = useRef(false);
 
   const loadList = useCallback(async () => {
     const r = await fetch('/api/panel/chats').then((x) => x.json()).catch(() => null);
@@ -348,20 +352,29 @@ export function ChatsClient() {
   }, [detail]);
 
   useEffect(() => {
+    // Al cambiar de chat marcamos que hay que bajar al fondo; la bajada real se
+    // hace más abajo recién cuando los mensajes están pintados.
+    if (scrollSelRef.current !== sel) {
+      scrollSelRef.current = sel;
+      pendingBottomRef.current = true;
+    }
     const el = bodyRef.current;
     if (!el) return;
-    const count = detail?.messages.length ?? 0;
-    const changedChat = scrollSelRef.current !== sel;
-    scrollSelRef.current = sel;
-    scrollCountRef.current = count;
-    // Baja al fondo SOLO al abrir otro chat o cuando el operador acaba de enviar.
-    // Los mensajes que llegan por el poll NO mueven el scroll.
-    if (changedChat || forceScrollRef.current) {
-      el.scrollTop = el.scrollHeight;
+    scrollCountRef.current = detail?.messages.length ?? 0;
+
+    // Bajar al último mensaje: al abrir un chat (una vez que ya se pintó al menos
+    // un mensaje) o cuando el operador acaba de enviar. Los mensajes que llegan
+    // por el poll NO mueven el scroll del que está leyendo hacia arriba.
+    const openBottom = pendingBottomRef.current && visibleMsgCount > 0;
+    if (openBottom || forceScrollRef.current) {
+      // rAF: esperar a que el layout con los mensajes esté aplicado antes de medir.
+      const target = el;
+      requestAnimationFrame(() => { target.scrollTop = target.scrollHeight; });
       atBottomRef.current = true;
+      if (openBottom) pendingBottomRef.current = false;
       forceScrollRef.current = false;
     }
-  }, [detail, sel]);
+  }, [detail, sel, visibleMsgCount]);
 
   function openExport() {
     const today = new Date();

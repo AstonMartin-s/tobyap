@@ -516,7 +516,24 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         {msgs.map((m, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: m.from === 'user' ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
             <div style={{ maxWidth: '80%', background: m.from === 'user' ? C.userBubble : C.botBubble, color: '#111827', padding: '7px 10px', borderRadius: 10, borderTopLeftRadius: m.from === 'bot' ? 2 : 10, borderTopRightRadius: m.from === 'user' ? 2 : 10, boxShadow: '0 1px 1px rgba(0,0,0,.12)', fontSize: 15, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-              {m.image ? <img src={m.image} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} style={{ maxWidth: 240, maxHeight: 320, borderRadius: 8, display: 'block' }} /> : (
+              {m.image ? (
+                <a href={m.image} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+                  <img
+                    src={m.image}
+                    alt=""
+                    onError={(e) => {
+                      const img = e.currentTarget as HTMLImageElement;
+                      img.style.display = 'none';
+                      const span = img.nextElementSibling as HTMLElement | null;
+                      if (span) span.style.display = 'inline-flex';
+                    }}
+                    style={{ maxWidth: 240, maxHeight: 320, borderRadius: 8, display: 'block' }}
+                  />
+                  <span style={{ display: 'none', alignItems: 'center', gap: 6, padding: '8px 10px', fontSize: 14, fontWeight: 600, color: C.send }}>
+                    📄 Archivo enviado ✓
+                  </span>
+                </a>
+              ) : (
                 m.copy ? (
                   <div>
                     <div style={{ fontSize: 17, fontWeight: 600, letterSpacing: 0.3, fontFamily: 'ui-monospace, Menlo, monospace' }}>{m.text}</div>
@@ -584,7 +601,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
           <button onClick={() => fileRef.current?.click()} title="Adjuntar imagen" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#54656F', display: 'flex', alignItems: 'center', padding: '4px' }}>
             <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path></svg>
           </button>
-          <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.currentTarget.value = ''; }} />
+          <input ref={fileRef} type="file" accept="image/*,application/pdf,.pdf,.heic,.heif" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.currentTarget.value = ''; }} />
           <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send(); }} placeholder="Escribe un mensaje" style={{ flex: 1, border: 'none', borderRadius: 20, padding: '10px 14px', fontSize: 15, outline: 'none', background: '#fff', color: '#111827' }} />
           <button onClick={send} style={{ background: C.send, color: '#fff', border: 'none', width: 40, height: 40, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', transform: 'translate(-1px, 1px)' }}>

@@ -21,10 +21,15 @@ export function storageEnabled(): boolean {
 }
 
 const extFromMime = (mime: string): string => {
-  if (mime.includes('png')) return 'png';
-  if (mime.includes('webp')) return 'webp';
-  if (mime.includes('gif')) return 'gif';
-  if (mime.includes('pdf')) return 'pdf';
+  const m = (mime || '').toLowerCase();
+  if (m.includes('png')) return 'png';
+  if (m.includes('webp')) return 'webp';
+  if (m.includes('gif')) return 'gif';
+  if (m.includes('pdf')) return 'pdf';
+  if (m.includes('heic')) return 'heic';
+  if (m.includes('heif')) return 'heif';
+  if (m.includes('bmp')) return 'bmp';
+  if (m.includes('tiff')) return 'tiff';
   return 'jpg';
 };
 
