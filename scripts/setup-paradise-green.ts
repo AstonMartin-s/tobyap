@@ -23,6 +23,7 @@ const GREEN_SOURCE_ID = 78784;
 const ACCOUNT_NAME = 'VANTUM';
 const ACCOUNT_CBU = '0000151500037381717133';
 const WALINK = 'https://wa.link/greenplay';
+const BRAND_COLOR = '#E0A81E'; // dorado/amarillo (marca Paradise Queens)
 const SUPPORT_URL = `https://go.fichaslibres.online/l/${SLUG}/walink?campaign=Soporte`;
 
 async function main() {
@@ -56,19 +57,19 @@ async function main() {
       portal_withdraw: `${GREEN_BASE}/login`,
     },
     avatarUrl: `/api/chat/${SLUG}/avatar`,
-    brandName: 'Paradise', // TODO confirmar nombre visible definitivo
-    offerType: 'bonus', // TODO confirmar oferta
-    portalUrl: `${GREEN_BASE}/login`, // TODO confirmar portal del jugador
+    brandName: 'Paradise',
+    offerType: 'bonus',
+    portalUrl: `${GREEN_BASE}/login`,
     templates: {},
     magicLinks: ['portal_play', 'portal_deposit', 'portal_withdraw'],
-    minDeposit: 1000, // TODO confirmar
-    offerValue: 30, // TODO confirmar
+    minDeposit: 1000,
+    offerValue: 30,
     panelQuick: {
       barPresets: ['Reenviame el comprobante completo y legible 📸'],
       barPlaceholder: 'Mensaje libre al cliente…',
     },
     supportUrl: SUPPORT_URL,
-    primaryColor: '#008069', // TODO confirmar color de marca
+    primaryColor: BRAND_COLOR, // dorado/amarillo Paradise Queens
     landingDomain: '',
     postAccreditCajera: false,
   };
@@ -92,7 +93,7 @@ async function main() {
   const walinkCfg = {
     brandName: 'Paradise Soporte',
     redirectUrl: WALINK,
-    primaryColor: '#008069',
+    primaryColor: BRAND_COLOR,
   };
   const [existing] = await db
     .select()
