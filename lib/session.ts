@@ -87,3 +87,9 @@ export function canAccess(panelRole: PanelRole | undefined, tab: string): boolea
   if (!allowed) return true;
   return allowed.includes(panelRole);
 }
+
+// Regla principal: EXPORTAR datos (CSV, etc.) es exclusivo de admin.
+// Las sesiones legacy sin panelRole son el admin del tenant → permitidas.
+export function isPanelAdmin(panelRole: PanelRole | undefined): boolean {
+  return !panelRole || panelRole === 'admin';
+}

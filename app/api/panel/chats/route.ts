@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
-import { getSession } from '@/lib/session';
+import { getSession, isPanelAdmin } from '@/lib/session';
 import { getTenantBySlug } from '@/lib/tenants';
 import { phoneForExport } from '@/lib/phone';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
@@ -172,6 +172,10 @@ export async function POST(req: NextRequest) {
   // Export CSV flexible: rango de creación + filtro opcional por estado. Para cruzar
   // con bases externas (no solo step=done en TrackerIO).
   if (b.op === 'export_csv' || b.op === 'export_done') {
+    // Regla principal: exportar es exclusivo de admin.
+    if (!isPanelAdmin(session.panelRole)) {
+      return NextResponse.json({ error: 'solo un admin puede exportar' }, { status: 403 });
+    }
     let where = eq(chatSessions.tenantId, session.tenantId);
     // Legacy export_done = solo acreditados, sin filtro de fecha.
     if (b.op === 'export_done') {

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/session';
+import { getSession, isPanelAdmin } from '@/lib/session';
 import { Nav } from '../_components/Nav';
 import { ChatsClient } from './ChatsClient';
 
@@ -14,7 +14,7 @@ export default async function ChatsPage() {
     <>
       <Nav slug={session.slug} role={session.role} panelRole={session.panelRole} />
       <main className="shell shell--wide" style={{ paddingTop: '.8rem' }}>
-        <ChatsClient />
+        <ChatsClient canExport={isPanelAdmin(session.panelRole)} />
       </main>
     </>
   );

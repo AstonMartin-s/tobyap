@@ -140,7 +140,7 @@ function isoDateLocal(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
-export function ChatsClient() {
+export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [showKpis, setShowKpis] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [sel, setSel] = useState<string | null>(null);
@@ -601,9 +601,11 @@ export function ChatsClient() {
             {!soundOn && <line x1="3" y1="3" x2="21" y2="21" />}
           </svg>
         </button>
-        <button onClick={openExport}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', padding: '.3rem .6rem', fontSize: '.76rem', fontWeight: 600, border: '1px solid rgba(52,210,122,0.3)', borderRadius: 8, background: 'rgba(52,210,122,0.1)', color: 'var(--success)', cursor: 'pointer', transition: 'all .2s' }}
-          title="Exportar CSV: rango de fechas, filtro por estado, usuario y teléfono separados">⬇ Exportar</button>
+        {canExport && (
+          <button onClick={openExport}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', padding: '.3rem .6rem', fontSize: '.76rem', fontWeight: 600, border: '1px solid rgba(52,210,122,0.3)', borderRadius: 8, background: 'rgba(52,210,122,0.1)', color: 'var(--success)', cursor: 'pointer', transition: 'all .2s' }}
+            title="Exportar CSV: rango de fechas, filtro por estado, usuario y teléfono separados">⬇ Exportar</button>
+        )}
       </div>
     </div>
 
