@@ -47,11 +47,13 @@ export default async function ReportesPage({
       start: searchParams.start,
       end: searchParams.end,
       tenantId: session.tenantId,
+      channel,
     }),
     getDailyReport({
       start: chartRange.start,
       end: chartRange.end,
       tenantId: session.tenantId,
+      channel,
     }),
     getInfluencerSpend(session.tenantId, { start: searchParams.start, end: searchParams.end }),
   ]);

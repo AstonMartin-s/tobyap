@@ -27,6 +27,13 @@ function notTestCampaign() {
   return sql`(lower(${metaEvents.campaignId}) not in ('test') OR ${metaEvents.campaignId} is null)`;
 }
 
+/** SQL: filtra por canal según el prefijo del campaign_id (influ* = influencer). */
+function channelCond(channel?: Channel) {
+  if (channel === 'influencer') return sql`lower(${metaEvents.campaignId}) like 'influ%'`;
+  if (channel === 'meta') return sql`(${metaEvents.campaignId} is null OR lower(${metaEvents.campaignId}) not like 'influ%')`;
+  return undefined;
+}
+
 export function todayAR(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: AR_TZ }).format(new Date()); // YYYY-MM-DD
 }
@@ -295,7 +302,7 @@ export interface DailyRow {
   saldo: number; // saldo corriente: Σ recargas − Σ gasto hasta ese día (por cliente)
 }
 
-export async function getDailyReport(opts: { start?: string; end?: string; tenantId?: string } = {}): Promise<DailyRow[]> {
+export async function getDailyReport(opts: { start?: string; end?: string; tenantId?: string; channel?: Channel } = {}): Promise<DailyRow[]> {
   // El día se agrupa en hora AR (dayExpr), pero el filtro es sobre sentAt (UTC).
   // Ensanchamos ±1 día la ventana UTC para no cortar las cargas de la tarde/noche
   // AR (que en UTC caen al día siguiente) y luego recortamos por el día ya
@@ -312,6 +319,8 @@ export async function getDailyReport(opts: { start?: string; end?: string; tenan
   if (opts.end) conds.push(lte(metaEvents.sentAt, shift(opts.end, +2)));
   if (opts.tenantId) conds.push(eq(metaEvents.tenantId, opts.tenantId));
   conds.push(notTestCampaign());
+  const chCond = channelCond(opts.channel);
+  if (chCond) conds.push(chCond);
 
   const ev = await db
     .select({ tenantId: metaEvents.tenantId, day: dayExpr, type: metaEvents.eventType, n: sql<number>`count(*)::int` })
@@ -321,7 +330,25 @@ export async function getDailyReport(opts: { start?: string; end?: string; tenan
 
   const ts = await db.select({ id: tenants.id, slug: tenants.slug, name: tenants.name }).from(tenants).where(eq(tenants.role, 'client'));
   const tById = new Map(ts.map((t) => [t.id, t]));
-  const led = await db.select().from(ledger);
+
+  // Fuente del gasto según canal:
+  //  - influencer: caja APARTE (influencer_spend) → gasto = Σ amount por día;
+  //    recarga/saldo NO aplican (no tocan el saldo del cliente) → quedan en 0.
+  //  - meta / todos: ledger del cliente (gasto/recarga/saldo como siempre).
+  type LedgerLike = { tenantId: string; day: string; gasto: number | null; ingreso: number | null };
+  let led: LedgerLike[];
+  if (opts.channel === 'influencer') {
+    const spendConds = [];
+    if (opts.tenantId) spendConds.push(eq(influencerSpend.tenantId, opts.tenantId));
+    const sp = await db
+      .select({ tenantId: influencerSpend.tenantId, day: influencerSpend.day, gasto: sql<number>`coalesce(sum(${influencerSpend.amount}),0)::float` })
+      .from(influencerSpend)
+      .where(spendConds.length ? and(...spendConds) : undefined)
+      .groupBy(influencerSpend.tenantId, influencerSpend.day);
+    led = sp.map((s) => ({ tenantId: s.tenantId, day: s.day, gasto: s.gasto, ingreso: 0 }));
+  } else {
+    led = await db.select().from(ledger);
+  }
   const ledByKey = new Map(led.map((l) => [`${l.tenantId}|${l.day}`, l]));
 
   const map = new Map<string, DailyRow>();
@@ -405,6 +432,12 @@ export async function getDailyReport(opts: { start?: string; end?: string; tenan
     r.conversion = r.chats ? +(100 * r.cargas / r.chats).toFixed(1) : 0;
     r.costPerChat = r.chats ? +(r.gasto / r.chats).toFixed(2) : 0;
     r.costPerCarga = r.cargas ? +(r.gasto / r.cargas).toFixed(2) : 0;
+    // El saldo es la caja del cliente (ledger). En el canal influencer (caja
+    // aparte) no aplica → 0.
+    if (opts.channel === 'influencer') {
+      r.saldo = 0;
+      continue;
+    }
     const hist = ledByTenant.get(r.tenantId) ?? [];
     r.saldo = +hist
       .filter((l) => l.day <= r.day)
