@@ -119,7 +119,7 @@ export default async function ReportesPage({
           </div>
         </div>
 
-        {isAdmin && <InfluencerSpend start={searchParams.start} end={searchParams.end} />}
+        {isAdmin && channel === 'influencer' && <InfluencerSpend start={searchParams.start} end={searchParams.end} />}
 
         <div className="card">
           <div className="card__title">
