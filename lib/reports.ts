@@ -1,6 +1,17 @@
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { metaEvents, tenants, ledger } from '@/db/schema';
+import { metaEvents, tenants, ledger, influencerSpend } from '@/db/schema';
+
+// ---------------------------------------------------------------------------
+// Canal de la campaña. Convención operativa: toda campaña de influencer arranca
+// con el prefijo "influ" (INFLU/Influ/influ). El resto es tráfico de Meta.
+// Se usa para separar reportes por canal sin cambiar cómo se cargan las campañas.
+// ---------------------------------------------------------------------------
+export type Channel = 'meta' | 'influencer';
+
+export function campaignChannel(campaign: string | null | undefined): Channel {
+  return /^influ/i.test((campaign ?? '').trim()) ? 'influencer' : 'meta';
+}
 
 // Día (YYYY-MM-DD) en zona AR — usado para agrupar reportes diarios y el ledger.
 const AR_TZ = 'America/Argentina/Buenos_Aires';
@@ -68,18 +79,27 @@ export interface ClientReport {
 }
 
 // Reporte de UN cliente (su propia data), con filtros opcionales de campaña y fechas.
+interface ChannelTotals {
+  conversaciones: number;
+  cargas: number;
+  redirects: number;
+}
+
 export interface ClientKpis {
   conversaciones: number;
   cargas: number;
   redirects: number;
   totalEvents: number;
   conversion: number;
-  byCampaign: Array<{ campaign: string; conversaciones: number; cargas: number; redirects: number }>;
+  byCampaign: Array<{ campaign: string; channel: Channel; conversaciones: number; cargas: number; redirects: number }>;
+  // Totales por canal (siempre calculados sobre TODO el período, sin importar el
+  // filtro de canal), para poder mostrar Meta e Influencer lado a lado.
+  byChannel: { meta: ChannelTotals; influencer: ChannelTotals };
 }
 
 export async function getClientKpis(
   tenantId: string,
-  opts: { campaign?: string; start?: string; end?: string } = {},
+  opts: { campaign?: string; start?: string; end?: string; channel?: Channel } = {},
 ): Promise<ClientKpis> {
   const conds = [eq(metaEvents.tenantId, tenantId), notTestCampaign(), ...range(opts.start, opts.end)];
   if (opts.campaign) conds.push(eq(metaEvents.campaignId, opts.campaign));
@@ -94,25 +114,39 @@ export async function getClientKpis(
     .where(and(...conds))
     .groupBy(metaEvents.eventType, metaEvents.campaignId);
 
-  let conversaciones = 0;
-  let cargas = 0;
-  let redirects = 0;
-  const byCamp = new Map<string, { conversaciones: number; cargas: number; redirects: number }>();
+  const empty = (): ChannelTotals => ({ conversaciones: 0, cargas: 0, redirects: 0 });
+  const byChannel = { meta: empty(), influencer: empty() };
+  const byCamp = new Map<string, { channel: Channel; conversaciones: number; cargas: number; redirects: number }>();
+
+  const bump = (t: ChannelTotals, type: string | null, n: number) => {
+    if (type === 'conversacion') t.conversaciones += n;
+    else if (type === 'cargo') t.cargas += n;
+    else if (type === 'redirect') t.redirects += n;
+  };
+
   for (const r of rows) {
-    if (r.type === 'conversacion') conversaciones += r.n;
-    else if (r.type === 'cargo') cargas += r.n;
-    else if (r.type === 'redirect') redirects += r.n;
+    const channel = campaignChannel(r.campaign);
+    // byChannel: siempre acumula ambos canales (para el resumen lado a lado).
+    bump(byChannel[channel], r.type, r.n);
+    // El detalle por campaña y los totales respetan el filtro de canal si vino.
+    if (opts.channel && channel !== opts.channel) continue;
     const key = r.campaign ?? '(sin campaña)';
-    const c = byCamp.get(key) ?? { conversaciones: 0, cargas: 0, redirects: 0 };
-    if (r.type === 'conversacion') c.conversaciones += r.n;
-    else if (r.type === 'cargo') c.cargas += r.n;
-    else if (r.type === 'redirect') c.redirects += r.n;
+    const c = byCamp.get(key) ?? { channel, conversaciones: 0, cargas: 0, redirects: 0 };
+    bump(c, r.type, r.n);
     byCamp.set(key, c);
   }
 
   const byCampaign = [...byCamp.entries()]
     .map(([campaign, v]) => ({ campaign, ...v }))
     .sort((a, b) => b.conversaciones - a.conversaciones);
+
+  // Totales según canal filtrado (o todo si no hay filtro).
+  const sel = opts.channel
+    ? [byChannel[opts.channel]]
+    : [byChannel.meta, byChannel.influencer];
+  const conversaciones = sel.reduce((a, t) => a + t.conversaciones, 0);
+  const cargas = sel.reduce((a, t) => a + t.cargas, 0);
+  const redirects = sel.reduce((a, t) => a + t.redirects, 0);
 
   return {
     conversaciones,
@@ -121,7 +155,39 @@ export async function getClientKpis(
     totalEvents: conversaciones + cargas,
     conversion: conversaciones ? +(100 * cargas / conversaciones).toFixed(1) : 0,
     byCampaign,
+    byChannel,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Gasto de influencers — caja APARTE (no toca ledger ni el saldo del cliente).
+// Solo trazabilidad para calcular CPA del canal influencer. Se carga por
+// (tenant, campaña, día). Devuelve el total del período por campaña y global.
+// ---------------------------------------------------------------------------
+export interface InfluencerSpendSummary {
+  total: number;
+  byCampaign: Array<{ campaign: string; amount: number }>;
+}
+
+export async function getInfluencerSpend(
+  tenantId: string,
+  opts: { start?: string; end?: string } = {},
+): Promise<InfluencerSpendSummary> {
+  const conds = [eq(influencerSpend.tenantId, tenantId)];
+  if (opts.start) conds.push(gte(influencerSpend.day, opts.start));
+  if (opts.end) conds.push(lte(influencerSpend.day, opts.end));
+
+  const rows = await db
+    .select({ campaign: influencerSpend.campaign, amount: sql<number>`coalesce(sum(${influencerSpend.amount}),0)::float` })
+    .from(influencerSpend)
+    .where(and(...conds))
+    .groupBy(influencerSpend.campaign);
+
+  const byCampaign = rows
+    .map((r) => ({ campaign: r.campaign, amount: r.amount }))
+    .sort((a, b) => b.amount - a.amount);
+  const total = byCampaign.reduce((a, r) => a + r.amount, 0);
+  return { total, byCampaign };
 }
 
 function range(start?: string, end?: string) {

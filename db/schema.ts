@@ -33,6 +33,29 @@ export const ledger = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// influencer_spend — gasto en campañas de INFLUENCERS, caja APARTE del cliente.
+// NO toca el ledger ni el saldo disponible (el cliente maneja su propia caja):
+// es SOLO trazabilidad para calcular CPA/rendimiento del canal influencer.
+// Una fila por (tenant, campaña, día). Lo carga el admin del cliente.
+// ---------------------------------------------------------------------------
+export const influencerSpend = pgTable(
+  'influencer_spend',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    campaign: text('campaign').notNull(), // ej. "INFLUjuan" (prefijo influ*)
+    day: text('day').notNull(), // 'YYYY-MM-DD' (zona AR)
+    amount: doublePrecision('amount').default(0), // gasto en ARS
+    note: text('note'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({ uniqSpend: unique('influencer_spend_tenant_campaign_day').on(t.tenantId, t.campaign, t.day) }),
+);
+export type InfluencerSpendRow = typeof influencerSpend.$inferSelect;
+
+// ---------------------------------------------------------------------------
 // tenants — un registro por cliente. Secretos cifrados (AES-256-GCM) en reposo.
 // ---------------------------------------------------------------------------
 export const tenants = pgTable('tenants', {

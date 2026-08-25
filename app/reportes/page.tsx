@@ -1,24 +1,28 @@
 import { redirect } from 'next/navigation';
-import { getSession, canAccess } from '@/lib/session';
+import { getSession, canAccess, isPanelAdmin } from '@/lib/session';
 import { getTenantBySlug } from '@/lib/tenants';
 import {
   buildDailyChartSeries,
   getClientKpis,
   getDailyReport,
+  getInfluencerSpend,
   lastNDaysRangeAR,
+  type Channel,
 } from '@/lib/reports';
 import { Nav } from '../_components/Nav';
 import { DailyAdsCharts } from './DailyAdsCharts';
 import { DailyAdsTable } from './DailyAdsTable';
+import { InfluencerSpend } from './InfluencerSpend';
 
 export const dynamic = 'force-dynamic';
 
 const fmt = (n: number) => n.toLocaleString('es-AR');
+const money = (n: number) => n.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
 export default async function ReportesPage({
   searchParams,
 }: {
-  searchParams: { campaign?: string; start?: string; end?: string };
+  searchParams: { campaign?: string; start?: string; end?: string; channel?: string };
 }) {
   const session = await getSession();
   if (!session) redirect('/login');
@@ -27,11 +31,15 @@ export default async function ReportesPage({
   const tenantF = await getTenantBySlug(session.slug);
   if (tenantF && !tenantF.features.reportes) redirect('/chats');
 
+  const channel: Channel | undefined =
+    searchParams.channel === 'meta' || searchParams.channel === 'influencer' ? searchParams.channel : undefined;
+  const isAdmin = isPanelAdmin(session.panelRole);
   const chartRange = lastNDaysRangeAR(3);
 
-  const [k, daily, chartRows] = await Promise.all([
+  const [k, daily, chartRows, influSpend] = await Promise.all([
     getClientKpis(session.tenantId, {
       campaign: searchParams.campaign || undefined,
+      channel,
       start: searchParams.start ? `${searchParams.start}T00:00:00.000Z` : undefined,
       end: searchParams.end ? `${searchParams.end}T23:59:59.999Z` : undefined,
     }),
@@ -45,7 +53,21 @@ export default async function ReportesPage({
       end: chartRange.end,
       tenantId: session.tenantId,
     }),
+    getInfluencerSpend(session.tenantId, { start: searchParams.start, end: searchParams.end }),
   ]);
+
+  const conv = (t: { conversaciones: number; cargas: number }) =>
+    t.conversaciones ? +(100 * t.cargas / t.conversaciones).toFixed(1) : 0;
+  const influCpa = k.byChannel.influencer.cargas ? influSpend.total / k.byChannel.influencer.cargas : 0;
+  const qs = (ch: string) => {
+    const p = new URLSearchParams();
+    if (searchParams.campaign) p.set('campaign', searchParams.campaign);
+    if (searchParams.start) p.set('start', searchParams.start);
+    if (searchParams.end) p.set('end', searchParams.end);
+    if (ch) p.set('channel', ch);
+    const s = p.toString();
+    return s ? `/reportes?${s}` : '/reportes';
+  };
 
   const chartData = buildDailyChartSeries(chartRows, 3);
 
@@ -64,6 +86,34 @@ export default async function ReportesPage({
           <div className="page-head__text">
             <h1>Reportes</h1>
             <p>Estadísticas y análisis de eventos de tu cuenta.</p>
+          </div>
+        </div>
+
+        {/* Resumen por canal: Meta vs Influencers (todo el período/filtro de fechas). */}
+        <div className="card">
+          <div className="card__title">
+            Canales <span className="card__sub">Meta vs Influencers · influencer = campañas que empiezan con INFLU</span>
+          </div>
+          <div className="grid-2">
+            <div className="kpi kpi--blue">
+              <div className="kpi__label">📣 Meta</div>
+              <div className="kpi__value">{fmt(k.byChannel.meta.cargas)} cargas</div>
+              <div className="kpi__hint">{fmt(k.byChannel.meta.conversaciones)} conversaciones · {conv(k.byChannel.meta)}% conv.</div>
+            </div>
+            <div className="kpi kpi--purple">
+              <div className="kpi__label">⭐ Influencers</div>
+              <div className="kpi__value">{fmt(k.byChannel.influencer.cargas)} cargas</div>
+              <div className="kpi__hint">
+                {fmt(k.byChannel.influencer.conversaciones)} conversaciones · {conv(k.byChannel.influencer)}% conv.
+                {influSpend.total > 0 && <> · CPA ${money(influCpa)}</>}
+              </div>
+            </div>
+          </div>
+          <div className="row" style={{ marginTop: '.7rem', gap: '.4rem' }}>
+            <span style={{ fontSize: '.82rem', color: 'var(--muted)', marginRight: '.3rem' }}>Ver:</span>
+            <a className={`btn btn--sm ${!channel ? '' : 'btn--ghost'}`} href={qs('')}>Todos</a>
+            <a className={`btn btn--sm ${channel === 'meta' ? '' : 'btn--ghost'}`} href={qs('meta')}>Meta</a>
+            <a className={`btn btn--sm ${channel === 'influencer' ? '' : 'btn--ghost'}`} href={qs('influencer')}>Influencers</a>
           </div>
         </div>
 
@@ -131,12 +181,15 @@ export default async function ReportesPage({
         <div className="card">
           <div className="card__title">
             Rendimiento por campaña
-            <span className="card__sub">conversión = cargas / conversaciones</span>
+            <span className="card__sub">
+              conversión = cargas / conversaciones{channel ? ` · filtrando: ${channel === 'meta' ? 'Meta' : 'Influencers'}` : ''}
+            </span>
           </div>
           <table className="table">
             <thead>
               <tr>
                 <th>Campaña</th>
+                <th>Canal</th>
                 <th className="num">Conversaciones</th>
                 <th className="num">Cargas</th>
                 <th className="num">Redirecciones</th>
@@ -145,11 +198,12 @@ export default async function ReportesPage({
             </thead>
             <tbody>
               {k.byCampaign.length === 0 && (
-                <tr><td colSpan={5} className="empty">Todavía no hay eventos en este período.</td></tr>
+                <tr><td colSpan={6} className="empty">Todavía no hay eventos en este período.</td></tr>
               )}
               {k.byCampaign.map((c) => (
                 <tr key={c.campaign}>
                   <td>{c.campaign}</td>
+                  <td>{c.channel === 'influencer' ? '⭐ Influencer' : '📣 Meta'}</td>
                   <td className="num">{fmt(c.conversaciones)}</td>
                   <td className="num">{fmt(c.cargas)}</td>
                   <td className="num">{fmt(c.redirects)}</td>
@@ -161,6 +215,8 @@ export default async function ReportesPage({
             </tbody>
           </table>
         </div>
+
+        {isAdmin && <InfluencerSpend start={searchParams.start} end={searchParams.end} />}
       </main>
     </>
   );
