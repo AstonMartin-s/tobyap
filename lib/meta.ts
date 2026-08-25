@@ -40,7 +40,12 @@ export interface CapiUserData {
   fbclid?: string | null; // fallback para construir fbc
   clientIp?: string | null;
   userAgent?: string | null;
+  externalId?: string | null; // ID estable por usuario; si falta, se deriva del teléfono
 }
+
+// País por defecto de nuestros clientes (AR). Meta espera el código ISO-2 en
+// minúscula y hasheado. Suma señal de matching sin pedir dato nuevo.
+const DEFAULT_COUNTRY = 'ar';
 
 export interface SendCapiInput {
   eventName: BaseEventName;
@@ -82,10 +87,19 @@ function buildUserData(u: CapiUserData) {
   const fbc = resolveFbc(u);
   if (fbc) ud.fbc = fbc;
   if (u.fbp) ud.fbp = u.fbp;
+  const phoneDigits = u.phone ? u.phone.replace(/\D/g, '') : '';
   const ph = hashPhone(u.phone);
   if (ph) ud.ph = [ph];
   const em = sha256(u.email);
   if (em) ud.em = [em];
+  // external_id: ID estable por usuario. Si no viene explícito, lo derivamos del
+  // teléfono (hash). Mejora la calidad de coincidencias sin pedir datos nuevos.
+  const externalRaw = u.externalId ?? (phoneDigits || null);
+  const extId = sha256(externalRaw);
+  if (extId) ud.external_id = [extId];
+  // country (ISO-2, minúscula, hasheado). Todos nuestros clientes son AR.
+  const country = sha256(DEFAULT_COUNTRY);
+  if (country) ud.country = [country];
   if (u.clientIp) ud.client_ip_address = u.clientIp;
   if (u.userAgent) ud.client_user_agent = u.userAgent;
   return ud;

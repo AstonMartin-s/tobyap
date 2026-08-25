@@ -214,12 +214,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       }
 
       let campaign = readLeadField(lead, tenant.fieldUtmCampaign) ?? undefined;
+      let convEventSourceUrl: string | null = null;
       // Enriquecemos el evento con la atribución ya resuelta arriba.
       if (attr) {
         ud.fbclid = ud.fbclid ?? attr.fbclid;
         ud.fbc = ud.fbc ?? attr.fbc;
         ud.fbp = ud.fbp ?? attr.fbp;
         campaign = campaign ?? attr.campaignId ?? undefined;
+        convEventSourceUrl = convEventSourceUrl ?? attr.eventSourceUrl ?? null;
       }
 
       // RECUPERO de atribución: si este webhook no trajo el token (ej. llegó por
@@ -233,6 +235,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
             fbc: attributions.fbc,
             fbp: attributions.fbp,
             fbclid: attributions.fbclid,
+            eventSourceUrl: attributions.eventSourceUrl,
           })
           .from(attributions)
           .where(and(eq(attributions.tenantId, tenant.id), eq(attributions.matchedLeadId, sig.leadId)))
@@ -242,6 +245,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
           ud.fbc = ud.fbc ?? prev.fbc;
           ud.fbp = ud.fbp ?? prev.fbp;
           ud.fbclid = ud.fbclid ?? prev.fbclid;
+          convEventSourceUrl = convEventSourceUrl ?? prev.eventSourceUrl ?? null;
         }
       }
 
@@ -262,6 +266,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
               eventId: convId,
               userData: ud,
               customData: { campaign_id: campaign, internal_event: 'ConversacionCRM', ...conversationValue(tenant) },
+              eventSourceUrl: convEventSourceUrl,
               leadId: row?.id ?? null,
             }),
           );

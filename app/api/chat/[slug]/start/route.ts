@@ -92,12 +92,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // Leemos la atribución del token SIEMPRE, independiente de si el lead se creó
   // en Kommo: el evento a Meta no puede depender de que Kommo ande bien, son dos
   // sistemas separados y uno no debe tumbar al otro.
-  let attr: { campaignId: string | null; fbc: string | null; fbp: string | null; fbclid: string | null } | null = null;
+  let attr: { campaignId: string | null; fbc: string | null; fbp: string | null; fbclid: string | null; eventSourceUrl: string | null } | null = null;
   if (b.token) {
     const row = await db.query.attributions.findFirst({
       where: and(eq(attributions.tenantId, tenant.id), eq(attributions.code, b.token)),
     });
-    if (row) attr = { campaignId: row.campaignId, fbc: row.fbc, fbp: row.fbp, fbclid: row.fbclid };
+    if (row) attr = { campaignId: row.campaignId, fbc: row.fbc, fbp: row.fbp, fbclid: row.fbclid, eventSourceUrl: row.eventSourceUrl };
   }
 
   // El lead ya se crea con etiquetas (Chat Web + campaña + bono), custom fields
@@ -121,6 +121,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         eventId: convId,
         userData: { phone: wa.phone, fbc: attr?.fbc, fbp: attr?.fbp, fbclid: attr?.fbclid },
         customData: { campaign_id: attr?.campaignId ?? b.campaign, internal_event: 'ConversacionCRM', ...conversationValue(tenant) },
+        eventSourceUrl: attr?.eventSourceUrl ?? null,
         leadId: null,
       }).catch(() => {});
     }
