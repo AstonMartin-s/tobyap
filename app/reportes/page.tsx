@@ -119,6 +119,8 @@ export default async function ReportesPage({
           </div>
         </div>
 
+        {isAdmin && <InfluencerSpend start={searchParams.start} end={searchParams.end} />}
+
         <div className="card">
           <div className="card__title">
             Reportes diarios de ads
@@ -218,7 +220,6 @@ export default async function ReportesPage({
           </table>
         </div>
 
-        {isAdmin && <InfluencerSpend start={searchParams.start} end={searchParams.end} />}
       </main>
     </>
   );
