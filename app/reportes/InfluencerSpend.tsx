@@ -63,7 +63,7 @@ export function InfluencerSpend({ start, end }: { start?: string; end?: string }
   return (
     <div className="card">
       <div className="card__title">
-        Gasto de influencers <span className="card__sub">caja aparte · no afecta tu saldo · solo trazabilidad para el CPA</span>
+        Gasto de influencers <span className="card__sub">en USDT · caja aparte · no afecta tu saldo · solo trazabilidad para el CPA</span>
       </div>
 
       {msg && <p style={{ color: 'var(--accent)', fontSize: '.85rem' }}>{msg}</p>}
@@ -76,8 +76,8 @@ export function InfluencerSpend({ start, end }: { start?: string; end?: string }
         <div className="field"><label>Fecha</label>
           <input className="input" type="date" value={day} onChange={(e) => setDay(e.target.value)} />
         </div>
-        <div className="field"><label>Monto (ARS)</label>
-          <input className="input" type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="15000" />
+        <div className="field"><label>Monto (USDT)</label>
+          <input className="input" type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="150" />
         </div>
         <div className="field"><label>Nota (opcional)</label>
           <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Historia IG @juan" />
