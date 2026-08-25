@@ -42,7 +42,7 @@ export interface EmitCargoResult {
   ok: boolean;
   eventId: string;
   source: CargoSource;
-  skipped?: 'already_sent' | 'no_id' | 'no_value';
+  skipped?: 'already_sent' | 'no_id';
   error?: string;
   capi?: CapiResult;
   chatReleased?: boolean;
@@ -288,23 +288,6 @@ export async function emitCargo(tenant: ResolvedTenant, input: EmitCargoInput): 
     console.log(`[emitCargo ${tenant.slug}] skip already_sent`, { eventId: ids.eventId, source: input.source });
     await markConverted(tenant.id, ids.kommoLeadId, input.leadRowId ?? null);
     return { ok: true, eventId: ids.eventId, source: input.source, skipped: 'already_sent', ...extra };
-  }
-
-  // King: el CargoCRM debe llevar SIEMPRE el monto real de la carga hecha desde
-  // el panel de fichas (pa_deposit). Nunca mandamos un placeholder (value 1),
-  // porque una vez que Meta recibe un event_id no lo actualiza: si "Aprobar" o el
-  // webhook dispararan primero con valor 1, la carga real quedaría pegada en 1.
-  // Regla: para king solo emitimos cuando hay monto real (>0); si no, no lockeamos
-  // el evento y dejamos que la carga real (que sí trae monto) lo emita después.
-  const hasRealValue = input.value != null && input.value > 0;
-  if (tenant.provider === 'king' && !hasRealValue) {
-    const extra = await sideEffects();
-    console.log(`[emitCargo ${tenant.slug}] skip no_value (king espera monto real del panel de fichas)`, {
-      eventId: ids.eventId,
-      source: input.source,
-    });
-    await markConverted(tenant.id, ids.kommoLeadId, input.leadRowId ?? null);
-    return { ok: true, eventId: ids.eventId, source: input.source, skipped: 'no_value', ...extra };
   }
 
   try {
