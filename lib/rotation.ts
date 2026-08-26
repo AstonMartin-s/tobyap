@@ -35,3 +35,41 @@ export async function pickNumberByCategory(
 export async function pickPubliRotating(tenantId: string): Promise<string | null> {
   return pickNumberByCategory(tenantId, 'publi');
 }
+
+// Igual que pickNumberByCategory pero devuelve teléfono + nombre. Se usa para el
+// "cajero sticky": elegimos uno con el round-robin y lo fijamos al usuario.
+export async function pickCajero(
+  tenantId: string,
+): Promise<{ phone: string; name: string | null } | null> {
+  const rows = await db
+    .select({ phone: numbers.phone, name: numbers.name })
+    .from(numbers)
+    .where(and(eq(numbers.tenantId, tenantId), eq(numbers.type, 'cajero'), eq(numbers.status, true)))
+    .orderBy(asc(numbers.createdAt));
+
+  const valid = rows.filter((r) => r.phone && String(r.phone).replace(/\D/g, ''));
+  if (!valid.length) return null;
+  if (valid.length === 1) return { phone: String(valid[0].phone), name: valid[0].name };
+
+  const [row] = await db
+    .update(tenants)
+    .set({ rotationCursor: sql`coalesce(${tenants.rotationCursor}, 0) + 1` })
+    .where(eq(tenants.id, tenantId))
+    .returning({ c: tenants.rotationCursor });
+
+  const cursor = row?.c ?? 0;
+  const pick = valid[cursor % valid.length];
+  return { phone: String(pick.phone), name: pick.name };
+}
+
+// Lista de cajeros activos (para el selector de reasignación manual en el panel).
+export async function listCajeros(
+  tenantId: string,
+): Promise<Array<{ phone: string; name: string | null }>> {
+  const rows = await db
+    .select({ phone: numbers.phone, name: numbers.name })
+    .from(numbers)
+    .where(and(eq(numbers.tenantId, tenantId), eq(numbers.type, 'cajero'), eq(numbers.status, true)))
+    .orderBy(asc(numbers.createdAt));
+  return rows.filter((r) => r.phone).map((r) => ({ phone: String(r.phone), name: r.name }));
+}

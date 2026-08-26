@@ -15,6 +15,7 @@ export type StoredBotMsg = {
   text?: string;
   image?: string;
   copy?: string;
+  wa?: string;
   at: number;
   delayMs?: number;
   op?: boolean;
@@ -26,6 +27,7 @@ export function toStoredBot(m: BotMsg, extra?: Partial<StoredBotMsg>): StoredBot
     text: m.text,
     image: m.image,
     copy: m.copy,
+    ...(m.wa ? { wa: m.wa } : {}),
     at: m.at,
     delayMs: m.delayMs,
     ...extra,

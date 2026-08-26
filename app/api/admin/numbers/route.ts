@@ -6,7 +6,7 @@ import { isAdmin } from '@/lib/admin-auth';
 
 // Categorías = tipos de landing (para que la landing rote entre números de su
 // misma categoría).
-const TYPES = ['publi', 'regular', 'spam', 'remarketing', 'soporte'];
+const TYPES = ['publi', 'regular', 'spam', 'remarketing', 'soporte', 'cajero'];
 
 async function tenantId(slug: string): Promise<string | null> {
   const t = await db.query.tenants.findFirst({ where: eq(tenants.slug, slug) });

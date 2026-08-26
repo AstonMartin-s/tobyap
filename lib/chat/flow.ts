@@ -4,6 +4,7 @@ import { clientSettings } from '@/db/schema';
 import { createPortalAccount, buildPortalName } from '@/lib/pagoda';
 import { createPlayerWithRetry, buildPlayerUsername, randomPlayerPassword } from '@/lib/partner-api';
 import { createUser as kingCreateUser, KingApiError } from '@/lib/king-api';
+import { pickCajero } from '@/lib/rotation';
 import type { ResolvedTenant } from '@/lib/types';
 import {
   DEFAULT_RUNTIME,
@@ -18,7 +19,7 @@ import {
 } from '@/lib/chat/runtime';
 
 export interface Btn { id: string; label: string }
-export interface BotMsg { from: 'bot'; text?: string; copy?: string; image?: string; delayMs?: number; at: number }
+export interface BotMsg { from: 'bot'; text?: string; copy?: string; image?: string; wa?: string; delayMs?: number; at: number }
 
 // Re-export defaults (compat con imports existentes).
 export const PORTAL_URL = DEFAULT_PORTAL_URL;
@@ -38,6 +39,51 @@ function portalNameFrom(name?: string | null, phone?: string): string {
   const clean = (name ?? '').normalize('NFD').replace(/[^a-zA-Z]/g, '');
   if (clean.length >= 3) return clean.slice(0, 12);
   return buildPortalName(name ?? phone);
+}
+
+// Cajero sticky: al crear el usuario elegimos UN cajero del pool (categoría
+// 'cajero', round-robin) y lo fijamos a la sesión. Todas las derivaciones a
+// WhatsApp de ese usuario van siempre a ese número (no rota más). Si el tenant
+// no tiene pool de cajeros cargado, devuelve {} y el flujo sigue como siempre
+// (link de soporte con rotación de landing). El operador puede reasignarlo a
+// mano desde el panel.
+async function assignCajeroData(tenantId: string): Promise<Record<string, unknown>> {
+  try {
+    const c = await pickCajero(tenantId);
+    if (!c) return {};
+    return { assignedWa: c.phone, assignedWaName: c.name ?? null };
+  } catch {
+    return {};
+  }
+}
+
+// Mensaje que se prellena al abrir el WhatsApp del cajero asignado.
+export const CAJERO_WA_MSG = '¡Holaa! 🙌 Me derivaron a esta línea y quiero aprovechar mi promo 🎁✨';
+
+/** Link wa.me directo al cajero asignado (sticky), con mensaje predeterminado. */
+export function stickyWaUrl(phone: string, msg = CAJERO_WA_MSG): string {
+  const digits = String(phone).replace(/\D/g, '');
+  return `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`;
+}
+
+/** Si la sesión tiene cajero asignado, override del slot {support} con el link
+ *  sticky directo. Si no, {} (se usa el link de soporte normal de la landing). */
+export function supportOverride(data: Record<string, unknown>): Record<string, string> {
+  const wa = data.assignedWa ? String(data.assignedWa).replace(/\D/g, '') : '';
+  return wa ? { support: stickyWaUrl(wa) } : {};
+}
+
+/** Mensaje de soporte, con botón "Abrir WhatsApp" (campo wa) si hay cajero
+ *  asignado. El widget pinta el botón como el de "Copiar CBU". */
+function buildSupportMsg(cfg: ChatRuntimeConfig, data: Record<string, unknown>, delayMs: number): BotMsg {
+  const wa = data.assignedWa ? String(data.assignedWa).replace(/\D/g, '') : '';
+  return {
+    from: 'bot',
+    delayMs,
+    at: now(),
+    text: renderTemplate('support', cfg, supportOverride(data)),
+    ...(wa ? { wa: stickyWaUrl(wa) } : {}),
+  };
 }
 
 // ── Paso 1: WELCOME ────────────────────────────────────────────────────────
@@ -86,10 +132,11 @@ export async function accountStep(
         { from: 'bot', delayMs: 2400, at: now(), text: renderTemplate('account_agent_followup', cfg) },
       ];
 
+  const cajero = acc.existing ? {} : await assignCajeroData(tenant.id);
   return {
     messages,
     buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
-    data: { username: acc.username, password: acc.password, loginUrl: acc.loginUrl, portalName, existing: acc.existing },
+    data: { username: acc.username, password: acc.password, loginUrl: acc.loginUrl, portalName, existing: acc.existing, ...cajero },
     step: 'credenciales',
   };
 }
@@ -107,6 +154,7 @@ async function accountStepPartnerApi(
   try {
     const { username, password } = await createPlayerWithRetry(tenant, { name: session.name, phone: session.phone });
     const creds = `\n\n👤 Usuario: *${username}*\n🔑 Contraseña: *${password}*\n\n🔗 Entrá acá:\n${cfg.links.portal_login}`;
+    const cajero = await assignCajeroData(tenant.id);
     return {
       messages: [
         { from: 'bot', delayMs: 600, at: now(), text: renderTemplate('account_creating', cfg) },
@@ -114,7 +162,7 @@ async function accountStepPartnerApi(
         { from: 'bot', delayMs: 2400, at: now(), text: renderTemplate('account_agent_followup', cfg) },
       ],
       buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
-      data: { username, password, loginUrl: null, portalName: username, existing: false },
+      data: { username, password, loginUrl: null, portalName: username, existing: false, ...cajero },
       step: 'credenciales',
     };
   } catch {
@@ -140,6 +188,7 @@ async function accountStepKingApi(
     try {
       const acc = await kingCreateUser(tenant, { username, password, phone: session.phone, name: session.name ?? undefined });
       const creds = `\n\n👤 Usuario: *${acc.username}*\n🔑 Contraseña: *${acc.password}*\n\n🔗 Entrá acá:\n${cfg.links.portal_login}`;
+      const cajero = acc.existing ? {} : await assignCajeroData(tenant.id);
       return {
         messages: [
           { from: 'bot', delayMs: 600, at: now(), text: renderTemplate('account_creating', cfg) },
@@ -147,7 +196,7 @@ async function accountStepKingApi(
           { from: 'bot', delayMs: 2400, at: now(), text: renderTemplate('account_agent_followup', cfg) },
         ],
         buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
-        data: { username: acc.username, password: acc.password, loginUrl: null, portalName: acc.username, existing: acc.existing },
+        data: { username: acc.username, password: acc.password, loginUrl: null, portalName: acc.username, existing: acc.existing, ...cajero },
         step: 'credenciales',
       };
     } catch (e) {
@@ -209,10 +258,8 @@ export function comprobanteRejectedMessages(cfg: ChatRuntimeConfig = DEFAULT_RUN
   ];
 }
 
-export function supportMessage(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg[] {
-  return [
-    { from: 'bot', delayMs: 400, at: now(), text: renderTemplate('support', cfg) },
-  ];
+export function supportMessage(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME, data: Record<string, unknown> = {}): BotMsg[] {
+  return [buildSupportMsg(cfg, data, 400)];
 }
 
 // ── Paso 5: CARGO — dos mensajes: acreditado + jugar, luego promo cajera/walink.
@@ -248,7 +295,7 @@ export function postActionMessages(action: string, data: Record<string, unknown>
     case 'withdraw':
       return { messages: ref(renderTemplate('post_withdraw', cfg, { portal_withdraw: portalUrl('portal_withdraw') })) };
     case 'support':
-      return { messages: [{ from: 'bot', delayMs: 600, at: now(), text: renderTemplate('support', cfg) }] };
+      return { messages: [buildSupportMsg(cfg, data, 600)] };
     case 'forgot_user':
       return { messages: [{ from: 'bot', delayMs: 600, at: now(), text: renderTemplate('post_forgot', cfg, { username: user, password: pass, portal_forgot: portalUrl('portal_forgot') }) }] };
     case 'cancel':
@@ -261,8 +308,8 @@ export function postActionMessages(action: string, data: Record<string, unknown>
 // Detecta si el cliente está pidiendo ayuda / confundido / consulta que el flujo
 // no resuelve → lo mandamos directo al soporte de WhatsApp.
 const HELP_RE = /(ayuda|no entiendo|no comprendo|no puedo|no me (anda|funciona|sale)|problema|c[oó]mo hago|como funciona|no s[eé]|duda|consulta|hablar con|una persona|un humano|asesor|operador|reclamo|estafa|no me lleg|error)/i;
-function supportReply(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg[] {
-  return [{ from: 'bot', delayMs: 600, at: now(), text: renderTemplate('support', cfg) }];
+function supportReply(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME, data: Record<string, unknown> = {}): BotMsg[] {
+  return [buildSupportMsg(cfg, data, 600)];
 }
 
 // Palabras que indican un problema real (no solo confusión con el paso de la
@@ -277,7 +324,7 @@ const APP_CONFUSION_RE = /(qu[eé] app|cu[aá]l aplicaci|qu[eé] aplicaci|c[oó]
 // 'welcome' para siempre — nunca se crea el usuario/contraseña.
 export const WANT_ACCOUNT_RE = /(quiero|dame|necesito|abr[ií]|crea|hace).*(mi )?cuenta|abrir cuenta|crear cuenta|registrar(me)?|jugar|empezar|usuario y contrase/i;
 
-export function onFreeText(step: string, text?: string, cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg[] {
+export function onFreeText(step: string, text?: string, cfg: ChatRuntimeConfig = DEFAULT_RUNTIME, data: Record<string, unknown> = {}): BotMsg[] {
   // Comprobante en revisión: acá manda el operario. El bot no responde nada
   // automático para no interferir mientras se valida — el cliente puede escribir
   // libremente y el humano interviene.
@@ -298,10 +345,10 @@ export function onFreeText(step: string, text?: string, cfg: ChatRuntimeConfig =
     return [{ from: 'bot', delayMs: 600, at: now(), text: '✅ Tranquilo/a, no hace falta nada más con la app. Tu imagen ya quedó en proceso y en breve te acreditamos 🎉' }];
   }
   // Si pide ayuda en cualquier paso → soporte (no lo dejamos dando vueltas).
-  if (text && HELP_RE.test(text)) return supportReply(cfg);
+  if (text && HELP_RE.test(text)) return supportReply(cfg, data);
   if (step === 'welcome') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Tocá el botón *Quiero mi cuenta 🎁* para empezar 👇' }];
   if (step === 'credenciales') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Cuando quieras cargar, tocá *Quiero el CBU 💳* 👇' }];
   if (step === 'comprobante') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Cuando tengas el comprobante de la transferencia, mandámelo por acá 📸' }];
   // Fallback: nunca dejar al cliente sin salida → soporte.
-  return supportReply(cfg);
+  return supportReply(cfg, data);
 }

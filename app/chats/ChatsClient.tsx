@@ -162,6 +162,10 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [tenantProvider, setTenantProvider] = useState<string>('pagoda');
   const [fichasEnabled, setFichasEnabled] = useState<boolean>(true);
   const [opsOpen, setOpsOpen] = useState(false);
+  // Cajero sticky asignado al lead + pool disponible (para reasignar a mano).
+  const [cajeros, setCajeros] = useState<Array<{ phone: string; name: string | null }>>([]);
+  const [assignedWa, setAssignedWa] = useState<string | null>(null);
+  const [assignedWaName, setAssignedWaName] = useState<string | null>(null);
   const showOpsPanel = fichasEnabled && (tenantProvider === 'partner_api' || tenantProvider === 'king') && !!sel && !!detail?.username;
   // Ancho de la lista (barra divisora arrastrable, estilo Black Dragon).
   const [listW, setListW] = useState(380);
@@ -294,8 +298,35 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     if (r?.ok) {
       const s = r.session;
       setDetail({ messages: (s.messages ?? []) as Msg[], phone: s.phone, name: s.name, username: (s.data?.username as string) ?? null, step: s.step, kommoLeadId: s.kommoLeadId });
+      setAssignedWa((s.data?.assignedWa as string) ?? null);
+      setAssignedWaName((s.data?.assignedWaName as string) ?? null);
     }
+    // Pool de cajeros (para la solapa). Best-effort: si el tenant no tiene, queda vacío y no se muestra.
+    fetch('/api/panel/chats', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionKey: key, op: 'cajeros_list' }),
+    }).then((x) => x.json()).then((d) => {
+      if (d?.ok) {
+        setCajeros(d.cajeros ?? []);
+        setAssignedWa(d.assignedWa ?? null);
+        setAssignedWaName(d.assignedWaName ?? null);
+      }
+    }).catch(() => {});
   }, []);
+
+  async function assignCajero(to: string) {
+    if (!sel) return;
+    const r = await fetch('/api/panel/chats', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionKey: sel, op: 'assign_cajero', to }),
+    }).then((x) => x.json()).catch(() => null);
+    if (r?.ok) {
+      setAssignedWa(r.assignedWa ?? null);
+      setAssignedWaName(r.assignedWaName ?? null);
+      setToast(r.assignedWa ? `Cajero asignado: ${r.assignedWaName ?? r.assignedWa} ✓` : 'Cajero desasignado ✓');
+      setTimeout(() => setToast(null), 1800);
+    }
+  }
 
   useEffect(() => {
     fetch('/api/panel/livechat')
@@ -833,6 +864,36 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                 })()}
               </div>
             </div>
+
+            {cajeros.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', padding: '.4rem 1rem', borderBottom: '1px solid var(--border)', background: 'var(--card-2, rgba(255,255,255,.02))', fontSize: '.74rem' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem', color: 'var(--muted)', fontWeight: 600 }}>
+                  {ICONS.support} Cajero asignado:
+                </span>
+                <span style={{ fontWeight: 700, color: assignedWa ? 'var(--accent)' : 'var(--muted-2,#5d6478)' }}>
+                  {assignedWa ? (assignedWaName || assignedWa) : 'sin asignar'}
+                </span>
+                <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }} title="Reasignar cajero">
+                  <select
+                    value={assignedWa ?? ''}
+                    disabled={busy}
+                    onChange={(e) => assignCajero(e.target.value)}
+                    style={{ background: 'var(--card-3,#1b1f28)', color: 'var(--text)', fontWeight: 600, fontSize: '.72rem', border: '1px solid var(--border)', borderRadius: 7, padding: '.22rem 1.6rem .22rem .5rem', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none' }}>
+                    <option value="">— sin asignar —</option>
+                    {cajeros.map((c) => (
+                      <option key={c.phone} value={c.phone}>{c.name || c.phone}</option>
+                    ))}
+                  </select>
+                  <span aria-hidden style={{ position: 'absolute', right: '.5rem', color: 'var(--muted)', fontSize: '.58rem', pointerEvents: 'none' }}>▼</span>
+                </div>
+                {assignedWa && (
+                  <a href={`https://wa.me/${assignedWa.replace(/\D/g, '')}`} target="_blank" rel="noreferrer"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem', color: '#25D366', fontWeight: 700, textDecoration: 'none' }}>
+                    abrir WhatsApp
+                  </a>
+                )}
+              </div>
+            )}
 
             <div ref={bodyRef}
               onScroll={(e) => { const el = e.currentTarget; atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}

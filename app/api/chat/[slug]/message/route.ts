@@ -49,7 +49,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length });
   }
 
-  let replies = onFreeText(s.step ?? 'comprobante', b.text, runtime);
+  let replies = onFreeText(s.step ?? 'comprobante', b.text, runtime, (s.data ?? {}) as Record<string, unknown>);
   // OPERADOR AL MANDO: si un humano ya intervino con un mensaje libre, el bot se
   // calla. No tiene sentido que reinyecte "mandame el comprobante" mientras el
   // operador está resolviendo otra cosa con el cliente.

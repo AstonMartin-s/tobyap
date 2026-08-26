@@ -23,6 +23,7 @@ import {
   postActionMessages,
 } from '@/lib/chat/flow';
 import { prepareBotBatch } from '@/lib/chat/stagger';
+import { listCajeros } from '@/lib/rotation';
 
 export const dynamic = 'force-dynamic';
 
@@ -227,6 +228,32 @@ export async function POST(req: NextRequest) {
   const data = (s.data ?? {}) as Record<string, unknown>;
   const loginUrl = data.loginUrl as string | undefined;
 
+  // ── Cajero sticky ──────────────────────────────────────────────────────────
+  // Lista de cajeros disponibles + el asignado actual (para la solapa del lead).
+  if (b.op === 'cajeros_list') {
+    const list = await listCajeros(session.tenantId);
+    return NextResponse.json({
+      ok: true,
+      cajeros: list,
+      assignedWa: (data.assignedWa as string | null) ?? null,
+      assignedWaName: (data.assignedWaName as string | null) ?? null,
+    });
+  }
+  // Reasignación manual del cajero. Acepta un phone del pool (b.to) o vacío para
+  // desasignar. Guardamos también el nombre para mostrarlo en el panel.
+  if (b.op === 'assign_cajero') {
+    const toDigits = (b.to ?? '').replace(/\D/g, '');
+    if (!toDigits) {
+      await mergeChatData(s.id, { assignedWa: null, assignedWaName: null }, undefined, { touchUpdatedAt: false });
+      return NextResponse.json({ ok: true, assignedWa: null, assignedWaName: null });
+    }
+    const list = await listCajeros(session.tenantId);
+    const match = list.find((c) => c.phone.replace(/\D/g, '') === toDigits);
+    if (!match) return NextResponse.json({ error: 'cajero no está en el pool' }, { status: 400 });
+    await mergeChatData(s.id, { assignedWa: match.phone, assignedWaName: match.name ?? null }, undefined, { touchUpdatedAt: false });
+    return NextResponse.json({ ok: true, assignedWa: match.phone, assignedWaName: match.name ?? null });
+  }
+
   // ── Operaciones de SALDO REAL (Partner API / King API) ─────────────────────
   // Provider 'partner_api' (bblack) o 'king' (greenbet/dat4win). El disparo lo
   // hace SIEMPRE el operario (botón); nunca automático.
@@ -393,8 +420,8 @@ export async function POST(req: NextRequest) {
       note = '⚠️ Comprobante RECHAZADO desde el panel (se le pidió reenviar).';
       break;
     case 'support':
-      newMsgs = prepareBotBatch(supportMessage(runtime), { op: true });
-      note = '🙋 Se le pasó el link de soporte (walink) desde el panel.';
+      newMsgs = prepareBotBatch(supportMessage(runtime, data), { op: true });
+      note = '🙋 Se le pasó el WhatsApp del cajero asignado (o soporte) desde el panel.';
       break;
     case 'deposit':
     case 'withdraw':
