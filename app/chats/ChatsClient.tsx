@@ -190,6 +190,17 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     document.addEventListener('mouseup', up);
   }
   function resetDrag() { setListW(380); listWRef.current = 380; try { localStorage.setItem('chatListW', '380'); } catch { /* ignore */ } }
+  // Responsive: en celular pasamos a una sola columna con patrón toggle
+  // (lista <-> conversación). Sin esto, el grid de 3 columnas se salía de la
+  // pantalla y parecía que "no abría" el chat al tocarlo.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 820px)');
+    const apply = () => setIsMobile(mq.matches);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
   const [soundOn, setSoundOn] = useState(true);
   const soundRef = useRef(true);
   const prevAttn = useRef<Set<string> | null>(null);
@@ -653,9 +664,9 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
       </div>
     )}
 
-    <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: `${listW}px 10px minmax(0,1fr)`, alignItems: 'stretch', height: `calc(100vh - ${showKpis ? '150px' : '90px'})`, minHeight: 560 }}>
-      {/* LISTA */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : `${listW}px 10px minmax(0,1fr)`, alignItems: 'stretch', height: `calc(100vh - ${showKpis ? '150px' : '90px'})`, minHeight: isMobile ? 0 : 560 }}>
+      {/* LISTA — en mobile se oculta cuando hay un chat abierto */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden', display: isMobile && sel ? 'none' : 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ padding: '.6rem .6rem .35rem', flexShrink: 0 }}>
           <input className="input" placeholder="Buscar nombre, usuario, teléfono…" value={q}
             onChange={(e) => setQ(e.target.value)} style={{ width: '100%', fontSize: '.8rem', padding: '.4rem .6rem' }} />
@@ -723,20 +734,26 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
         </div>
       </div>
 
-      {/* BARRA DIVISORA arrastrable */}
+      {/* BARRA DIVISORA arrastrable — oculta en mobile */}
       <div onMouseDown={startDrag} onDoubleClick={resetDrag} title="Arrastrar para ajustar · doble clic para restablecer"
-        style={{ cursor: 'col-resize', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        style={{ cursor: 'col-resize', display: isMobile ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ width: 3, height: 46, borderRadius: 3, background: 'var(--border-2)', transition: 'background .15s' }}
           onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--accent)')}
           onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--border-2)')} />
       </div>
 
-      {/* DETALLE */}
-      <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', position: 'relative' }}>
+      {/* DETALLE — en mobile solo se muestra cuando hay un chat seleccionado */}
+      <div className="card" style={{ padding: 0, display: isMobile && !sel ? 'none' : 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', position: 'relative' }}>
         {!detail ? (
           <div className="empty" style={{ padding: '3rem', margin: 'auto' }}>Elegí un chat para ver la conversación.</div>
         ) : (
           <>
+            {isMobile && (
+              <button onClick={() => { setSel(null); setDetail(null); }}
+                style={{ display: 'flex', alignItems: 'center', gap: '.35rem', width: '100%', textAlign: 'left', padding: '.6rem 1rem', border: 'none', borderBottom: '1px solid var(--border)', background: 'var(--card-3, rgba(255,255,255,.03))', color: 'var(--accent)', fontWeight: 700, fontSize: '.85rem', cursor: 'pointer' }}>
+                ‹ Volver a la lista
+              </button>
+            )}
             <div style={{ padding: '.8rem 1rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap', overflow: 'visible', position: 'relative', zIndex: 5 }}>
               {/* IZQUIERDA: icono, nombre + selector de estado, y campaña */}
               <div style={{ display: 'flex', gap: '.7rem', minWidth: 0 }}>
