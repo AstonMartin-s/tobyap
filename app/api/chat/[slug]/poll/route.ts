@@ -53,5 +53,6 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
   // Devolvemos solo lo nuevo respecto de `since` (largo de la lista del widget).
   const fresh = messages.slice(Math.max(0, since));
-  return NextResponse.json({ ok: true, step, total: messages.length, messages: fresh, ...(debug ? { dbg } : {}) });
+  const assignedWa = ((s.data ?? {}) as Record<string, unknown>).assignedWa ?? null;
+  return NextResponse.json({ ok: true, step, total: messages.length, messages: fresh, assignedWa, ...(debug ? { dbg } : {}) });
 }

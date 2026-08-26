@@ -63,6 +63,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   const autoPromptedRef = useRef(false); // instalador nativo auto-disparado — solo 1 vez
   const [skin, setSkin] = useState({ brand, primaryColor, avatarUrl });
   const [waBtn, setWaBtn] = useState<{ enabled: boolean; url: string }>({ enabled: false, url: '' });
+  const [assignedWa, setAssignedWa] = useState<string | null>(null); // cajero sticky
   const [waBtnClicked, setWaBtnClicked] = useState(false);
   const [waBtnToast, setWaBtnToast] = useState(false);
 
@@ -128,6 +129,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         setMsgs(d.messages ?? []);
         pollBase.current = d.total;
         setStep(d.step ?? 'done');
+        if (d.assignedWa) setAssignedWa(String(d.assignedWa));
         if (d.step === 'welcome') setButtons([{ id: 'want_account', label: 'Quiero mi cuenta' }]);
         else if (d.step === 'credenciales') setButtons([{ id: 'want_cbu', label: 'Quiero el CBU' }]);
       } catch { /* sin resume */ }
@@ -203,6 +205,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         const r = await fetch(`/api/chat/${slug}/poll?sessionKey=${sessionKey}&since=${since}&kc=${kc}`);
         const d = await r.json();
         if (!d.ok) return;
+        if (d.assignedWa) setAssignedWa(String(d.assignedWa));
         if (pollBase.current === null) { pollBase.current = d.total; if (d.step && d.step !== 'validando') setStep(d.step); return; }
         if (d.total > pollBase.current) {
           const fresh = (d.messages ?? []).filter((m: Msg) => m.from === 'bot');
@@ -443,9 +446,16 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     navigator.clipboard?.writeText(value).then(() => { setCopied(value); setTimeout(() => setCopied(null), 1600); }).catch(() => {});
   }
 
+  // Cajero sticky: si el usuario tiene uno asignado, el botón del header abre ESE
+  // número (con mensaje predeterminado), no la URL/rotación del cliente.
+  const CAJERO_MSG = '¡Holaa! 🙌 Me derivaron a esta línea y quiero aprovechar mi promo 🎁✨';
+  const effectiveWaUrl = assignedWa
+    ? `https://wa.me/${assignedWa.replace(/\D/g, '')}?text=${encodeURIComponent(CAJERO_MSG)}`
+    : waBtn.url;
+
   function handleWaBtn() {
     if (step === 'done') {
-      window.open(waBtn.url, '_blank');
+      window.open(effectiveWaUrl, '_blank');
       return;
     }
     if (!waBtnClicked) setWaBtnClicked(true);
