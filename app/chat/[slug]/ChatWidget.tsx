@@ -39,6 +39,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [accept, setAccept] = useState(false);
+  const [ackAuto, setAckAuto] = useState(false); // cartel "atención automática + hay gente detrás"
   const [formErr, setFormErr] = useState('');
   const [starting, setStarting] = useState(false);
 
@@ -240,6 +241,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   async function start() {
     setFormErr('');
     if (!phone.trim()) return setFormErr('Ingresá tu número de WhatsApp.');
+    if (!ackAuto) return setFormErr('Confirmá que entendiste cómo es la atención.');
     if (!accept) return setFormErr('Necesitás confirmar que es tu número.');
     setStarting(true);
     try {
@@ -626,6 +628,16 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
             <p style={{ color: '#54656F', fontSize: 14, margin: '4px 0 16px' }}>Dejanos tu número para crear tu usuario y darte tu bonificación</p>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre o apodo" style={inputStyle} />
             <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="Tu WhatsApp (ej: 11 2345 6789)" style={inputStyle} />
+            <div style={{ background: '#F0F7F4', border: '1px solid #cfe6dc', borderRadius: 10, padding: '11px 12px', margin: '4px 0 12px' }}>
+              <p style={{ fontSize: 13, lineHeight: 1.45, color: '#1b3a30', margin: 0 }}>
+                🤖 La atención para crear tu usuario es <b>automática</b>, pero quedate tranquilo:
+                <b> hay personas detrás</b> pendientes por si necesitás algo. Cuando quieras, pedí por <b>Soporte</b> y te atendemos 🙌
+              </p>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, color: '#111827', marginTop: 10, cursor: 'pointer' }}>
+                <input type="checkbox" checked={ackAuto} onChange={(e) => setAckAuto(e.target.checked)} style={{ marginTop: 2 }} />
+                <span>Entendido 👍</span>
+              </label>
+            </div>
             <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, color: '#111827', margin: '6px 0 14px', cursor: 'pointer' }}>
               <input type="checkbox" checked={accept} onChange={(e) => setAccept(e.target.checked)} style={{ marginTop: 2 }} />
               <span>Confirmo que este es <b>mi número</b>. Si no lo es, no podré recibir mi bonificación.</span>

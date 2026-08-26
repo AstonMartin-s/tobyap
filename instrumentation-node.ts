@@ -34,8 +34,12 @@ if (process.env.DISABLE_RETRY_SCHEDULER !== '1') {
   console.log(`[retry-scheduler] activo · cada ${Math.round(everyMs / 60000)} min`);
 }
 
-// Recordatorios del chat (5/15/30 min sin respuesta del cliente). Corre cada 1 min.
-if (process.env.DISABLE_REMINDERS !== '1') {
+// Recontacto automático a los 5 min de silencio. DESACTIVADO por pedido de
+// operaciones (Marce): la "repesca" ('¿Seguís por ahí?') molestaba. El enganche
+// ahora lo cubre el aviso "en un momento te atiende un agente" que se manda al
+// toque tras crear el usuario (account_agent_followup). Reactivar con
+// ENABLE_REMINDERS=1 solo si se decide volver.
+if (process.env.ENABLE_REMINDERS === '1') {
   const tick = async () => {
     try {
       const r = await runReminders();

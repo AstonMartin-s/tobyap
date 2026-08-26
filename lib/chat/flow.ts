@@ -83,6 +83,7 @@ export async function accountStep(
     : [
         { from: 'bot', delayMs: 600, at: now(), text: renderTemplate('account_creating', cfg) },
         { from: 'bot', delayMs: 1800, at: now(), text: renderTemplate('account_done', cfg, { creds_block: creds }) },
+        { from: 'bot', delayMs: 2400, at: now(), text: renderTemplate('account_agent_followup', cfg) },
       ];
 
   return {
@@ -110,6 +111,7 @@ async function accountStepPartnerApi(
       messages: [
         { from: 'bot', delayMs: 600, at: now(), text: renderTemplate('account_creating', cfg) },
         { from: 'bot', delayMs: 1800, at: now(), text: renderTemplate('account_done', cfg, { creds_block: creds }) },
+        { from: 'bot', delayMs: 2400, at: now(), text: renderTemplate('account_agent_followup', cfg) },
       ],
       buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
       data: { username, password, loginUrl: null, portalName: username, existing: false },
@@ -142,6 +144,7 @@ async function accountStepKingApi(
         messages: [
           { from: 'bot', delayMs: 600, at: now(), text: renderTemplate('account_creating', cfg) },
           { from: 'bot', delayMs: 1800, at: now(), text: renderTemplate('account_done', cfg, { creds_block: creds }) },
+          { from: 'bot', delayMs: 2400, at: now(), text: renderTemplate('account_agent_followup', cfg) },
         ],
         buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
         data: { username: acc.username, password: acc.password, loginUrl: null, portalName: acc.username, existing: acc.existing },
