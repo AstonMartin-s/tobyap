@@ -12,11 +12,22 @@ export async function pickNumberByCategory(
   category: string | null | undefined,
 ): Promise<string | null> {
   if (!category) return null;
-  const rows = await db
+  let rows = await db
     .select({ phone: numbers.phone })
     .from(numbers)
     .where(and(eq(numbers.tenantId, tenantId), eq(numbers.type, category), eq(numbers.status, true)))
     .orderBy(asc(numbers.createdAt));
+
+  // Fallback: si la categoría pedida no tiene números activos (típico en
+  // 'soporte' cuando el cliente sólo cargó cajeros), rotamos entre los 'cajero'
+  // activos. Evita que la landing walink muestre "No disponible".
+  if (!rows.length && category !== 'cajero') {
+    rows = await db
+      .select({ phone: numbers.phone })
+      .from(numbers)
+      .where(and(eq(numbers.tenantId, tenantId), eq(numbers.type, 'cajero'), eq(numbers.status, true)))
+      .orderBy(asc(numbers.createdAt));
+  }
 
   if (!rows.length) return null;
   if (rows.length === 1) return rows[0].phone;
