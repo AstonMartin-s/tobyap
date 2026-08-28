@@ -14,7 +14,11 @@ import type { ResolvedTenant } from '@/lib/types';
 // El disparo SIEMPRE viene de un operario tocando un botón — nunca automático.
 // ---------------------------------------------------------------------------
 
-export function maxOpAmount(): number {
+// Tope por operación (anti-error de tipeo). Prioridad: customField del tenant
+// (`max_op_ars`, editable desde el panel admin) → env PARTNER_MAX_OP_ARS → 50.000.
+export function maxOpAmount(tenant?: ResolvedTenant): number {
+  const cf = Number(tenant?.customFields?.['max_op_ars']);
+  if (Number.isFinite(cf) && cf > 0) return cf;
   const v = Number(process.env.PARTNER_MAX_OP_ARS);
   return Number.isFinite(v) && v > 0 ? v : 50_000;
 }
@@ -38,9 +42,10 @@ export interface OpResult {
   code?: string;
 }
 
-function validate(amount: number): string | null {
+function validate(amount: number, tenant?: ResolvedTenant): string | null {
   if (!Number.isFinite(amount) || amount <= 0) return 'monto inválido';
-  if (amount > maxOpAmount()) return `supera el tope por operación ($${maxOpAmount().toLocaleString('es-AR')})`;
+  const cap = maxOpAmount(tenant);
+  if (amount > cap) return `supera el tope por operación ($${cap.toLocaleString('es-AR')})`;
   return null;
 }
 
@@ -49,7 +54,7 @@ async function runOp(
   type: 'deposit' | 'withdraw',
   input: OpInput,
 ): Promise<OpResult> {
-  const bad = validate(input.amount);
+  const bad = validate(input.amount, tenant);
   if (bad) return { ok: false, type, amount: input.amount, error: bad };
   if (tenant.provider !== 'partner_api') return { ok: false, type, amount: input.amount, error: 'cliente sin Partner API' };
 

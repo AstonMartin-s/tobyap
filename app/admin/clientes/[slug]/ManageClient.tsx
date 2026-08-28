@@ -44,7 +44,7 @@ export function ManageClient({ slug }: { slug: string }) {
   const [err, setErr] = useState('');
 
   // Campos editables del tenant
-  const [edit, setEdit] = useState({ name: '', eventSuffix: '', metaPixelId: '', metaCapiToken: '', kommoToken: '', panelPassword: '' });
+  const [edit, setEdit] = useState({ name: '', eventSuffix: '', metaPixelId: '', metaCapiToken: '', kommoToken: '', panelPassword: '', maxOp: '' });
 
   async function load() {
     try {
@@ -53,7 +53,7 @@ export function ManageClient({ slug }: { slug: string }) {
       setLandings(d.landings ?? []);
       setBonos(d.bonos ?? {});
       setSettings(d.settings ?? {});
-      setEdit((p) => ({ ...p, name: d.tenant.name ?? '', eventSuffix: d.tenant.eventSuffix ?? '', metaPixelId: d.tenant.metaPixelId ?? '' }));
+      setEdit((p) => ({ ...p, name: d.tenant.name ?? '', eventSuffix: d.tenant.eventSuffix ?? '', metaPixelId: d.tenant.metaPixelId ?? '', maxOp: d.tenant.customFields?.max_op_ars ? String(d.tenant.customFields.max_op_ars) : '' }));
     } catch (e) {
       setErr((e as Error).message);
     }
@@ -143,6 +143,7 @@ export function ManageClient({ slug }: { slug: string }) {
           <div className="field"><label>Meta CAPI Token (rotar)</label><input className="input" value={edit.metaCapiToken} onChange={(e) => setEdit({ ...edit, metaCapiToken: e.target.value })} placeholder="••• sin cambios" /></div>
           <div className="field"><label>Kommo Token (rotar)</label><input className="input" value={edit.kommoToken} onChange={(e) => setEdit({ ...edit, kommoToken: e.target.value })} placeholder="••• sin cambios" /></div>
           <div className="field"><label>Reset contraseña panel</label><input className="input" value={edit.panelPassword} onChange={(e) => setEdit({ ...edit, panelPassword: e.target.value })} placeholder="••• sin cambios" /></div>
+          <div className="field"><label>Tope por carga (ARS)</label><input className="input" type="number" min="0" step="1000" value={edit.maxOp} onChange={(e) => setEdit({ ...edit, maxOp: e.target.value })} placeholder="50000 (default)" /></div>
         </div>
         <button className="btn" onClick={() => patch({
           name: edit.name,
@@ -151,6 +152,7 @@ export function ManageClient({ slug }: { slug: string }) {
           ...(edit.metaCapiToken ? { metaCapiToken: edit.metaCapiToken } : {}),
           ...(edit.kommoToken ? { kommoToken: edit.kommoToken } : {}),
           ...(edit.panelPassword ? { panelPassword: edit.panelPassword } : {}),
+          ...(t && Number(edit.maxOp) > 0 ? { customFields: { ...t.customFields, max_op_ars: Number(edit.maxOp) } } : {}),
         })}>Guardar cambios</button>
       </div>
 
