@@ -104,6 +104,14 @@
 4. Ajustar env vars de origins + CORS whitelist.
 5. Smoke: login panel en dominio nuevo, landing→redirect→atribución PB OK, chat cross-origin OK.
 
+### Bitácora ejecución (2026-08-28)
+- **Dominio elegido:** `panel.trackerapp.site` (subdominio, CNAME directo a Railway). Cloudflare pospuesto.
+- **Railway Pro:** se subió de plan para habilitar 3er custom domain.
+- **Etapa 1 (DONE):** custom domain `panel.trackerapp.site` → servicio `tobyap` (port 8080). DNS en Hostinger: `CNAME panel → wl86nzeg.up.railway.app` + `TXT _railway-verify.panel`. Ownership verified, cert emitido, `HTTPS 200`. Cero downtime (go/chat/railway intactos).
+- **Ventana de transición (hoy):** ambos dominios activos en paralelo; clientes migran al panel nuevo a su ritmo. **Gating NO activado** aún (a propósito).
+- **Env vars:** sin cambios. `NEXT_PUBLIC_LANDING_ORIGIN` (build-time) y `CHAT_ORIGIN` quedan en fichaslibres. `APP_PUBLIC_URL` a definir en Etapa 2.
+- **Pendiente Etapa 3 (gating por host):** `middleware.ts` detrás de flag → panel solo en `panel.trackerapp.site`, bloqueado en fichaslibres; mantener `/l`, `/chat`, `/api/track`, `/api/chat` en fichaslibres. **Requiere R1 a CRM Main** por `/api/v1/resolve` (host donde lo consume). Activar recién cuando todos los clientes hayan migrado.
+
 ---
 
 ## ÁREA 3 — Plan de protección + expansión (escalar clientes)
