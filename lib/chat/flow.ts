@@ -73,17 +73,28 @@ export function supportOverride(data: Record<string, unknown>): Record<string, s
   return wa ? { support: stickyWaUrl(wa) } : {};
 }
 
-/** Mensaje de soporte, con botón "Abrir WhatsApp" (campo wa) si hay cajero
- *  asignado. El widget pinta el botón como el de "Copiar CBU". */
+// Texto LIMPIO para cuando hay cajero sticky: NO metemos el link wa.me crudo en
+// el cuerpo (queda feo y con mil parámetros); solo el botón verde de WhatsApp.
+// Si el usuario quiere que aprieten el botón, no le tiramos el link al lado.
+const SUPPORT_BTN_TEXT = '🙋 Tocá el botón de acá abajo y hablás directo con tu cajero por WhatsApp. Te atendemos al toque, 24hs 👇';
+const CAJERA_BTN_TEXT = '¿Querés un EXTRA? 📲 Agendá a tu cajero para no perderte las promos 🔥\n📸 Pasale la captura de tu carga y sumá +1000 EXTRAS de regalo 🎁🤑\n\nTocá el botón de acá abajo 👇';
+
+/** Mensaje de soporte. Si hay cajero sticky asignado → texto limpio + botón
+ *  "Abrir WhatsApp" (campo wa) al cajero, sin link crudo en el cuerpo. Si no hay
+ *  cajero (tenants sin pool) → template normal con link de soporte. */
 function buildSupportMsg(cfg: ChatRuntimeConfig, data: Record<string, unknown>, delayMs: number): BotMsg {
   const wa = data.assignedWa ? String(data.assignedWa).replace(/\D/g, '') : '';
-  return {
-    from: 'bot',
-    delayMs,
-    at: now(),
-    text: renderTemplate('support', cfg, supportOverride(data)),
-    ...(wa ? { wa: stickyWaUrl(wa) } : {}),
-  };
+  if (wa) return { from: 'bot', delayMs, at: now(), text: SUPPORT_BTN_TEXT, wa: stickyWaUrl(wa) };
+  return { from: 'bot', delayMs, at: now(), text: renderTemplate('support', cfg) };
+}
+
+/** Derivación al cajero POST-carga (promo cajera). Misma lógica: si hay cajero
+ *  sticky → texto limpio + botón al MISMO cajero asignado (coordinado con soporte
+ *  y el botón superior). Si no hay cajero → template con link. */
+function buildCajeraMsg(cfg: ChatRuntimeConfig, data: Record<string, unknown>, delayMs: number): BotMsg {
+  const wa = data.assignedWa ? String(data.assignedWa).replace(/\D/g, '') : '';
+  if (wa) return { from: 'bot', delayMs, at: now(), text: CAJERA_BTN_TEXT, wa: stickyWaUrl(wa) };
+  return { from: 'bot', delayMs, at: now(), text: postAccreditCajeraText(cfg) };
 }
 
 // ── Paso 1: WELCOME ────────────────────────────────────────────────────────
@@ -263,14 +274,15 @@ export function supportMessage(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME, data: R
 }
 
 // ── Paso 5: CARGO — dos mensajes: acreditado + jugar, luego promo cajera/walink.
-export function accreditedMessages(loginUrl?: string | null, cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): BotMsg[] {
+export function accreditedMessages(loginUrl?: string | null, cfg: ChatRuntimeConfig = DEFAULT_RUNTIME, data: Record<string, unknown> = {}): BotMsg[] {
   const useMagic = cfg.magicLinks.includes('portal_play');
   const link = (useMagic && loginUrl) ? loginUrl : cfg.links.portal_play;
   const msgs: BotMsg[] = [
     { from: 'bot', delayMs: 700, at: now(), text: renderTemplate('accredited', cfg, { portal_play: link }) },
   ];
+  // Derivación al cajero SOLO acá (post-carga): usa el cajero sticky asignado.
   if (cfg.postAccreditCajera) {
-    msgs.push({ from: 'bot', delayMs: 1100, at: now(), text: postAccreditCajeraText(cfg) });
+    msgs.push(buildCajeraMsg(cfg, data, 1100));
   }
   return msgs;
 }
@@ -316,6 +328,16 @@ function supportReply(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME, data: Record<str
 // app) — esas SÍ van directo a soporte incluso durante app_onboarding.
 const REAL_ISSUE_RE = /(problema|reclamo|estafa|error|no me lleg|no anda|no funciona)/i;
 
+// Mensaje tranquilizador cuando el cliente pide ayuda ANTES de cargar: no lo
+// derivamos a WhatsApp (la derivación al cajero es SOLO post-carga), lo dejamos
+// en el chat y un agente lo atiende desde el panel (livechat).
+function reassureInChat(): BotMsg[] {
+  return [{
+    from: 'bot', delayMs: 600, at: now(),
+    text: '🙌 Quedate tranquilo/a, hay un agente pendiente que te atiende por acá en un momento. Seguí los pasos y en breve estás listo/a 🙂',
+  }];
+}
+
 // Confusión puntual con "la app" — muy común, no requiere soporte humano.
 const APP_CONFUSION_RE = /(qu[eé] app|cu[aá]l aplicaci|qu[eé] aplicaci|c[oó]mo (la )?descargo|descargar|instalar|apk|play store|app store|me piden|tu nombre)/i;
 
@@ -344,11 +366,14 @@ export function onFreeText(step: string, text?: string, cfg: ChatRuntimeConfig =
   if (asksAboutApp && step !== 'app_onboarding') {
     return [{ from: 'bot', delayMs: 600, at: now(), text: '✅ Tranquilo/a, no hace falta nada más con la app. Tu imagen ya quedó en proceso y en breve te acreditamos 🎉' }];
   }
-  // Si pide ayuda en cualquier paso → soporte (no lo dejamos dando vueltas).
-  if (text && HELP_RE.test(text)) return supportReply(cfg, data);
+  // Derivación al cajero por WhatsApp SOLO post-carga (acreditado). Antes de
+  // cargar mantenemos al cliente en el chat: un agente lo atiende por el panel.
+  const accredited = step === 'done';
+  // Si pide ayuda: post-carga → soporte/cajero; pre-carga → tranquilizar en el chat.
+  if (text && HELP_RE.test(text)) return accredited ? supportReply(cfg, data) : reassureInChat();
   if (step === 'welcome') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Tocá el botón *Quiero mi cuenta 🎁* para empezar 👇' }];
   if (step === 'credenciales') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Cuando quieras cargar, tocá *Quiero el CBU 💳* 👇' }];
   if (step === 'comprobante') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Cuando tengas el comprobante de la transferencia, mandámelo por acá 📸' }];
-  // Fallback: nunca dejar al cliente sin salida → soporte.
-  return supportReply(cfg, data);
+  // Fallback: post-carga → soporte/cajero; pre-carga → tranquilizar (sin WhatsApp).
+  return accredited ? supportReply(cfg, data) : reassureInChat();
 }

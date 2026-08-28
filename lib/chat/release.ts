@@ -81,8 +81,10 @@ export async function acreditarChat(
     if (opts.requireComprobanteStep && !['comprobante', 'app_onboarding', 'validando'].includes(s.step ?? '')) return false;
 
     const cfg = await loadChatRuntime(tenant.id, tenant.name, s.phone, tenant.slug);
-    const acc = prepareBotBatch(accreditedMessages(data.loginUrl as string | undefined, cfg));
-    const accJson = JSON.stringify(acc.map((m) => ({ from: 'bot', text: m.text, at: m.at, delayMs: m.delayMs })));
+    const acc = prepareBotBatch(accreditedMessages(data.loginUrl as string | undefined, cfg, data));
+    const accJson = JSON.stringify(
+      acc.map((m) => ({ from: 'bot', text: m.text, at: m.at, delayMs: m.delayMs, ...(m.wa ? { wa: m.wa } : {}) })),
+    );
     const now = Date.now();
 
     // UPDATE atómico con CANDADO: agrega los mensajes y marca accreditedAt solo si
