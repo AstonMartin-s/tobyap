@@ -26,6 +26,29 @@
 
 ## Bitácora
 
+### 2026-08-28 — Nichos: categorización Circo / Tienda (fundación, rama `feat/tob/nichos`)
+
+- **Objetivo:** habilitar la instalación del sistema en otros nichos (primero un ecommerce de ebooks) sin romper los clientes actuales. Paso 1 = **solo categorizar**, no implementar aún el flujo del nuevo nicho.
+- **Diseño (aditivo, cero riesgo prod):**
+  - Columna `tenants.niche` (text, default `'circo'`). Todos los clientes existentes quedan en **Circo** automáticamente.
+  - Dos ramas: `circo` (casino/apuestas = todo lo trabajado hasta hoy) · `tienda` (ecommerce/ebooks, proceso de venta a definir).
+  - Registro central `lib/niche.ts` (`NICHES`, `Niche`, `DEFAULT_NICHE`, `NICHE_META`, `isNiche`, `parseNiche`).
+  - `ResolvedTenant.niche` + `CreateTenantInput.niche` (default `circo` vía `parseNiche`). `resolve()` lo mapea con fallback.
+- **Archivos:** `lib/niche.ts` (nuevo), `db/schema.ts`, `lib/types.ts`, `lib/tenants.ts`. **No** se tocó `flow.ts` ni rutas de chat todavía (el despacho por nicho vendrá en la fase de implementación de Tienda).
+- **Migración (pendiente deploy):** `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS niche text DEFAULT 'circo';` (mismo patrón que `chat_config`; **no** `drizzle-kit push`).
+- `npm run typecheck` verde (el único error es `scripts/check-mayofa-events.ts`, script no rastreado preexistente, ajeno a este cambio).
+- **Overlap:** `schema.ts`, `types.ts`, `tenants.ts` son compartidos → ver bloque R1 abajo. `flow.ts` NO tocado (aviso previo cuando llegue el despacho por nicho).
+
+#### Bloque R1 — MSG-TOB-20260828-1 (Cursor TOBYAP → Claude TOBYAP)
+- **DE:** Cursor TOBYAP `[TOB]` · **A:** Claude TOBYAP `[TOB]`
+- **TIPO:** aviso de contrato/estructura (pre-merge)
+- **MODULO:** tenants (nicho) — `db/schema.ts`, `lib/types.ts`, `lib/tenants.ts`, `lib/niche.ts`
+- **REF-MENSAJE:** MSG-TOB-20260828-1
+- **CONTEXTO:** nueva rama `feat/tob/nichos`. Se agrega categorización de clientes por nicho (`circo` default / `tienda`) para instalar el sistema en un ecommerce de ebooks. Cambio 100% aditivo; `flow.ts` y rutas de chat sin tocar.
+- **CONTRATO:** `tenants.niche` (text default `'circo'`) · `ResolvedTenant.niche: Niche` · `CreateTenantInput.niche?: Niche` · helpers en `lib/niche.ts`. Deploy requiere `ALTER TABLE ... ADD COLUMN IF NOT EXISTS niche`.
+- **ACCION:** Claude — `git pull` antes de tocar `schema.ts`/`types.ts`/`tenants.ts`; usar `parseNiche`/`NICHE_META` para cualquier UI de alta o panel que muestre/edite el nicho. Coordinar antes de bifurcar `flow.ts` por nicho.
+- **REFERENCIAS:** `lib/niche.ts`, esta bitácora.
+
 ### 2026-08-19 — Arranque Cursor TOBYAP + Fase 1 `emitCargo`
 
 - Handoff MSG-TOB-20260819-1. Plan aprobado: aditivo, flags, sin reescritura.

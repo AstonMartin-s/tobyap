@@ -11,6 +11,7 @@ import {
   type TenantRow,
 } from '@/db/schema';
 import { encrypt, encryptOptional, decryptOptional } from '@/lib/crypto';
+import { parseNiche } from '@/lib/niche';
 import type { CreateTenantInput, ResolvedTenant } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
@@ -37,6 +38,7 @@ function tenantValues(input: CreateTenantInput) {
     // Documento de cliente (§4)
     role: input.role ?? 'client',
     platform: input.platform ?? 'meta',
+    niche: parseNiche(input.niche),
     apiUrl: input.apiUrl ?? null,
     kommoDb: input.kommoDb ?? null,
     projectId: input.projectId ?? null,
@@ -255,6 +257,7 @@ function resolve(row: TenantRow): ResolvedTenant {
     id: row.id,
     slug: row.slug,
     name: row.name,
+    niche: parseNiche(row.niche),
     kommoSubdomain: row.kommoSubdomain,
     kommoToken: decryptOptional(row.kommoToken),
     kommoPipelineId: row.kommoPipelineId,

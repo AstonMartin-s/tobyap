@@ -89,6 +89,9 @@ export const tenants = pgTable('tenants', {
   // --- Documento de cliente (estructura PAYBOT, §4) ---
   role: text('role').default('client'), // client | admin
   platform: text('platform').default('meta'),
+  // Nicho: gran rama de negocio que determina el proceso de venta / guion.
+  // 'circo' (casino/apuestas, default = todo lo existente) | 'tienda' (ecommerce).
+  niche: text('niche').default('circo'),
   apiUrl: text('api_url'), // URL externa del cliente (api-paybot-...)
   kommoDb: text('kommo_db'), // etiqueta lógica de partición de eventos
   projectId: text('project_id'), // proyecto Vercel asociado

@@ -1,9 +1,14 @@
+import type { Niche } from '@/lib/niche';
+
 // Tenant ya resuelto: secretos descifrados en memoria + helpers derivados.
 // Es lo que consumen lib/meta.ts y el webhook (no tocan la fila cruda de DB).
 export interface ResolvedTenant {
   id: string;
   slug: string;
   name: string;
+
+  // Nicho / gran rama de negocio. 'circo' por defecto (casino, todo lo existente).
+  niche: Niche;
 
   // Kommo (token descifrado)
   kommoSubdomain: string | null;
@@ -118,6 +123,8 @@ export interface PanelUserSeedInput {
 export interface CreateTenantInput {
   slug: string;
   name: string;
+  // Nicho del cliente. Ausente = 'circo' (casino/apuestas, todo lo existente).
+  niche?: Niche;
 
   // Kommo
   kommoSubdomain?: string;
