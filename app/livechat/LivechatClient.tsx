@@ -86,6 +86,10 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
   const [copied, setCopied] = useState(false);
   const [waBtnEnabled, setWaBtnEnabled] = useState(true);
   const [waBtnUrl, setWaBtnUrl] = useState('');
+  // Landings de chat del cliente (las que redirigen al chat web = tienen chatSlug).
+  // El generador de link debe usar la landing REAL, no un slug hardcodeado.
+  const [chatLandings, setChatLandings] = useState<Array<{ id: string; landingSlug: string | null; name: string | null }>>([]);
+  const [selLandingId, setSelLandingId] = useState('');
 
   function templateVal(id: MessageTemplateId): string {
     return runtime.templates?.[id] ?? DEFAULT_TEMPLATES[id];
@@ -100,9 +104,13 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
     const origin = landingDomain
       ? `https://${landingDomain}`
       : (landingOrigin || (typeof window !== 'undefined' ? window.location.origin : ''));
+    // Usamos la landing de chat REAL (la que dio de alta en Configuración), no un
+    // slug fijo. Sin landing de chat no hay link válido.
+    const sel = chatLandings.find((l) => l.id === selLandingId) ?? chatLandings[0];
+    if (!sel?.landingSlug) return '';
     const cid = linkCampaign.trim();
     const qs = `ccpp=${linkBono}${cid ? `&campaign=${cid}` : ''}`;
-    return `${origin}/l/${slug}/go?${qs}`;
+    return `${origin}/l/${slug}/${sel.landingSlug}?${qs}`;
   })();
 
   const preview = useMemo(() => buildConversationPreview(runtime, 'Martín'), [runtime]);
@@ -125,6 +133,21 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
         if (typeof d.waBtnUrl === 'string') setWaBtnUrl(d.waBtnUrl);
       })
       .catch(() => setMsg('No se pudo leer la config (¿falta columna chat_config en DB?)'));
+
+    // Traemos las landings del cliente y nos quedamos con las de CHAT (chatSlug set),
+    // que son las que redirigen al chat web. El link del anuncio debe apuntar a una
+    // de ellas — nunca a un slug inexistente.
+    fetch('/api/landings')
+      .then((r) => r.json())
+      .then((d) => {
+        const all = (d.landings ?? []) as Array<{ id: string; landingSlug: string | null; name: string | null; config: Record<string, unknown> | null }>;
+        const chat = all
+          .filter((l) => l.config && typeof (l.config as Record<string, unknown>).chatSlug === 'string' && (l.config as Record<string, unknown>).chatSlug)
+          .map((l) => ({ id: l.id, landingSlug: l.landingSlug, name: l.name }));
+        setChatLandings(chat);
+        if (chat.length) setSelLandingId((prev) => prev || chat[0].id);
+      })
+      .catch(() => { /* sin landings: el generador avisa */ });
   }, []);
 
   async function save() {
@@ -496,6 +519,18 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
               <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '0 0 .6rem' }}>
                 Link para el anuncio: redirige al chat con el bono y la campaña ya cargados.
               </p>
+              {chatLandings.length === 0 ? (
+                <div style={{ padding: '.6rem .7rem', borderRadius: 8, background: 'var(--blue-soft)', border: '1px solid var(--border)', fontSize: '.78rem', color: 'var(--muted)', marginBottom: '.5rem' }}>
+                  No hay ninguna landing de <b>Chat</b> creada. Andá a <b>Configuración → Landings → + Nueva landing</b> y elegí destino <b>Chat</b>. Después volvé acá para generar el link.
+                </div>
+              ) : chatLandings.length > 1 ? (
+                <div className="field" style={{ marginBottom: '.3rem' }}>
+                  <label>Landing de chat</label>
+                  <select className="input" value={selLandingId} onChange={(e) => setSelLandingId(e.target.value)}>
+                    {chatLandings.map((l) => <option key={l.id} value={l.id}>{l.landingSlug}{l.name ? ` — ${l.name}` : ''}</option>)}
+                  </select>
+                </div>
+              ) : null}
               <div className="field" style={{ marginBottom: '.3rem' }}>
                 <label>Dominio del cliente <span style={{ color: 'var(--muted)', fontSize: '.72rem' }}>(subdominio propio; vacío = dominio compartido)</span></label>
                 <input className="input" value={landingDomain.replace(/^https?:\/\//, '')}
@@ -518,11 +553,11 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
               </div>
               <div className="field" style={{ marginTop: '.3rem' }}>
                 <label>Link generado</label>
-                <input className="input" readOnly value={genLink} onFocus={(e) => e.currentTarget.select()}
-                  style={{ fontSize: '.78rem', fontFamily: 'monospace' }} />
+                <input className="input" readOnly value={genLink || 'Creá una landing de Chat para generar el link'} onFocus={(e) => e.currentTarget.select()}
+                  style={{ fontSize: '.78rem', fontFamily: 'monospace', opacity: genLink ? 1 : 0.6 }} />
               </div>
               <div className="row" style={{ marginTop: '.4rem' }}>
-                <button className="btn" type="button" onClick={() => {
+                <button className="btn" type="button" disabled={!genLink} onClick={() => {
                   navigator.clipboard?.writeText(genLink).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => {});
                 }}>{copied ? '✓ Copiado' : 'Copiar link'}</button>
               </div>
