@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
@@ -18,7 +18,18 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const since = Number(req.nextUrl.searchParams.get('since') ?? '0');
   if (!sessionKey) return NextResponse.json({ error: 'sessionKey requerido' }, { status: 400 });
 
-  const [s] = await db.select().from(chatSessions).where(and(eq(chatSessions.tenantId, tenant.id), eq(chatSessions.sessionKey, sessionKey)));
+  // Solo columnas necesarias: NO traemos el `data` completo (guarda el comprobante
+  // en base64, que pesa MBs) — únicamente el assignedWa. Baja el egress DB→app en
+  // cada tick del widget (endpoint de alta frecuencia).
+  const [s] = await db
+    .select({
+      step: chatSessions.step,
+      messages: chatSessions.messages,
+      kommoLeadId: chatSessions.kommoLeadId,
+      assignedWa: sql<string | null>`${chatSessions.data} ->> 'assignedWa'`,
+    })
+    .from(chatSessions)
+    .where(and(eq(chatSessions.tenantId, tenant.id), eq(chatSessions.sessionKey, sessionKey)));
   if (!s) return NextResponse.json({ error: 'sesión desconocida' }, { status: 404 });
 
   let step = s.step ?? 'validando';
@@ -53,6 +64,6 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
   // Devolvemos solo lo nuevo respecto de `since` (largo de la lista del widget).
   const fresh = messages.slice(Math.max(0, since));
-  const assignedWa = ((s.data ?? {}) as Record<string, unknown>).assignedWa ?? null;
+  const assignedWa = s.assignedWa ?? null;
   return NextResponse.json({ ok: true, step, total: messages.length, messages: fresh, assignedWa, ...(debug ? { dbg } : {}) });
 }

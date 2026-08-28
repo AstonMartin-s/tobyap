@@ -54,8 +54,27 @@ export async function GET(req: NextRequest) {
     limit = 500;
   }
 
+  // Columnas de la lista: NO traemos el `data` completo (guarda el comprobante en
+  // base64, que pesa MBs por fila) — lo servimos por /file y en el detalle. Quitamos
+  // solo la clave `comprobante` del JSONB; el resto de `data` (username, flags, etc.)
+  // queda intacto. Baja fuerte el egress DB→app en cada refresh del panel.
+  const listCols = {
+    id: chatSessions.id,
+    sessionKey: chatSessions.sessionKey,
+    phone: chatSessions.phone,
+    name: chatSessions.name,
+    waVerified: chatSessions.waVerified,
+    campaign: chatSessions.campaign,
+    step: chatSessions.step,
+    kommoLeadId: chatSessions.kommoLeadId,
+    messages: chatSessions.messages,
+    data: sql<Record<string, unknown>>`${chatSessions.data} - 'comprobante'`,
+    createdAt: chatSessions.createdAt,
+    updatedAt: chatSessions.updatedAt,
+  } as const;
+
   const rows = await db
-    .select()
+    .select(listCols)
     .from(chatSessions)
     .where(where)
     .orderBy(desc(chatSessions.updatedAt))
@@ -66,7 +85,7 @@ export async function GET(req: NextRequest) {
   let extraRows: typeof rows = [];
   if (!view) {
     extraRows = await db
-      .select()
+      .select(listCols)
       .from(chatSessions)
       .where(
         and(
@@ -198,13 +217,29 @@ export async function POST(req: NextRequest) {
       cbu: 'Pidió CBU', comprobante: 'Pidió CBU', app_onboarding: 'Instalando app',
       validando: 'Revisar imagen', done: 'Cargo$', no_cargo: 'No Cargo', closed: 'Cerrado',
     };
-    const rows = await db.select().from(chatSessions).where(where).orderBy(desc(chatSessions.createdAt)).limit(10000);
+    // Solo columnas usadas por el CSV (sin messages/data pesados): username sale del
+    // JSONB con ->> para no traer todo el blob por cada una de las hasta 10k filas.
+    const rows = await db
+      .select({
+        name: chatSessions.name,
+        username: sql<string | null>`${chatSessions.data} ->> 'username'`,
+        phone: chatSessions.phone,
+        step: chatSessions.step,
+        campaign: chatSessions.campaign,
+        ccpp: chatSessions.ccpp,
+        createdAt: chatSessions.createdAt,
+        updatedAt: chatSessions.updatedAt,
+        kommoLeadId: chatSessions.kommoLeadId,
+      })
+      .from(chatSessions)
+      .where(where)
+      .orderBy(desc(chatSessions.createdAt))
+      .limit(10000);
     const data = rows.map((s) => {
-      const sdata = (s.data ?? {}) as Record<string, unknown>;
       const st = s.step ?? '';
       return {
         nombre: s.name ?? '',
-        usuario: (sdata.username as string) ?? '',
+        usuario: s.username ?? '',
         telefono: phoneForExport(s.phone),
         estado: STEP_LABEL[st] ?? st,
         campana: s.campaign ?? '',
