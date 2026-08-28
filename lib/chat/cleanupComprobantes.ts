@@ -23,9 +23,12 @@ export async function cleanupOldComprobantes(hours = 48): Promise<{ cleaned: num
     if (!at || at > cutoff) continue;
 
     if (data.comprobantePath) await deleteComprobante(String(data.comprobantePath));
+    // Borra también cada archivo de la lista (varios comprobantes por sesión).
+    const list = Array.isArray(data.comprobantes) ? (data.comprobantes as Array<{ path?: string }>) : [];
+    for (const c of list) if (c?.path) await deleteComprobante(String(c.path));
 
-    const { comprobante, comprobantePath, comprobanteAt, comprobanteMime, comprobanteName, ...rest } = data;
-    void comprobante; void comprobantePath; void comprobanteAt; void comprobanteMime; void comprobanteName;
+    const { comprobante, comprobantePath, comprobanteAt, comprobanteMime, comprobanteName, comprobantes, ...rest } = data;
+    void comprobante; void comprobantePath; void comprobanteAt; void comprobanteMime; void comprobanteName; void comprobantes;
     await db.update(chatSessions).set({ data: { ...rest, comprobanteCleaned: true } }).where(eq(chatSessions.id, r.id));
     cleaned++;
   }

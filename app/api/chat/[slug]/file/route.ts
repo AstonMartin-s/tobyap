@@ -20,25 +20,35 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const [s] = await db.select().from(chatSessions).where(and(eq(chatSessions.tenantId, tenant.id), eq(chatSessions.sessionKey, sessionKey)));
   if (!s) return NextResponse.json({ error: 'sesión desconocida' }, { status: 404 });
 
-  const signed = verifyFileToken(params.slug, sessionKey, req.nextUrl.searchParams.get('e'), req.nextUrl.searchParams.get('t'));
+  const cid = req.nextUrl.searchParams.get('c');
+  const signed = verifyFileToken(params.slug, sessionKey, cid, req.nextUrl.searchParams.get('e'), req.nextUrl.searchParams.get('t'));
   const panel = await getSession();
   const panelOk = panel?.slug === params.slug || panel?.role === 'admin';
   const data = (s.data as Record<string, unknown> | null) ?? {};
-  const comprobanteAt = typeof data.comprobanteAt === 'number' ? data.comprobanteAt : s.updatedAt?.getTime();
-  const legacyOk = withinLegacyWindow(comprobanteAt);
+
+  // Con cid buscamos el comprobante PUNTUAL en la lista; sin cid, comportamiento
+  // legacy (último comprobante en los campos sueltos).
+  type Comp = { id?: string; path?: string; b64?: string; mime?: string; at?: number };
+  const list = Array.isArray(data.comprobantes) ? (data.comprobantes as Comp[]) : [];
+  const entry = cid ? list.find((c) => c?.id === cid) : undefined;
+  if (cid && !entry) return NextResponse.json({ error: 'sin comprobante' }, { status: 404 });
+
+  const mime = (entry?.mime as string) || (data.comprobanteMime as string) || 'image/jpeg';
+  const atForLegacy = typeof entry?.at === 'number' ? entry.at
+    : typeof data.comprobanteAt === 'number' ? data.comprobanteAt
+    : s.updatedAt?.getTime();
+  const legacyOk = withinLegacyWindow(atForLegacy);
 
   if (!signed && !panelOk && !legacyOk) {
     return NextResponse.json({ error: 'no autorizado' }, { status: 401 });
   }
 
-  const mime = (data.comprobanteMime as string) || 'image/jpeg';
-
-  const relPath = data.comprobantePath as string | undefined;
+  const relPath = entry ? entry.path : (data.comprobantePath as string | undefined);
   if (relPath) {
     const buf = await readComprobante(relPath);
     if (buf) return new NextResponse(new Uint8Array(buf), { headers: { 'Content-Type': mime, 'Cache-Control': 'private, max-age=300' } });
   }
-  const b64 = data.comprobante as string | undefined;
+  const b64 = entry ? entry.b64 : (data.comprobante as string | undefined);
   if (!b64) return NextResponse.json({ error: 'sin comprobante' }, { status: 404 });
   return new NextResponse(Buffer.from(b64, 'base64'), {
     headers: { 'Content-Type': mime, 'Cache-Control': 'private, max-age=300' },

@@ -38,7 +38,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // iPhone sube HEIC/HEIF (no lo renderizan los navegadores) → lo pasamos a JPEG
   // para no "perder" comprobantes invisibles. El resto de formatos pasa igual.
   const { buf, mime } = await normalizeUploadImage(rawBuf, file.type || '', file.name || '');
-  const fileUrl = signFilePath(params.slug, sessionKey);
+  // cid único por comprobante → URL única. Antes todas las cargas de una sesión
+  // compartían URL y `/file` servía siempre la última, "borrando" las anteriores.
+  const cid = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  const fileUrl = signFilePath(params.slug, sessionKey, cid);
 
   // Guardamos en el volumen si está configurado (barato, fuera de la DB). Si no,
   // caemos a base64 en la sesión (comportamiento anterior).
@@ -74,18 +77,30 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     { from: 'user' as const, image: fileUrl, at: Date.now() },
     ...botMsgs,
   ];
+  // Entrada del comprobante en la LISTA (cada carga conserva la suya, con su cid).
+  const at = Date.now();
+  const entry = {
+    id: cid,
+    ...(storedPath ? { path: storedPath } : { b64: buf.toString('base64') }),
+    mime,
+    name: file.name,
+    at,
+  };
   // Append atómico + merge de data (no pisa mensajes ni flags concurrentes).
   await appendChatMessages(s.id, newMsgs, {
     step,
     markUnread: true,
     dataMerge: {
+      // Campos legacy = ÚLTIMO comprobante (compat con /file viejo, limpieza 48h,
+      // borrado de sesión). El detalle por-comprobante vive en `comprobantes[]`.
       ...(storedPath ? { comprobantePath: storedPath } : { comprobante: buf.toString('base64') }),
       comprobanteMime: mime,
       comprobanteName: file.name,
-      comprobanteAt: Date.now(), // para la limpieza automática a las 48h
+      comprobanteAt: at, // para la limpieza automática a las 48h
       comprobanteSentOnce: true,
     },
-    // Si quedó en disco, borramos cualquier base64 viejo de un intento anterior.
+    dataAppend: { comprobantes: [entry] },
+    // Si quedó en disco, borramos cualquier base64 legacy de un intento anterior.
     dataRemove: storedPath ? ['comprobante'] : [],
   });
   const history = [...(s.messages ?? []), ...newMsgs];
