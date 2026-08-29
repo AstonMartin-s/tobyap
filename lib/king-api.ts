@@ -63,10 +63,13 @@ export async function getUser(tenant: ResolvedTenant, username: string): Promise
 
 // ── Alta de jugador (creación de cuenta directa por Green API) ─────────────
 // Para clientes greenbet SIN Pagoda: la cuenta se crea acá, no por dat4win.
-// ⚠️ PENDIENTE DE VERIFICAR CONTRA LA DOC DE GREEN (`Nuevas-funciones-API green`
-//    / `API-Integracion-CRM Green`): endpoint exacto, nombres de campos y forma
-//    de la respuesta. Dejo la estructura alineada al resto de king-api (token +
-//    source_id en el body). Ajustar `CREATE_USER_PATH` y el mapeo cuando llegue.
+// ✓ Verificado en prod (greenbet.uno, 2026-08-28). Green tuvo que habilitar
+//   create-user para el token de agente (igual que hicieron con get-user).
+//   Contrato confirmado:
+//     POST /api/create-user  body { token, source_id, username, password, phone?, name? }
+//     OK:        { success:true, message:"Successfully created. ID:1034375", id:1034375 }
+//     Duplicado: { success:false, message:"Username already exists" }
+//   El `id` viene en la raíz (no en `data`); username/password no se devuelven.
 export const CREATE_USER_PATH = '/api/create-user';
 
 export interface KingCreateUserInput {
