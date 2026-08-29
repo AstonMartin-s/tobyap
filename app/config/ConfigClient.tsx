@@ -7,7 +7,7 @@ interface NumberRow { id: string; name: string | null; phone: string | null; sta
 interface StatusRow { id: string; kommoStatusId: number | null; name: string | null; color: string | null }
 interface RuleRow { id: string; rule: string | null; text: string | null; priority: number | null }
 
-const TYPES = ['publi', 'regular', 'spam', 'soporte'];
+const TYPES = ['publi', 'regular', 'spam', 'soporte', 'cajero'];
 
 async function j(url: string, opts?: RequestInit) {
   const res = await fetch(url, opts);
