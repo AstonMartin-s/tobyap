@@ -233,7 +233,7 @@ function WebhooksSection({ slug }: { slug: string }) {
 }
 
 interface NumberRow { id: string; name: string | null; phone: string | null; type: string | null; status: boolean | null; }
-const NUMBER_TYPES = ['publi', 'regular', 'spam', 'remarketing', 'soporte'];
+const NUMBER_TYPES = ['publi', 'regular', 'spam', 'remarketing', 'soporte', 'cajero'];
 
 // Números de contacto: la landing rota entre los ACTIVOS de su misma categoría (type).
 function NumbersSection({ slug }: { slug: string }) {

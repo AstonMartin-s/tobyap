@@ -33,10 +33,20 @@ const q = new URL(`https://x${url}`);
 const e = q.searchParams.get('e');
 const t = q.searchParams.get('t');
 check('signFilePath agrega e y t', !!e && !!t);
-check('verifyFileToken acepta token válido', verifyFileToken('king', 'sess-1', e, t));
-check('verifyFileToken rechaza token adulterado', !verifyFileToken('king', 'sess-1', e, (t ?? '') + 'z'));
-check('verifyFileToken rechaza otra sesión', !verifyFileToken('king', 'sess-2', e, t));
-check('verifyFileToken rechaza expirado', !verifyFileToken('king', 'sess-1', '1', t));
+check('verifyFileToken acepta token válido', verifyFileToken('king', 'sess-1', null, e, t));
+check('verifyFileToken rechaza token adulterado', !verifyFileToken('king', 'sess-1', null, e, (t ?? '') + 'z'));
+check('verifyFileToken rechaza otra sesión', !verifyFileToken('king', 'sess-2', null, e, t));
+check('verifyFileToken rechaza expirado', !verifyFileToken('king', 'sess-1', null, '1', t));
+
+// URL con cid: única por comprobante, y el token queda ligado al cid.
+const urlC = signFilePath('king', 'sess-1', 'cid-abc');
+const qc = new URL(`https://x${urlC}`);
+const ec = qc.searchParams.get('e');
+const tc = qc.searchParams.get('t');
+check('signFilePath con cid agrega c', qc.searchParams.get('c') === 'cid-abc');
+check('verifyFileToken acepta cid correcto', verifyFileToken('king', 'sess-1', 'cid-abc', ec, tc));
+check('verifyFileToken rechaza cid distinto', !verifyFileToken('king', 'sess-1', 'cid-xyz', ec, tc));
+check('verifyFileToken rechaza cid faltante', !verifyFileToken('king', 'sess-1', null, ec, tc));
 check('legacy window: reciente pasa', withinLegacyWindow(Date.now() - 3 * 86_400_000));
 check('legacy window: 20 días no pasa', !withinLegacyWindow(Date.now() - 20 * 86_400_000));
 

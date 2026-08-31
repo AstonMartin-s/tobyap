@@ -92,6 +92,8 @@ export default async function NamedLanding({
     portalUrl: c.portalUrl != null && String(c.portalUrl).trim() !== '' ? String(c.portalUrl) : null,
     // Si tiene redirectUrl, redirige tal cual (ej soporte wa.link) sin query extra.
     redirectUrl: c.redirectUrl != null && String(c.redirectUrl).trim() !== '' ? String(c.redirectUrl) : null,
+    // Si tiene telegramBot, redirige a t.me/<bot>?start=<code> (afiliados Telegram).
+    telegramBot: c.telegramBot != null && String(c.telegramBot).trim() !== '' ? String(c.telegramBot) : null,
     noCode: c.noCode === true || lp.type === 'soporte',
   };
 

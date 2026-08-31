@@ -186,7 +186,8 @@ async function accountStepPartnerApi(
 
 // Green API directa (greenbet SIN Pagoda): igual que partner_api, ACÁ generamos
 // username/password y reintentamos con otro username si el elegido ya existe.
-// ⚠️ El endpoint/campos de creación se confirman contra la doc de Green.
+// ✓ Verificado en prod (greenbet.uno, 2026-08-28): create-user con token de
+//   agente (Green lo habilitó). Duplicado devuelve "Username already exists".
 async function accountStepKingApi(
   tenant: ResolvedTenant,
   session: { phone: string; name?: string | null },

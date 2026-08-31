@@ -4,7 +4,7 @@ import { db } from '@/db';
 import { numbers } from '@/db/schema';
 import { getSession } from '@/lib/session';
 
-const TYPES = ['publi', 'regular', 'spam', 'soporte'];
+const TYPES = ['publi', 'regular', 'spam', 'soporte', 'cajero'];
 
 // GET /api/numbers — números de contacto del tenant (§6.2).
 export async function GET() {

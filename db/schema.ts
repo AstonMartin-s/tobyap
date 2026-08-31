@@ -112,6 +112,10 @@ export const tenants = pgTable('tenants', {
   partnerApiUrl: text('partner_api_url'), // ej: https://api-kplay.com/api/v1
   partnerApiKey: text('partner_api_key'), // cifrado — pk_...
 
+  // Afiliados Telegram — secreto compartido para firmar (HMAC-SHA256) el webhook
+  // entrante que nos devuelve conversiones por code (registro / primera carga).
+  affiliateWebhookSecret: text('affiliate_webhook_secret'), // cifrado
+
   // Override por cliente del mapa CCPP -> bono (ej. { "A1": "Bono10%" }).
   // Si falta una clave, se usa el mapa global por defecto (lib/attribution).
   bonoMap: jsonb('bono_map').$type<Record<string, string>>().default({}),

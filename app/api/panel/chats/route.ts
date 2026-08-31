@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
     step: chatSessions.step,
     kommoLeadId: chatSessions.kommoLeadId,
     messages: chatSessions.messages,
-    data: sql<Record<string, unknown>>`${chatSessions.data} - 'comprobante'`,
+    data: sql<Record<string, unknown>>`${chatSessions.data} - 'comprobante' - 'comprobantes'`,
     createdAt: chatSessions.createdAt,
     updatedAt: chatSessions.updatedAt,
   } as const;
@@ -424,8 +424,10 @@ export async function POST(req: NextRequest) {
     const full = (s.data ?? {}) as Record<string, unknown>;
     // Abrir el chat = leerlo → limpia el "no leído" (best-effort, sin bloquear).
     if (full.unread) mergeChatData(s.id, { unread: false, unreadCount: 0 }, undefined, { touchUpdatedAt: false }).catch(() => {});
-    const { comprobante, ...dataLite } = full;
-    void comprobante;
+    // El panel muestra las imágenes vía las URLs de cada mensaje (`/file?c=...`),
+    // no desde `data` — así que quitamos el/los base64 pesados del detalle.
+    const { comprobante, comprobantes, ...dataLite } = full;
+    void comprobante; void comprobantes;
     return NextResponse.json({ ok: true, session: { ...s, data: dataLite } });
   }
 

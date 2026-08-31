@@ -17,17 +17,24 @@ interface AppendOpts {
   dataMerge?: Record<string, unknown>;
   /** Claves a eliminar de `data` (ej. limpiar el base64 del comprobante). */
   dataRemove?: string[];
+  /** Anexa elementos al final de un array jsonb en `data` (crea la clave si falta). */
+  dataAppend?: Record<string, unknown[]>;
   /** Marca no leído e incrementa unreadCount en Postgres (sin race). */
   markUnread?: boolean;
 }
 
-function dataExpr(merge?: Record<string, unknown>, remove?: string[], markUnread?: boolean) {
+function dataExpr(merge?: Record<string, unknown>, remove?: string[], markUnread?: boolean, append?: Record<string, unknown[]>) {
   let expr = sql`coalesce(data, '{}'::jsonb)`;
   if (merge && Object.keys(merge).length) {
     expr = sql`${expr} || ${JSON.stringify(merge)}::jsonb`;
   }
   for (const k of remove ?? []) {
     expr = sql`${expr} - ${k}`;
+  }
+  for (const [k, arr] of Object.entries(append ?? {})) {
+    if (!arr.length) continue;
+    // jsonb_set + coalesce: si la clave no existe arranca de '[]' y concatena.
+    expr = sql`jsonb_set(${expr}, array[${k}]::text[], coalesce(${expr} -> ${k}, '[]'::jsonb) || ${JSON.stringify(arr)}::jsonb, true)`;
   }
   if (markUnread) expr = applyUnreadIncrement(expr);
   return expr;
@@ -44,8 +51,9 @@ export async function appendChatMessages(
     sql`updated_at = now()`,
   ];
   if (opts.step) parts.push(sql`step = ${opts.step}`);
-  if (opts.dataMerge || opts.dataRemove?.length || opts.markUnread) {
-    parts.push(sql`data = ${dataExpr(opts.dataMerge, opts.dataRemove, opts.markUnread)}`);
+  const hasAppend = !!opts.dataAppend && Object.keys(opts.dataAppend).length > 0;
+  if (opts.dataMerge || opts.dataRemove?.length || opts.markUnread || hasAppend) {
+    parts.push(sql`data = ${dataExpr(opts.dataMerge, opts.dataRemove, opts.markUnread, opts.dataAppend)}`);
   }
   await db.execute(sql`UPDATE chat_sessions SET ${sql.join(parts, sql`, `)} WHERE id = ${sessionId}`);
 }

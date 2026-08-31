@@ -33,6 +33,9 @@ export interface ResolvedTenant {
   partnerApiUrl: string | null;
   partnerApiKey: string | null; // descifrado
 
+  // Afiliados Telegram — secreto HMAC del webhook entrante (descifrado).
+  affiliateWebhookSecret: string | null;
+
   // Mapa de custom fields de Kommo
   customFields: Record<string, number>;
   // Override CCPP -> bono (se combina con el mapa global por defecto)
@@ -164,6 +167,7 @@ export interface CreateTenantInput {
   provider?: string;
   partnerApiUrl?: string;
   partnerApiKey?: string; // cifrado
+  affiliateWebhookSecret?: string; // cifrado
 
   // Sub-entidades opcionales (se insertan en sus tablas)
   settings?: TenantSettingsInput;

@@ -10,5 +10,7 @@ export async function purgeChatSession(
 ): Promise<void> {
   const rel = data?.comprobantePath;
   if (typeof rel === 'string' && rel) await deleteComprobante(rel).catch(() => {});
+  const list = Array.isArray(data?.comprobantes) ? (data!.comprobantes as Array<{ path?: string }>) : [];
+  for (const c of list) if (c?.path) await deleteComprobante(String(c.path)).catch(() => {});
   await db.delete(chatSessions).where(eq(chatSessions.id, sessionId));
 }
