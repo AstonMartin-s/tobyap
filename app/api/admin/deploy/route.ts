@@ -48,8 +48,39 @@ export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as CreateTenantInput & {
     mode?: 'provision' | 'discover';
     pipelineName?: string;
+    noKommo?: boolean;
   };
-  if (!body.slug || !body.name || !body.kommoSubdomain || !body.kommoToken) {
+  if (!body.slug || !body.name) {
+    return NextResponse.json({ error: 'slug y name son requeridos' }, { status: 400 });
+  }
+
+  // Cliente SIN Kommo (afiliados / Telegram): no hay CRM detrás. Solo trackeamos
+  // y disparamos CAPI vía el webhook de afiliados. Se salta provision/discover/heal.
+  const noKommo = body.noKommo === true || (!body.kommoSubdomain && !body.kommoToken);
+  if (noKommo) {
+    if (!body.metaPixelId || !body.metaCapiToken) {
+      return NextResponse.json(
+        { error: 'cliente sin Kommo: Pixel ID y CAPI token de Meta son requeridos' },
+        { status: 400 },
+      );
+    }
+    const row = await upsertTenant({
+      ...body,
+      role: 'client',
+      // Sin CRM: nunca escribimos en leads (no existen). readonly por defecto.
+      readonly: body.readonly ?? true,
+      // Panel afiliados: oculta Embudo/Livechat/Fichas (Kommo/chat) → solo Reportes + Config.
+      customFields: { feat_embudo: 0, feat_livechat: 0, feat_fichas: 0, ...(body.customFields ?? {}) },
+    });
+    return NextResponse.json({
+      ok: true,
+      mode: 'no-kommo',
+      tenant: { id: row.id, slug: row.slug },
+      webhook: `/api/webhooks/affiliate/${row.slug}`,
+    });
+  }
+
+  if (!body.kommoSubdomain || !body.kommoToken) {
     return NextResponse.json(
       { error: 'slug, name, kommoSubdomain y kommoToken son requeridos' },
       { status: 400 },
