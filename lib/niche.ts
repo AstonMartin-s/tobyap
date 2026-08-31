@@ -32,6 +32,33 @@ export const NICHE_META: Record<Niche, NicheMeta> = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Vocabulario de eventos a Meta por nicho. Las dos ranuras lógicas del sistema
+// (conversation = inicia conversación · conversion = venta/cargo) se traducen a
+// nombres de evento distintos según el nicho:
+//  - circo:  ConversacionCRM<suffix> / CargoCRM<suffix> (comportamiento actual).
+//  - tienda: Contact / Purchase (eventos ESTÁNDAR de Meta, SIN sufijo CRM), para
+//            trackear conversación de sitio web + conversión personalizada.
+// `standard=true` => nombre fijo de Meta, no se le agrega el sufijo del tenant.
+// ---------------------------------------------------------------------------
+export type EventSlot = 'conversation' | 'conversion';
+
+export interface NicheEventName {
+  base: string;
+  standard: boolean;
+}
+
+export const NICHE_EVENTS: Record<Niche, Record<EventSlot, NicheEventName>> = {
+  circo: {
+    conversation: { base: 'Conversacion', standard: false },
+    conversion: { base: 'Cargo', standard: false },
+  },
+  tienda: {
+    conversation: { base: 'Contact', standard: true },
+    conversion: { base: 'Purchase', standard: true },
+  },
+};
+
 export function isNiche(v: unknown): v is Niche {
   return typeof v === 'string' && (NICHES as readonly string[]).includes(v);
 }

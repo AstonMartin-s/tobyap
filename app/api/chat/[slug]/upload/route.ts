@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { onComprobante, comprobanteReviewMessages } from '@/lib/chat/flow';
+import { comprobanteReviewTienda } from '@/lib/chat/flows/tienda';
 import { prepareBotBatch } from '@/lib/chat/stagger';
 import { appendChatMessages } from '@/lib/chat/mutations';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
@@ -58,7 +59,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   let step: string;
   let botMsgs: ReturnType<typeof prepareBotBatch>;
-  if (firstComprobante) {
+  if (tenant.niche === 'tienda') {
+    // Tienda: sin gate de app. El comprobante entra directo a verificación.
+    step = 'validando';
+    botMsgs = prepareBotBatch(comprobanteReviewTienda());
+  } else if (firstComprobante) {
     step = 'app_onboarding'; // primero instala app + notificaciones, luego entra a revisión
     botMsgs = prepareBotBatch(onComprobante(runtime));
   } else {

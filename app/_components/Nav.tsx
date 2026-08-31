@@ -32,6 +32,11 @@ const I = {
       <path d="M3 4h18l-7 8v6l-4 2v-8z" />
     </svg>
   ),
+  product: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" />
+    </svg>
+  ),
   clients: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
@@ -70,15 +75,21 @@ export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?:
 
   // Solapas opcionales por cliente (default: todas on hasta que cargue).
   const [feat, setFeat] = useState<Features>(ALL_ON);
+  const [niche, setNiche] = useState<'circo' | 'tienda'>('circo');
   useEffect(() => {
     if (isAdmin) return; // el panel admin global no usa solapas por cliente
     let alive = true;
     fetch('/api/panel/features')
       .then((r) => r.json())
-      .then((d) => { if (alive && d?.features) setFeat(d.features); })
+      .then((d) => {
+        if (!alive) return;
+        if (d?.features) setFeat(d.features);
+        if (d?.niche === 'tienda' || d?.niche === 'circo') setNiche(d.niche);
+      })
       .catch(() => { /* mantiene ALL_ON */ });
     return () => { alive = false; };
   }, [isAdmin]);
+  const isTienda = niche === 'tienda';
 
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   useEffect(() => {
@@ -142,8 +153,15 @@ export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?:
           <>
             {feat.reportes && (pr === 'supervisor' || pr === 'admin') && NavLink('/reportes', 'Reportes', I.report)}
             {NavLink('/chats', 'Chats web', I.chat)}
-            {feat.embudo && (pr === 'supervisor' || pr === 'admin') && NavLink('/embudo', 'Embudo', I.funnel)}
-            {feat.livechat && (pr === 'supervisor' || pr === 'admin') && NavLink('/livechat', 'Ajustes chat', I.live)}
+            {/* Tienda: Producto (matriz editable). Circo: Embudo (Kommo) + Ajustes chat. */}
+            {isTienda
+              ? (pr === 'supervisor' || pr === 'admin') && NavLink('/producto', 'Producto', I.product)
+              : (
+                <>
+                  {feat.embudo && (pr === 'supervisor' || pr === 'admin') && NavLink('/embudo', 'Embudo', I.funnel)}
+                  {feat.livechat && (pr === 'supervisor' || pr === 'admin') && NavLink('/livechat', 'Ajustes chat', I.live)}
+                </>
+              )}
             {pr === 'admin' && NavLink('/config', 'Configuración', I.config)}
             {pr === 'admin' && NavLink('/usuarios', 'Usuarios', I.clients)}
           </>

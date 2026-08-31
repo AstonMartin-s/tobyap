@@ -26,6 +26,38 @@
 
 ## Bitácora
 
+### 2026-08-31 — Tienda T5+T6: guion del chat + liberar producto (rama `feat/tob/nichos`)
+
+Guion propio del nicho **Tienda** (data-driven desde `chat_config.tienda`), despachado por `tenant.niche` sin tocar Circo:
+
+- **`lib/chat/flows/tienda.ts`** (nuevo): `welcomeStepTienda` (bienvenida + botón por producto `buy:<id>`), `productStepTienda` (detalle + medios de pago → paso `comprobante`), `comprobanteReviewTienda`/`onFreeTextTienda`, `deliveredMessagesTienda` (entrega link/email/manual).
+- **`lib/chat/loadTienda.ts`** (nuevo): loader de `TiendaConfig`.
+- Despacho por nicho en rutas chat: `start` (bienvenida+botones), `action` (`buy:` / `finish_upload` / `support`), `message` (texto libre Tienda, sin "quiero mi cuenta"/Pagoda), `upload` (comprobante directo a `validando`, sin gate de app).
+- **Panel `approve`** (`app/api/panel/chats/route.ts`): para `tienda` = "liberar producto" → entrega el ebook + dispara **Purchase** con el valor del producto (`data.price`), sin mensaje de "jugar" ni Kommo.
+- **Validado E2E en local (test tenant `casaurbana`):** matriz Producto persiste (marca/producto $9.900/transferencia/entrega link); chat arma bienvenida con botón de producto; al comprar pide transferir a `casaurbana.mp` y pide comprobante. typecheck verde.
+
+**Reportes niche-aware** (`app/reportes/page.tsx`): para `tienda` se ocultan Canales Meta/Influencers, InfluencerSpend y "Reportes diarios de ads"; KPIs/tabla renombran `Cargas→Ventas` y la tabla por campaña oculta la columna Canal. typecheck verde.
+
+Pendiente (Claude, R1): widget post-menú fijo (aún botonera Circo) + botonera Chats operario ("Liberar producto" en vez de Acreditar/Cargar/Retirar).
+
+### 2026-08-31 — Tienda (T1–T3 backend) + config data-driven (rama `feat/tob/nichos`)
+
+- **Modelo fijado** (ver `docs/02_PLAN_NICHO_TIENDA.md`): Tienda usa el chat web propio (recibe comprobante), Kommo opcional, "carga"→"compra", sin cuenta portal/ficha, evento de venta = `Purchase` estándar disparado MANUAL desde panel ("liberar producto"), embudo Pauta→Conversación→Venta→Soporte. Proceso de venta **data-driven** (pestañas Producto/Pago/Entrega), no hardcodeado.
+- **Backend hecho:**
+  - `lib/niche.ts`: `NICHE_EVENTS` (vocabulario por nicho). `lib/meta.ts::fullEventName` niche-aware → circo `ConversacionCRM/CargoCRM<suffix>` (intacto) · tienda `Contact`/`Purchase` (estándar, sin sufijo).
+  - `app/api/admin/onboard`: Kommo obligatorio solo en circo; tienda exige `metaPixelId`. Discovery Kommo solo si hay credenciales.
+  - `lib/chat/tienda.ts`: `TiendaConfig` + `parseTiendaConfig` (products/payments/delivery) en `client_settings.chat_config.tienda`.
+- `npm run typecheck` verde. Nada de Circo tocado; todo gated por `niche`.
+- **Pendiente (backend, Cursor):** flujo `lib/chat/flows/tienda.ts` + despacho por nicho en rutas chat · "liberar producto" + `Purchase` con valor manual en panel.
+
+#### Bloque R1 — MSG-TOB-20260831-1 (Cursor TOB → Claude TOB)
+- **DE:** Cursor TOB · **A:** Claude TOB · **TIPO:** aviso de contrato + pedido de front
+- **MODULO:** nicho Tienda — onboarding UI + panel
+- **CONTEXTO:** rama `feat/tob/nichos`. Backend Tienda T1–T3 listo (nicho, eventos por nicho, onboarding Kommo-opcional, `TiendaConfig`). Falta la UI.
+- **CONTRATO:** `client_settings.chat_config.tienda` = `TiendaConfig` (`lib/chat/tienda.ts`: products[], payments[], delivery, brandName, currency, supportUrl). Usar `parseTiendaConfig`.
+- **ACCION:** Claude — cuando toque front: (1) pestañas de onboarding **Producto / Pago / Entrega** que editan `chat_config.tienda`; (2) en el panel de chats, para `tenant.niche='tienda'` relabelar "Acreditar" → **"Liberar producto"** y ocultar CBU/portal/ficha. Coordinar antes de tocar `flow.ts`/panel.
+- **REFERENCIAS:** `docs/02_PLAN_NICHO_TIENDA.md`, `lib/chat/tienda.ts`, `lib/niche.ts`.
+
 ### 2026-08-28 — Nichos: categorización Circo / Tienda (fundación, rama `feat/tob/nichos`)
 
 - **Objetivo:** habilitar la instalación del sistema en otros nichos (primero un ecommerce de ebooks) sin romper los clientes actuales. Paso 1 = **solo categorizar**, no implementar aún el flujo del nuevo nicho.

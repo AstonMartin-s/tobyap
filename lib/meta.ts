@@ -3,6 +3,7 @@ import { and, eq, gt, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { metaEvents, tenants } from '@/db/schema';
 import { decryptOptional } from '@/lib/crypto';
+import { NICHE_EVENTS, type EventSlot } from '@/lib/niche';
 import type { ResolvedTenant } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
@@ -105,9 +106,16 @@ function buildUserData(u: CapiUserData) {
   return ud;
 }
 
-// Nombre final con sufijo del tenant: "Conversacion" + "30" -> "ConversacionCRM30".
+// Nombre final del evento según el nicho del tenant.
+//  - circo:  "Conversacion" + "30" -> "ConversacionCRM30" (comportamiento actual).
+//  - tienda: eventos estándar de Meta -> "Contact" / "Purchase" (sin sufijo).
+// Las dos bases lógicas ('Conversacion' | 'Cargo') mapean a las ranuras
+// conversation/conversion del vocabulario de nicho (lib/niche.ts).
 export function fullEventName(base: BaseEventName, tenant: ResolvedTenant): string {
-  return `${base}CRM${tenant.eventSuffix}`;
+  const slot: EventSlot = base === 'Conversacion' ? 'conversation' : 'conversion';
+  const ev = NICHE_EVENTS[tenant.niche]?.[slot];
+  if (!ev) return `${base}CRM${tenant.eventSuffix}`;
+  return ev.standard ? ev.base : `${ev.base}CRM${tenant.eventSuffix}`;
 }
 
 // ---- Envío ----------------------------------------------------------------

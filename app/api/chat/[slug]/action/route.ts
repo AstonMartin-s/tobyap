@@ -4,6 +4,8 @@ import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { accountStep, cbuStep, postActionMessages, comprobanteReviewMessages } from '@/lib/chat/flow';
+import { BUY_ACTION_PREFIX, productStepTienda, comprobanteReviewTienda, onFreeTextTienda } from '@/lib/chat/flows/tienda';
+import { loadTiendaConfig } from '@/lib/chat/loadTienda';
 import { prepareBotBatch } from '@/lib/chat/stagger';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
@@ -27,6 +29,39 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // Persistimos el toque del cliente
   const label = b.label?.trim();
   if (label) s.messages = [...(s.messages ?? []), { from: 'user', text: label, at: Date.now() }];
+
+  // ── Nicho TIENDA: guion propio (producto → pago → comprobante). ───────────
+  if (tenant.niche === 'tienda') {
+    const cfg = await loadTiendaConfig(tenant.id, tenant.name);
+
+    if (b.action.startsWith(BUY_ACTION_PREFIX)) {
+      const productId = b.action.slice(BUY_ACTION_PREFIX.length);
+      const r = productStepTienda(cfg, productId);
+      const botMsgs = prepareBotBatch(r.messages);
+      const history = [...(s.messages ?? []), ...botMsgs];
+      await db.update(chatSessions).set({ step: r.step, data: { ...(s.data ?? {}), ...r.data }, messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+      return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length });
+    }
+
+    if (b.action === 'finish_upload') {
+      const botMsgs = prepareBotBatch(comprobanteReviewTienda());
+      const history = [...(s.messages ?? []), ...botMsgs];
+      await db.update(chatSessions).set({ step: 'validando', messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+      return NextResponse.json({ ok: true, messages: botMsgs, buttons: [], step: 'validando', total: history.length });
+    }
+
+    if (b.action === 'support') {
+      const botMsgs = prepareBotBatch(onFreeTextTienda('support', cfg));
+      const history = [...(s.messages ?? []), ...botMsgs];
+      await db.update(chatSessions).set({ messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+      return NextResponse.json({ ok: true, messages: botMsgs, buttons: [], step: s.step, total: history.length });
+    }
+
+    // Acción no reconocida en tienda: no rompemos el flujo.
+    const persisted = s.messages ?? [];
+    if (label) await db.update(chatSessions).set({ messages: persisted, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+    return NextResponse.json({ ok: true, messages: [], buttons: [], step: s.step, total: persisted.length });
+  }
 
   if (b.action === 'want_account') {
     const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name }, runtime);

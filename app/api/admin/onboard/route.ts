@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { discoverKommoConfig } from '@/lib/kommo-onboard';
 import { upsertTenant } from '@/lib/tenants';
+import { parseNiche } from '@/lib/niche';
 import type { CreateTenantInput } from '@/lib/types';
 
 // Auth: sesión admin O header x-admin-token (para scripts/automatización).
@@ -24,39 +25,60 @@ export async function POST(req: NextRequest) {
     pipelineName?: string;
     pipelineId?: number;
   };
-  if (!input.slug || !input.name || !input.kommoSubdomain || !input.kommoToken) {
+  if (!input.slug || !input.name) {
+    return NextResponse.json({ error: 'slug y name requeridos' }, { status: 400 });
+  }
+
+  const niche = parseNiche(input.niche);
+  // Kommo se usa si el tenant lo aporta. Es OBLIGATORIO solo en 'circo'
+  // (descubrimiento de pipeline/estados/campos). En 'tienda' es opcional: el
+  // CRM/panel es nuestro y el trackeo va por pixel + conversión personalizada.
+  const hasKommo = !!(input.kommoSubdomain && input.kommoToken);
+
+  if (niche === 'circo' && !hasKommo) {
     return NextResponse.json(
-      { error: 'slug, name, kommoSubdomain y kommoToken requeridos' },
+      { error: 'circo requiere kommoSubdomain y kommoToken' },
+      { status: 400 },
+    );
+  }
+  if (niche === 'tienda' && !input.metaPixelId) {
+    return NextResponse.json(
+      { error: 'tienda requiere metaPixelId (y metaCapiToken para disparar eventos)' },
       { status: 400 },
     );
   }
 
-  let cfg;
-  try {
-    cfg = await discoverKommoConfig(input.kommoSubdomain, input.kommoToken, {
-      pipelineName: input.pipelineName,
-      pipelineId: input.pipelineId,
-    });
-  } catch (e) {
-    return NextResponse.json({ error: String((e as Error).message) }, { status: 502 });
+  // Descubrimiento de Kommo: solo si se aportaron credenciales.
+  let cfg: Awaited<ReturnType<typeof discoverKommoConfig>> | null = null;
+  if (hasKommo) {
+    try {
+      cfg = await discoverKommoConfig(input.kommoSubdomain!, input.kommoToken!, {
+        pipelineName: input.pipelineName,
+        pipelineId: input.pipelineId,
+      });
+    } catch (e) {
+      return NextResponse.json({ error: String((e as Error).message) }, { status: 502 });
+    }
   }
 
-  // Modo preview: solo devuelve lo descubierto, no crea nada.
+  // Modo preview: solo devuelve lo descubierto (o el nicho), no crea nada.
   if (req.nextUrl.searchParams.get('preview') === 'true') {
-    return NextResponse.json({ ok: true, discovered: cfg });
+    return NextResponse.json({ ok: true, niche, discovered: cfg });
   }
 
   const tenantInput: CreateTenantInput = {
     ...input,
-    kommoPipelineId: input.kommoPipelineId ?? cfg.pipelineId,
-    customFields: { ...cfg.customFields, ...(input.customFields ?? {}) },
+    niche,
+    kommoPipelineId: input.kommoPipelineId ?? cfg?.pipelineId,
+    customFields: { ...(cfg?.customFields ?? {}), ...(input.customFields ?? {}) },
   };
 
   const row = await upsertTenant(tenantInput);
   return NextResponse.json({
     ok: true,
     tenant: { id: row.id, slug: row.slug },
+    niche,
     discovered: cfg,
-    webhook: `/api/webhooks/kommo/${row.slug}`,
+    webhook: hasKommo ? `/api/webhooks/kommo/${row.slug}` : null,
   });
 }

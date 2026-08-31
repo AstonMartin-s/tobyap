@@ -5,7 +5,9 @@ import { db } from '@/db';
 import { chatSessions, metaEvents, attributions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { checkWhatsApp } from '@/lib/chat/wachecker';
-import { welcomeStep } from '@/lib/chat/flow';
+import { welcomeStep, type Btn } from '@/lib/chat/flow';
+import { welcomeStepTienda, productButtons } from '@/lib/chat/flows/tienda';
+import { loadTiendaConfig } from '@/lib/chat/loadTienda';
 import { prepareBotBatch } from '@/lib/chat/stagger';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { createChatLead, addLeadNote } from '@/lib/chat/kommoMirror';
@@ -35,6 +37,20 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const runtime = await loadChatRuntime(tenant.id, tenant.name, wa.phone, tenant.slug);
 
+  // Nicho: TIENDA usa un guion propio (producto/pago/comprobante), sin cuenta/CBU.
+  const isTienda = tenant.niche === 'tienda';
+  const tiendaCfg = isTienda ? await loadTiendaConfig(tenant.id, tenant.name) : null;
+  const buildWelcome = (name?: string | null): { messages: ReturnType<typeof welcomeStep>['messages']; buttons: Btn[] } =>
+    isTienda ? welcomeStepTienda(name, tiendaCfg!) : welcomeStep(name, runtime);
+  const buttonsForStep = (step: string): Btn[] => {
+    if (isTienda) return step === 'welcome' ? productButtons(tiendaCfg!) : [];
+    return step === 'welcome'
+      ? [{ id: 'want_account', label: 'Quiero mi cuenta 🎁' }]
+      : step === 'credenciales'
+        ? [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }]
+        : [];
+  };
+
   // DEDUPE POR TELÉFONO
   const existing = await db.query.chatSessions.findFirst({
     where: and(eq(chatSessions.tenantId, tenant.id), eq(chatSessions.phone, wa.phone)),
@@ -50,7 +66,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     const terminal = ['closed', 'no_cargo'].includes(existing.step ?? '');
     if (terminal) {
       // Vuelve tras cerrar/no-cargar: reabrimos EN LA MISMA fila con una bienvenida.
-      const w = welcomeStep(b.name ?? existing.name, runtime);
+      const w = buildWelcome(b.name ?? existing.name);
       const welcomeMsgs = prepareBotBatch(w.messages);
       const history = [...(existing.messages ?? []), ...welcomeMsgs];
       await db.update(chatSessions).set({ step: 'welcome', messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, existing.id));
@@ -59,7 +75,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     // Sesión activa: la reanudamos tal cual (historial + estado actuales).
     if (b.name && !existing.name) await db.update(chatSessions).set({ name: b.name, updatedAt: new Date() }).where(eq(chatSessions.id, existing.id));
     const step = existing.step ?? 'welcome';
-    const buttons = step === 'welcome' ? [{ id: 'want_account', label: 'Quiero mi cuenta 🎁' }] : step === 'credenciales' ? [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }] : [];
+    const buttons = buttonsForStep(step);
     const msgs = existing.messages ?? [];
     return NextResponse.json({ ok: true, resumed: true, sessionKey: existing.sessionKey, messages: msgs, buttons, step, total: msgs.length, leadId: existing.kommoLeadId ?? null });
   }
@@ -70,7 +86,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     console.error(`[chat start] ${tenant.slug}: no se pudo crear el lead en Kommo (tel ${wa.phone}). Igual medimos la conversión a Meta.`);
   }
 
-  const { messages, buttons } = welcomeStep(b.name, runtime);
+  const { messages, buttons } = buildWelcome(b.name);
   const welcomeMsgs = prepareBotBatch(messages);
 
   await db.insert(chatSessions).values({

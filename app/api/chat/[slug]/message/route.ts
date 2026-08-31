@@ -4,6 +4,8 @@ import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { onFreeText, accountStep, WANT_ACCOUNT_RE } from '@/lib/chat/flow';
+import { onFreeTextTienda } from '@/lib/chat/flows/tienda';
+import { loadTiendaConfig } from '@/lib/chat/loadTienda';
 import { prepareBotBatch } from '@/lib/chat/stagger';
 import { appendChatMessages } from '@/lib/chat/mutations';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
@@ -27,6 +29,21 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const runtime = await loadChatRuntime(tenant.id, tenant.name, s.phone, tenant.slug);
 
   const userMsg = { from: 'user' as const, text: b.text, at: Date.now() };
+
+  // ── Nicho TIENDA: guion propio. Sin "quiero mi cuenta"/Pagoda. ─────────────
+  if (tenant.niche === 'tienda') {
+    const cfg = await loadTiendaConfig(tenant.id, tenant.name);
+    let replies = onFreeTextTienda(s.step ?? 'welcome', cfg);
+    if ((s.data as Record<string, unknown> | null)?.operatorTookOver) replies = [];
+    const prevMsgs = (s.messages ?? []) as Array<{ from: string; text?: string }>;
+    const lastBot = [...prevMsgs].reverse().find((m) => m.from === 'bot');
+    if (replies.length === 1 && lastBot && (lastBot.text ?? '') === (replies[0].text ?? '')) replies = [];
+    const botMsgs = prepareBotBatch(replies);
+    await appendChatMessages(s.id, [userMsg, ...botMsgs], { markUnread: true });
+    const history = [...(s.messages ?? []), userMsg, ...botMsgs];
+    if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, `👤 Lead: ${b.text}`);
+    return NextResponse.json({ ok: true, messages: botMsgs, total: history.length });
+  }
 
   // El cliente tipeó "quiero mi cuenta" en vez de tocar el botón (muy común en mobile).
   if ((s.step ?? 'welcome') === 'welcome' && WANT_ACCOUNT_RE.test(b.text)) {

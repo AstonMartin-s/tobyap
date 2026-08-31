@@ -11,5 +11,6 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'no autorizado' }, { status: 401 });
   const tenant = await getTenantBySlug(session.slug);
   const features = tenant?.features ?? { reportes: true, embudo: true, livechat: true, fichas: true };
-  return NextResponse.json({ features });
+  const niche = tenant?.niche ?? 'circo';
+  return NextResponse.json({ features, niche });
 }

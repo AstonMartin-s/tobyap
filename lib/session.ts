@@ -77,6 +77,7 @@ const TAB_ACCESS: Record<string, PanelRole[]> = {
   reportes: ['supervisor', 'admin'],
   embudo: ['supervisor', 'admin'],
   livechat: ['supervisor', 'admin'],
+  producto: ['supervisor', 'admin'],
   config: ['admin'],
   usuarios: ['admin'],
 };

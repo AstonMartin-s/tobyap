@@ -14,6 +14,8 @@ import { appendChatMessages, mergeChatData } from '@/lib/chat/mutations';
 import { sendPushToSession } from '@/lib/chat/push';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { emitCargo, panelApproveEmitsCargo } from '@/lib/cargo/emit';
+import { deliveredMessagesTienda } from '@/lib/chat/flows/tienda';
+import { loadTiendaConfig } from '@/lib/chat/loadTienda';
 import { depositOp, withdrawOp, consultBalance, operationsSummary } from '@/lib/partner-ops';
 import { kingDepositOp, kingWithdrawOp, kingConsultBalance } from '@/lib/king-ops';
 import {
@@ -527,6 +529,34 @@ export async function POST(req: NextRequest) {
   // APPROVE: acreditación idempotente + mover Kommo a Cargo$ + emitir CargoCRM.
   if (b.op === 'approve') {
     const tenant = await getTenantBySlug(session.slug);
+
+    // TIENDA: "liberar producto" = entregar el ebook + disparar Purchase (valor del
+    // producto). Sin mensaje de "jugar" ni Kommo/ficha.
+    if (tenant && tenant.niche === 'tienda') {
+      const cfg = await loadTiendaConfig(tenant.id, tenant.name);
+      const msgs = prepareBotBatch(deliveredMessagesTienda(cfg, data), { op: true });
+      await appendChatMessages(s.id, msgs, { step: 'done' });
+      void sendPushToSession(s.id, data.pushSub, {
+        title: '¡Pago confirmado!',
+        body: 'Ya te entregamos tu producto.',
+        url: `/chat/${session.slug}`,
+      });
+      if (panelApproveEmitsCargo()) {
+        const price = typeof data.price === 'number' ? data.price : undefined;
+        const currency = typeof data.currency === 'string' && data.currency ? data.currency : (cfg.currency || 'ARS');
+        await emitCargo(tenant, {
+          sessionKey: s.sessionKey,
+          source: 'panel',
+          operator: session.slug,
+          value: b.amount && b.amount > 0 ? b.amount : price,
+          currency,
+          skipKommoStatus: true,
+          skipChatRelease: true,
+        }).catch((e) => console.error(`[panel/chats ${session.slug}] emitPurchase:`, e));
+      }
+      return NextResponse.json({ ok: true, messages: msgs, step: 'done' });
+    }
+
     if (tenant) {
       // Agrega el mensaje "¡Acreditado!" UNA sola vez (candado atómico). Aunque
       // después llegue el webhook de Cargo$ o el poll, no se duplica. El panel
