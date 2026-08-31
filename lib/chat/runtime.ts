@@ -237,24 +237,34 @@ export function offerDepositLine(cfg: ChatRuntimeConfig): string {
   return `Mínimo *$${money(cfg.minDeposit)}* y ${bonus} 🎁`;
 }
 
-/** Vista previa del guion modelo (panel) — muestra dónde va cada link. */
+/**
+ * Vista previa del guion modelo (panel). Renderiza cada burbuja con los MISMOS
+ * templates que usa el chat real (`renderTemplate`) para que lo que se edita en
+ * "Guion" se refleje 1:1 en el preview. Solo se completan con datos de muestra
+ * (usuario/CBU) las partes que en runtime vienen del cliente.
+ */
 export function buildConversationPreview(cfg: ChatRuntimeConfig, sampleName = 'Martín'): PreviewBubble[] {
   const fn = sampleName.split(/\s+/)[0];
   const L = cfg.links;
   const m = (slot: LinkSlotId) => cfg.magicLinks.includes(slot) ? PAGODA_MAGIC_URL_SAMPLE : L[slot];
   const isM = (slot: LinkSlotId) => cfg.magicLinks.includes(slot);
+  const R = (id: MessageTemplateId, vars: Record<string, string> = {}) => renderTemplate(id, cfg, vars);
+  const user = `${fn.toLowerCase()}123`;
+  // Mismo formato de credenciales que arma flow.ts (accountStep).
+  const creds = `\n\n👤 Usuario: *${user}*\n🔑 Contraseña: *••••*\n\n🔗 Entrá acá:\n${L.portal_login}`;
+  const hi = `¡Hola ${fn}! 👋`;
   return [
-    { step: 'welcome', who: 'bot', text: `¡Hola ${fn}! 👋\nBienvenido a *${cfg.brandName}*.\n${offerWelcomeLine(cfg)}` },
+    { step: 'welcome', who: 'bot', text: `${hi} ${R('welcome_body')}` },
     { step: 'welcome', who: 'user', text: 'Quiero mi cuenta 🎁' },
-    { step: 'credenciales', who: 'bot', text: `✅ Tu usuario ya está creado:\n👤 Usuario: *martin123*\n🔑 Contraseña: *••••*\n\n🔗 Entrá acá:\n${L.portal_login}`, linkSlot: 'portal_login' },
-    { step: 'cbu', who: 'bot', text: `Perfecto 🙌 Datos para tu carga:\n🏦 Titular: *Titular CBU*\n[CBU del panel]\n${offerCbuLine(cfg)}` },
+    { step: 'credenciales', who: 'bot', text: R('account_done', { creds_block: creds }), linkSlot: 'portal_login' },
+    { step: 'cbu', who: 'bot', text: `${R('cbu_intro', { titular: 'Titular CBU' })}\n[CBU del panel]\n${offerCbuLine(cfg)}` },
     { step: 'comprobante', who: 'user', text: '📷 [comprobante]' },
-    { step: 'validando', who: 'bot', text: '✅ Tu imagen entró en revisión 🔎 En breve validamos y te acreditamos…' },
-    { step: 'done', who: 'bot', text: `✅ *¡Acreditado con éxito!*\n🎉 ¡Gracias por elegir ${cfg.brandName}! Ya tenés tu saldo.\n\n🎮 Entrá directo a jugar acá 👇\n${m('portal_play')}`, linkSlot: 'portal_play', linkMagic: isM('portal_play') },
-    ...(cfg.postAccreditCajera ? [{ step: 'done' as const, who: 'bot' as const, text: postAccreditCajeraText(cfg), linkSlot: 'support' as const }] : []),
-    { step: 'forgot', who: 'bot', text: `🔐 Tus datos de acceso:\n\n👤 Usuario: *martin123*\n🔑 Contraseña: *••••*\n\n🔗 Entrá directo acá 👇\n${m('portal_forgot')}`, linkSlot: 'portal_forgot', linkMagic: isM('portal_forgot') },
-    { step: 'deposit', who: 'bot', text: `💰 *Cargar saldo*\nEntrá al portal y tocá *"Cargar saldo"* 👇\n${m('portal_deposit')}\n\n${offerDepositLine(cfg)}`, linkSlot: 'portal_deposit', linkMagic: isM('portal_deposit') },
-    { step: 'withdraw', who: 'bot', text: `💸 *Retirar saldo*\nEntrá al portal 👇\n${m('portal_withdraw')}`, linkSlot: 'portal_withdraw', linkMagic: isM('portal_withdraw') },
-    { step: 'support', who: 'bot', text: `🙋 *Soporte*\nEscribinos por WhatsApp 👇\n${L.support}`, linkSlot: 'support' },
+    { step: 'validando', who: 'bot', text: R('comprobante_review') },
+    { step: 'done', who: 'bot', text: R('accredited', { portal_play: m('portal_play') }), linkSlot: 'portal_play', linkMagic: isM('portal_play') },
+    ...(cfg.postAccreditCajera ? [{ step: 'done' as const, who: 'bot' as const, text: R('accredited_cajera'), linkSlot: 'support' as const }] : []),
+    { step: 'forgot', who: 'bot', text: R('post_forgot', { username: user, password: '••••', portal_forgot: m('portal_forgot') }), linkSlot: 'portal_forgot', linkMagic: isM('portal_forgot') },
+    { step: 'deposit', who: 'bot', text: R('post_deposit', { portal_deposit: m('portal_deposit') }), linkSlot: 'portal_deposit', linkMagic: isM('portal_deposit') },
+    { step: 'withdraw', who: 'bot', text: R('post_withdraw', { portal_withdraw: m('portal_withdraw') }), linkSlot: 'portal_withdraw', linkMagic: isM('portal_withdraw') },
+    { step: 'support', who: 'bot', text: R('support'), linkSlot: 'support' },
   ];
 }
