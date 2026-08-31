@@ -85,6 +85,11 @@ const CAJERA_BTN_TEXT = '¿Querés un EXTRA? 📲 Agendá a tu cajero para no pe
 function buildSupportMsg(cfg: ChatRuntimeConfig, data: Record<string, unknown>, delayMs: number): BotMsg {
   const wa = data.assignedWa ? String(data.assignedWa).replace(/\D/g, '') : '';
   if (wa) return { from: 'bot', delayMs, at: now(), text: SUPPORT_BTN_TEXT, wa: stickyWaUrl(wa) };
+  // Sin cajero sticky: si el soporte es una URL (landing walink/redvip o wa.me),
+  // mostramos texto limpio + botón "Abrir WhatsApp" en vez del link crudo en el
+  // cuerpo (mismo formato que los tenants con cajero, ej. a3).
+  const url = (cfg.links.support || '').trim();
+  if (/^https?:\/\//i.test(url)) return { from: 'bot', delayMs, at: now(), text: SUPPORT_BTN_TEXT, wa: url };
   return { from: 'bot', delayMs, at: now(), text: renderTemplate('support', cfg) };
 }
 
@@ -94,6 +99,10 @@ function buildSupportMsg(cfg: ChatRuntimeConfig, data: Record<string, unknown>, 
 function buildCajeraMsg(cfg: ChatRuntimeConfig, data: Record<string, unknown>, delayMs: number): BotMsg {
   const wa = data.assignedWa ? String(data.assignedWa).replace(/\D/g, '') : '';
   if (wa) return { from: 'bot', delayMs, at: now(), text: CAJERA_BTN_TEXT, wa: stickyWaUrl(wa) };
+  // Sin cajero sticky: si el soporte es una URL (landing/wa.me), botón limpio en
+  // vez del link crudo (mismo formato que a3).
+  const url = (cfg.links.support || '').trim();
+  if (/^https?:\/\//i.test(url)) return { from: 'bot', delayMs, at: now(), text: CAJERA_BTN_TEXT, wa: url };
   return { from: 'bot', delayMs, at: now(), text: postAccreditCajeraText(cfg) };
 }
 
@@ -306,7 +315,9 @@ export function postActionMessages(action: string, data: Record<string, unknown>
     case 'deposit':
       return { messages: ref(renderTemplate('post_deposit', cfg, { portal_deposit: portalUrl('portal_deposit') })) };
     case 'withdraw':
-      return { messages: ref(renderTemplate('post_withdraw', cfg, { portal_withdraw: portalUrl('portal_withdraw') })) };
+      // Instrucciones de retiro (portal) + botón "Abrir WhatsApp" para hablar con
+      // el cajero/soporte y coordinar el retiro (mismo botón que la promo cajera).
+      return { messages: [...ref(renderTemplate('post_withdraw', cfg, { portal_withdraw: portalUrl('portal_withdraw') })), buildSupportMsg(cfg, data, 1200)] };
     case 'support':
       return { messages: [buildSupportMsg(cfg, data, 600)] };
     case 'forgot_user':
