@@ -19,6 +19,7 @@ export function DeployClient() {
     panelPassword: '',
     eventSuffix: '',
     readonly: false,
+    noKommo: false,
     kommoSubdomain: '',
     kommoToken: '',
     kommoEmail: '',
@@ -32,8 +33,9 @@ export function DeployClient() {
   const [err, setErr] = useState('');
   const [result, setResult] = useState<null | {
     webhook: string;
-    pipelineId: number;
-    customFields: Record<string, number>;
+    mode?: string;
+    pipelineId?: number;
+    customFields?: Record<string, number>;
   }>(null);
 
   const set = (k: keyof typeof f) => (v: string | boolean) => setF((p) => ({ ...p, [k]: v }));
@@ -70,15 +72,27 @@ export function DeployClient() {
       {result ? (
         <div className="card">
           <div className="card__title"><span className="ico">✓</span> Cliente desplegado</div>
-          <p style={{ color: 'var(--muted)', marginTop: 0 }}>
-            Pegá esta URL como webhook en Kommo (Ajustes → Webhooks), eventos <b>Lead agregado</b>, <b>Etapa del lead cambia</b> y <b>Mensaje entrante</b>:
-          </p>
+          {result.mode === 'no-kommo' ? (
+            <p style={{ color: 'var(--muted)', marginTop: 0 }}>
+              Cliente <b>sin Kommo</b> (afiliados). Pasale esta URL a su equipo como webhook de conversiones (firmado con HMAC-SHA256):
+            </p>
+          ) : (
+            <p style={{ color: 'var(--muted)', marginTop: 0 }}>
+              Pegá esta URL como webhook en Kommo (Ajustes → Webhooks), eventos <b>Lead agregado</b>, <b>Etapa del lead cambia</b> y <b>Mensaje entrante</b>:
+            </p>
+          )}
           <div className="field">
             <input className="input" readOnly value={`${origin}${result.webhook}`} onFocus={(e) => e.currentTarget.select()} />
           </div>
-          <p style={{ color: 'var(--muted)', fontSize: '.85rem' }}>
-            Pipeline: <b>{result.pipelineId}</b> · Campos mapeados: {Object.keys(result.customFields).length}
-          </p>
+          {result.mode === 'no-kommo' ? (
+            <p style={{ color: 'var(--muted)', fontSize: '.85rem' }}>
+              Configurá el secreto del webhook en Config → Webhook de afiliados. Panel: solo Reportes + Config.
+            </p>
+          ) : (
+            <p style={{ color: 'var(--muted)', fontSize: '.85rem' }}>
+              Pipeline: <b>{result.pipelineId}</b> · Campos mapeados: {Object.keys(result.customFields ?? {}).length}
+            </p>
+          )}
           <div className="row">
             <a className="btn" href="/admin/clientes">Ver clientes</a>
             <button className="btn btn--ghost" onClick={() => setResult(null)}>Cargar otro</button>
@@ -116,9 +130,17 @@ export function DeployClient() {
                 </label>
                 <span style={{ fontSize: '.85rem', color: 'var(--muted)' }}>Solo lectura (no escribe en el CRM)</span>
               </div>
+              <div className="field" style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginTop: '1.6rem' }}>
+                <label className="toggle">
+                  <input type="checkbox" checked={f.noKommo} onChange={(e) => set('noKommo')(e.target.checked)} />
+                  <span />
+                </label>
+                <span style={{ fontSize: '.85rem', color: 'var(--muted)' }}>Sin Kommo (afiliados/Telegram · solo CAPI)</span>
+              </div>
             </div>
           </div>
 
+          {!f.noKommo && (
           <div className="card">
             <div className="card__title">2 · Kommo</div>
             <div className="grid-2">
@@ -151,9 +173,10 @@ export function DeployClient() {
               </select>
             </div>
           </div>
+          )}
 
           <div className="card">
-            <div className="card__title">3 · Meta</div>
+            <div className="card__title">{f.noKommo ? '2' : '3'} · Meta {f.noKommo && <span style={{ color: 'var(--muted)', fontSize: '.8rem' }}>(requerido)</span>}</div>
             <div className="grid-2">
               <div className="field">
                 <label>Pixel ID</label>

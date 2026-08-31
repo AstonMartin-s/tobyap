@@ -311,7 +311,8 @@ export async function POST(req: NextRequest) {
         isKing ? kingConsultBalance(tenant, username) : consultBalance(tenant, username),
         operationsSummary(tenant, username),
       ]);
-      return NextResponse.json({ ok: bal.ok, balance: bal.balance, error: bal.error, summary });
+      const bonus = 'bonus' in bal ? bal.bonus : undefined;
+      return NextResponse.json({ ok: bal.ok, balance: bal.balance, bonus, error: bal.error, summary });
     }
 
     // Carga / retiro: bono automático desde la promo (offerValue), overridable.

@@ -104,10 +104,13 @@ export function kingWithdrawOp(tenant: ResolvedTenant, input: KingOpInput): Prom
   return runOp(tenant, 'withdraw', input);
 }
 
-export async function kingConsultBalance(tenant: ResolvedTenant, username: string): Promise<{ ok: boolean; balance?: number; error?: string }> {
+export async function kingConsultBalance(tenant: ResolvedTenant, username: string): Promise<{ ok: boolean; balance?: number; bonus?: number; error?: string }> {
   try {
     const user = await getUser(tenant, username);
-    return { ok: true, balance: user.balance };
+    // King separa saldo real (`balance`) de la billetera de bono (`bonus`). El bono
+    // de la promo se acredita en `bonus`, por eso hay que exponerlo aparte o el
+    // operario cree que "no se acreditó" al mirar solo el saldo.
+    return { ok: true, balance: user.balance, bonus: user.bonus };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }

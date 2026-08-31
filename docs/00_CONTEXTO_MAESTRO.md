@@ -243,6 +243,20 @@ apunta a prod) → correr off-hours; impacto = una fila temporal.
 - Resolve (código nuevo, flags off): 401 sin key, 404 code inexistente, 200 con `?client=` correcto, 404 si el client no coincide, 200 sin `?client=` (compat).
 - Resultado: **VERDE**. `npm run smoke` = typecheck + wiring + db.
 
+### 2026-08-31 — Afiliados Telegram (Meta CAPI) + alta cliente SIN Kommo (`9024ba7`, `66926c0`)
+
+- **Feature afiliados Telegram** (`9024ba7`, deploy SUCCESS):
+  - Landing modo Telegram: `LandingConfig.telegramBot` + branch en `_landing.tsx` `go()` (`t.me/<bot>?start=<code>`, antes de redirectUrl/portalUrl/chatSlug/wa) + destino "Telegram" en `ConfigClient`.
+  - `parseLeadId` (tolerante) en `lib/attribution.ts`.
+  - Webhook `POST /api/webhooks/affiliate/[slug]`: HMAC-SHA256 sobre body crudo (`X-Signature`) → 401; match por `attributions.code`; `registro`→Conversacion, `carga`/`primera carga`→Cargo; dedup `conv-`/`cargo-<lead_id>` vía `eventExists`+`sendCapiEvent`. Cargas múltiples → mide la 1ª (resto `duplicate`). Sin match → `200 unmatched`.
+  - Secreto cifrado (AES) `tenants.affiliate_webhook_secret` + migración aditiva (corrida en prod ANTES del deploy: `getTenantBySlug` hace `SELECT *`, la columna faltante rompería a TODOS) + config self-service en el panel (`/api/settings/affiliate-webhook`).
+  - Contrato para el cliente: `docs/telegram-afiliados-contrato.md`.
+- **Cliente candywin** (afiliados, SIN Kommo, `readonly`): onboardeado con pixel `1699551654171070` / suffix `A6` / secreto. Landing `telegram` (bot `candywinvip_bot`). Flags `feat_embudo/livechat/fichas=0` → panel solo Reportes + Config.
+- **Test end-to-end OK:** `ConversacionCRMA6` + `CargoCRMA6` en Meta Test Events (`TEST86628`, seteado SOLO en proceso local, nunca en prod); dedup verificado; webhook deployado probado con code real → `duplicate`; smokes 401/400/unmatched.
+- **Alta SIN Kommo** (`66926c0`, deploy SUCCESS): `/api/admin/deploy` modo `noKommo` (salta provision/discover/heal, exige Meta, `readonly`+flags, devuelve webhook de afiliados) + toggle "Sin Kommo" en `/admin/deploy`. **Estructura Kommo-opcional confirmada:** multi-tenant, un solo deploy; Kommo era obligatorio solo en el alta.
+- **Overlap Claude (R1 MSG-TOB-20260831-1, ACKeado):** `_landing.tsx`, `ConfigClient.tsx` (feature) y `app/admin/deploy/*` (onboarding) tocados y en prod. Aditivo. Claude sincronizado desde `9024ba7`.
+- **Auto-deploy**: se descongeló `watchPatterns` (estaba en `ops/__DEPLOY_FROZEN__/**` por el incidente Railway) → normal.
+
 ## Estado
 
 | Fase | Estado |
@@ -251,6 +265,8 @@ apunta a prod) → correr off-hours; impacto = una fila temporal.
 | 1 `emitCargo` | **en main** (`5a7f704`, mezclado con panel). Pendiente smoke King / Events Manager |
 | 2 Hardening | **en main/prod** (`5a102b5`). Flags default OFF. No prender `REQUIRE_RESOLVE_*` sin Aston. |
 | 4 Livechat piel | **en main/prod**. Pestaña `/livechat` (nombre/color/foto). `flow.ts` intacto. Columna `chat_config` aplicada. |
+| Afiliados Telegram | **en main/prod** (`9024ba7`). Webhook CAPI + landing Telegram + secreto cifrado. candywin activo y verificado (Test Events). Falta solo el POST del lado del cliente. |
+| Alta sin Kommo | **en main/prod** (`66926c0`). Toggle "Sin Kommo" en `/admin/deploy` → cliente afiliados self-service. |
 
 ## Próximo paso
 

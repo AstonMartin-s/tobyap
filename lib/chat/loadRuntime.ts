@@ -4,6 +4,7 @@ import { clientSettings } from '@/db/schema';
 import { phoneCandidates } from '@/lib/phone';
 import {
   applyTenantRuntimeOverrides,
+  DEFAULT_SUPPORT_URL,
   parseChatRuntime,
   type ChatRuntimeConfig,
   type OfferType,
@@ -57,7 +58,10 @@ export async function loadChatRuntime(
       .limit(1);
     const raw = row?.chatConfig;
     const base = parseChatRuntime(raw, fallbackBrand);
-    if (tenantSlug) {
+    // Solo forzamos la landing walink (rotación) cuando el cliente NO configuró un
+    // link de soporte propio. Si lo configuró (ej. su propia landing redvip),
+    // lo respetamos — antes lo pisábamos siempre y rompía el soporte del chat.
+    if (tenantSlug && base.links.support === DEFAULT_SUPPORT_URL) {
       const o = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
       const ld = typeof o.landingDomain === 'string' ? o.landingDomain : '';
       base.links = { ...base.links, support: walinkSupportUrl(tenantSlug, ld || undefined) };

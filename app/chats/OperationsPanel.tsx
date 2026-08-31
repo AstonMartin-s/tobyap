@@ -22,6 +22,7 @@ const BONO_OPTS = [
 
 export default function OperationsPanel({ sessionKey, onDone }: { sessionKey: string; onDone?: () => void }) {
   const [balance, setBalance] = useState<number | null>(null);
+  const [bonus, setBonus] = useState<number | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [amount, setAmount] = useState('');
   const [bono, setBono] = useState('');
@@ -30,7 +31,7 @@ export default function OperationsPanel({ sessionKey, onDone }: { sessionKey: st
   const [pending, setPending] = useState<PendingOp>(null);
 
   // Reset al cambiar de chat.
-  useEffect(() => { setBalance(null); setSummary(null); setAmount(''); setMsg(null); setPending(null); }, [sessionKey]);
+  useEffect(() => { setBalance(null); setBonus(null); setSummary(null); setAmount(''); setMsg(null); setPending(null); }, [sessionKey]);
 
   async function call(op: string, extra?: Record<string, unknown>) {
     const r = await fetch('/api/panel/chats', {
@@ -47,6 +48,7 @@ export default function OperationsPanel({ sessionKey, onDone }: { sessionKey: st
     setBusy(false);
     if (!r?.ok) { setMsg({ kind: 'err', text: r?.error ?? 'no se pudo consultar' }); return; }
     setBalance(typeof r.balance === 'number' ? r.balance : null);
+    setBonus(typeof r.bonus === 'number' ? r.bonus : null);
     if (r.summary) setSummary(r.summary);
   }
 
@@ -88,6 +90,9 @@ export default function OperationsPanel({ sessionKey, onDone }: { sessionKey: st
             <div style={{ ...box, flex: 1 }}>
               <div style={lbl}>Saldo actual</div>
               <div style={{ fontSize: '1.05rem', fontWeight: 800 }}>{balance == null ? '—' : money(balance)}</div>
+              {bonus != null && bonus > 0 ? (
+                <div style={{ fontSize: '.7rem', fontWeight: 700, color: '#f59e0b', marginTop: '.1rem' }}>+ {money(bonus)} en bono</div>
+              ) : null}
               <button className="tt tt--down tt--down-left" data-tt="Consulta el saldo en vivo en la plataforma" disabled={busy} onClick={consult}
                 style={{ marginTop: '.25rem', fontSize: '.7rem', padding: '.2rem .5rem', border: '1px solid var(--border)', borderRadius: 6, background: 'transparent', color: 'var(--muted)', cursor: 'pointer' }}>
                 ↻ Consultar

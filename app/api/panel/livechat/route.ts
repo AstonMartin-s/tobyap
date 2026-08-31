@@ -7,6 +7,7 @@ import { parseChatConfig } from '@/lib/chat/brand';
 import {
   applyTenantRuntimeOverrides,
   buildConversationPreview,
+  DEFAULT_SUPPORT_URL,
   LINK_SLOTS,
   LINK_SLOT_IDS,
   parseChatRuntime,
@@ -32,7 +33,10 @@ export async function GET() {
     const brand = parseChatConfig(row?.chatConfig, session.slug, session.slug);
     let runtime = parseChatRuntime(row?.chatConfig, brand.brandName);
     const ld = (row?.chatConfig as Record<string, unknown> | null)?.landingDomain;
-    runtime.links = { ...runtime.links, support: walinkSupportUrl(session.slug, typeof ld === 'string' ? ld : undefined) };
+    // Respeta el support configurado por el cliente; solo cae a walink si no lo seteó.
+    if (runtime.links.support === DEFAULT_SUPPORT_URL) {
+      runtime.links = { ...runtime.links, support: walinkSupportUrl(session.slug, typeof ld === 'string' ? ld : undefined) };
+    }
     runtime = applyTenantRuntimeOverrides(runtime, session.slug);
     const landingDomain = (row?.chatConfig as Record<string, unknown> | null)?.landingDomain;
     const cc = (row?.chatConfig ?? {}) as Record<string, unknown>;
