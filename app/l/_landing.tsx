@@ -51,6 +51,7 @@ export interface LandingConfig {
   chatOrigin?: string | null; // origen del chat (ej https://chat.fichaslibres.online); vacío = relativo
   portalUrl?: string | null; // si está, redirige a un portal externo (ej Vercel del cliente) con el token en la query, en vez de wa.me/chat
   redirectUrl?: string | null; // si está, redirige TAL CUAL a esa URL (ej wa.link/jugandoconking de soporte). Sin query extra. Igual dispara Pixel + cuenta el clic.
+  telegramBot?: string | null; // si está, redirige a t.me/<bot>?start=<code> (afiliados Telegram). El code viaja como sub-id.
   noCode?: boolean; // no incluir "Codigo Promocion:" en el mensaje (CRM sin webhook, no matchea)
 }
 
@@ -80,6 +81,7 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
     chatOrigin: cfg.chatOrigin ?? '',
     portalUrl: cfg.portalUrl ?? null,
     redirectUrl: cfg.redirectUrl ?? null,
+    telegramBot: cfg.telegramBot ?? null,
     noCode: cfg.noCode ?? false,
     redirectDelayMs: delay,
     // Si el mensaje configurado trae {fichas} o {bono}, se usa como plantilla.
@@ -131,6 +133,13 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
   }
   function go(d){
     var code = d && d.code;
+    // Destino TELEGRAM (afiliados): redirige al bot con el code como sub-id
+    // (?start=<code>). El bot es caja negra; la conversión vuelve por webhook.
+    if(C.telegramBot){
+      var bot=String(C.telegramBot).replace(/^@/,'');
+      window.location.href='https://t.me/'+bot+'?start='+encodeURIComponent(code||'');
+      return;
+    }
     // Destino REDIRECT DIRECTO (ej soporte wa.link/jugandoconking): redirige tal
     // cual a la URL configurada, sin query extra. El Pixel ya disparó y el clic
     // quedó contado en track/redirect. Ideal para soporte sin CRM/rotación.

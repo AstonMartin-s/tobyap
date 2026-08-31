@@ -48,6 +48,7 @@ function tenantValues(input: CreateTenantInput) {
     provider: input.provider ?? 'pagoda',
     partnerApiUrl: input.partnerApiUrl ?? null,
     partnerApiKey: encryptOptional(input.partnerApiKey),
+    affiliateWebhookSecret: encryptOptional(input.affiliateWebhookSecret),
   };
 }
 
@@ -217,6 +218,7 @@ export interface UpdateTenantPatch {
   provider?: string;
   partnerApiUrl?: string;
   partnerApiKey?: string;
+  affiliateWebhookSecret?: string;
 }
 
 export async function updateTenantFields(slug: string, patch: UpdateTenantPatch): Promise<void> {
@@ -233,6 +235,7 @@ export async function updateTenantFields(slug: string, patch: UpdateTenantPatch)
   if (patch.provider !== undefined) set.provider = patch.provider;
   if (patch.partnerApiUrl !== undefined) set.partnerApiUrl = patch.partnerApiUrl;
   if (patch.partnerApiKey) set.partnerApiKey = encrypt(patch.partnerApiKey);
+  if (patch.affiliateWebhookSecret) set.affiliateWebhookSecret = encrypt(patch.affiliateWebhookSecret);
   if (patch.panelPassword) set.panelPasswordHash = await bcrypt.hash(patch.panelPassword, 10);
 
   await db.update(tenants).set(set).where(eq(tenants.slug, slug));
@@ -268,6 +271,7 @@ function resolve(row: TenantRow): ResolvedTenant {
     provider: row.provider ?? 'pagoda',
     partnerApiUrl: row.partnerApiUrl,
     partnerApiKey: decryptOptional(row.partnerApiKey),
+    affiliateWebhookSecret: decryptOptional(row.affiliateWebhookSecret),
     customFields: cf,
     bonoMap: (row.bonoMap ?? {}) as Record<string, string>,
     readonly: row.readonly ?? false,

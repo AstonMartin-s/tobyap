@@ -33,6 +33,15 @@ export function generateCode(): string {
 
 export const CODE_REGEX = /PB[A-HJ-NP-Z2-9]{6}/;
 
+// Extrae nuestro `code` del `lead_id` que devuelve el webhook de afiliados. Como
+// mandamos el code limpio en ?start=, normalmente es identidad; igual somos
+// tolerantes: si viene embebido lo extraemos por regex, y si no, tomamos el
+// último segmento de una posible URL/path.
+export function parseLeadId(raw: string): string {
+  const m = raw.match(CODE_REGEX);
+  return m ? m[0] : (raw.split('/').pop() ?? raw);
+}
+
 // Match por PROXIMIDAD TEMPORAL (opción 2): para clientes cuyo lead no transporta
 // el token en el mensaje (livechat de Kommo en portal externo). Toma la última
 // atribución NO matcheada del tenant creada dentro de la ventana y la reclama de

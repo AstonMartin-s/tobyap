@@ -27,6 +27,7 @@ export function ConfigClient() {
       </div>
       <SettingsSection />
       <LiberadorSection />
+      <AffiliateWebhookSection />
       <LandingsSection />
       <NumbersSection />
       <StatusSection />
@@ -121,6 +122,85 @@ function LiberadorSection() {
       </label>
       <div className="row" style={{ marginTop: '0.4rem' }}>
         <button className="btn" onClick={save} disabled={busy}>Guardar</button>
+        <span style={{ color: 'var(--muted)', fontSize: '0.82rem' }}>{msg}</span>
+      </div>
+    </section>
+  );
+}
+
+// -------------------- Webhook de afiliados (Telegram) --------------------
+function AffiliateWebhookSection() {
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [hasSecret, setHasSecret] = useState(false);
+  const [secret, setSecret] = useState('');
+  const [revealed, setRevealed] = useState('');
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    j('/api/settings/affiliate-webhook').then((d) => {
+      setWebhookUrl(d.webhookUrl ?? '');
+      setHasSecret(!!d.hasSecret);
+    }).catch(() => {});
+  }, []);
+
+  async function copyText(text: string, label: string) {
+    try { await navigator.clipboard.writeText(text); setMsg(`${label} copiado`); setTimeout(() => setMsg(''), 2000); } catch { /* noop */ }
+  }
+
+  async function save(generate: boolean) {
+    setBusy(true); setMsg(generate ? 'Generando…' : 'Guardando…'); setRevealed('');
+    try {
+      const d = await j('/api/settings/affiliate-webhook', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(generate ? { generate: true } : { secret: secret.trim() }),
+      });
+      setHasSecret(true);
+      setSecret('');
+      if (d.secret) setRevealed(d.secret);
+      setMsg('✓ Guardado');
+      setTimeout(() => setMsg(''), 3000);
+    } catch (e) {
+      setMsg('Error: ' + (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card">
+      <div className="card__title"><span className="ico">✈</span> Webhook de afiliados (Telegram)</div>
+      <p style={{ color: 'var(--muted)', fontSize: '.82rem', margin: '0 0 .6rem' }}>
+        Endpoint que la plataforma del cliente llama para devolvernos las conversiones
+        por <b>code</b> (registro / primera carga). Firma con HMAC-SHA256 sobre el body
+        crudo usando el secreto compartido (header <code>X-Signature</code>). El secreto
+        se guarda cifrado y nunca se muestra de vuelta.
+      </p>
+      <div className="field">
+        <label>URL del webhook (dásela a su equipo)</label>
+        <div className="row">
+          <input className="input" readOnly value={webhookUrl} onFocus={(e) => e.currentTarget.select()} style={{ flex: 1 }} />
+          <button className="btn" type="button" onClick={() => copyText(webhookUrl, 'URL')}>Copiar</button>
+        </div>
+      </div>
+      <div className="field">
+        <label>Secreto compartido {hasSecret && <span style={{ color: 'var(--ok,#16a34a)', fontSize: '.72rem' }}>· ✓ configurado</span>}</label>
+        <input className="input" type="password" value={secret} onChange={(e) => setSecret(e.target.value)}
+          placeholder={hasSecret ? '•••••••• (dejar vacío para no cambiar)' : 'pegá el secreto (≥16 chars)'} autoComplete="new-password" />
+      </div>
+      {revealed && (
+        <div className="field">
+          <label style={{ color: 'var(--accent)' }}>Secreto generado (copialo ahora, no se vuelve a mostrar)</label>
+          <div className="row">
+            <input className="input" readOnly value={revealed} onFocus={(e) => e.currentTarget.select()} style={{ flex: 1 }} />
+            <button className="btn" type="button" onClick={() => copyText(revealed, 'Secreto')}>Copiar</button>
+          </div>
+        </div>
+      )}
+      <div className="row" style={{ marginTop: '0.4rem' }}>
+        <button className="btn" type="button" onClick={() => save(false)} disabled={busy || !secret.trim()}>Guardar secreto</button>
+        <button className="btn btn--ghost" type="button" onClick={() => save(true)} disabled={busy}>Generar aleatorio</button>
         <span style={{ color: 'var(--muted)', fontSize: '0.82rem' }}>{msg}</span>
       </div>
     </section>
@@ -251,7 +331,7 @@ function NumbersSection() {
 interface Landing { id: string; landingSlug: string | null; name: string | null; type: string | null; active: boolean | null; config: Record<string, string | number | null> | null }
 const LANDING_TYPES = ['publi', 'regular', 'spam', 'remarketing', 'soporte'];
 
-const emptyForm = { landingSlug: '', name: '', type: 'publi', brandName: '', logoUrl: '', primaryColor: '#25d366', waNumber: '', message: '', ccpp: '', campaign: '', destination: 'whatsapp' };
+const emptyForm = { landingSlug: '', name: '', type: 'publi', brandName: '', logoUrl: '', primaryColor: '#25d366', waNumber: '', message: '', ccpp: '', campaign: '', destination: 'whatsapp', telegramBot: '' };
 const cfgStr = (c: Landing['config'], k: string) => (c && c[k] != null ? String(c[k]) : '');
 
 function LandingsSection() {
@@ -305,7 +385,8 @@ function LandingsSection() {
       landingSlug: l.landingSlug ?? '', name: l.name ?? '', type: l.type ?? 'publi',
       brandName: cfgStr(l.config, 'brandName'), logoUrl: cfgStr(l.config, 'logoUrl'), primaryColor: cfgStr(l.config, 'primaryColor') || '#25d366',
       waNumber: cfgStr(l.config, 'waNumber'), message: cfgStr(l.config, 'message'), ccpp: cfgStr(l.config, 'ccpp'), campaign: cfgStr(l.config, 'campaign'),
-      destination: cfgStr(l.config, 'chatSlug') ? 'livechat' : 'whatsapp',
+      destination: cfgStr(l.config, 'chatSlug') ? 'livechat' : cfgStr(l.config, 'telegramBot') ? 'telegram' : 'whatsapp',
+      telegramBot: cfgStr(l.config, 'telegramBot'),
     });
     setOpen(true);
   }
@@ -314,8 +395,10 @@ function LandingsSection() {
     const config = {
       brandName: n.brandName, logoUrl: n.logoUrl, primaryColor: n.primaryColor,
       waNumber: n.waNumber, message: n.message, ccpp: n.ccpp, campaign: n.campaign,
-      // Destino livechat → redirige a /chat/<slug>; whatsapp → rotación de números.
+      // Destino livechat → redirige a /chat/<slug>; telegram → t.me/<bot>?start=;
+      // whatsapp → rotación de números. Solo uno queda seteado a la vez.
       chatSlug: n.destination === 'livechat' ? slug : '',
+      telegramBot: n.destination === 'telegram' ? n.telegramBot.trim().replace(/^@/, '') : '',
     };
     try {
       if (editId) {
@@ -354,10 +437,13 @@ function LandingsSection() {
               <select className="select" value={n.destination} onChange={(e) => setN({ ...n, destination: e.target.value })}>
                 <option value="whatsapp">WhatsApp (número/rotación)</option>
                 <option value="livechat">Livechat (chat web)</option>
+                <option value="telegram">Telegram (bot)</option>
               </select>
             </div>
             {n.destination === 'livechat' ? (
               <div className="field"><label>Destino livechat</label><div className="input" style={{ display: 'flex', alignItems: 'center', color: 'var(--muted)', fontSize: '.82rem' }}>Redirige al chat web <b style={{ margin: '0 .3rem', color: 'var(--text)' }}>/chat/{slug}</b></div></div>
+            ) : n.destination === 'telegram' ? (
+              <div className="field"><label>Bot de Telegram (usuario, sin @)</label><input className="input" value={n.telegramBot} onChange={(e) => setN({ ...n, telegramBot: e.target.value })} placeholder="MiBonoBot" /></div>
             ) : (
               <div className="field"><label>WhatsApp (con código país)</label><input className="input" value={n.waNumber} onChange={(e) => setN({ ...n, waNumber: e.target.value })} placeholder="5491155550000" /></div>
             )}
