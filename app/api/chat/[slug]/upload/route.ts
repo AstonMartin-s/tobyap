@@ -56,7 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     );
   }
   const recentCount = Array.isArray(dataRl.comprobantes)
-    ? (dataRl.comprobantes as Array<{ at?: number }>).filter((c) => typeof c?.at === 'number' && nowMs - (c.at as number) < RATE_WINDOW_MS).length
+    ? (dataRl.comprobantes as Array<{ at?: number; op?: boolean }>).filter((c) => !c?.op && typeof c?.at === 'number' && nowMs - (c.at as number) < RATE_WINDOW_MS).length
     : 0;
   if (recentCount >= RATE_MAX) {
     await mergeChatData(s.id, { uploadBlockUntil: nowMs + RATE_BLOCK_MS });
