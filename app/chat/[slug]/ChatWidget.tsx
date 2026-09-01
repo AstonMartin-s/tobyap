@@ -334,6 +334,12 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     fd.append('image', file);
     const r = await fetch(`/api/chat/${slug}/upload`, { method: 'POST', body: fd });
     const d = await r.json().catch(() => ({}));
+    // Rate limit / rechazo: avisamos en el chat y no seguimos (la imagen optimista
+    // queda, pero el cliente entiende que no se envió y debe esperar/reintentar).
+    if (!r.ok || d?.rateLimited) {
+      await play([{ from: 'bot', text: d?.error ?? 'No pudimos recibir la imagen. Probá de nuevo en un momento 🙌' }], []);
+      return;
+    }
     // Sincronizamos el contador y el estado ANTES de animar, para que el poll de
     // fondo no reproduzca de nuevo estos mensajes mientras dura la animación
     // (era la causa del doble envío del comprobante).
