@@ -10,7 +10,7 @@ import { appendChatMessages } from '@/lib/chat/mutations';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadStatus } from '@/lib/kommo';
-import { saveComprobante } from '@/lib/storage';
+import { saveComprobante, isDangerousUploadMime } from '@/lib/storage';
 import { signFilePath } from '@/lib/chat/fileToken';
 import { normalizeUploadImage } from '@/lib/chat/image';
 
@@ -38,7 +38,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const rawBuf = Buffer.from(await file.arrayBuffer());
   // iPhone sube HEIC/HEIF (no lo renderizan los navegadores) → lo pasamos a JPEG
   // para no "perder" comprobantes invisibles. El resto de formatos pasa igual.
+  // Rechazamos formatos que ejecutan script al servirse (svg/html/xml). Un
+  // comprobante legítimo es una foto o PDF, nunca esto.
+  if (isDangerousUploadMime(file.type) || isDangerousUploadMime(file.name)) {
+    return NextResponse.json({ error: 'formato de imagen no permitido' }, { status: 415 });
+  }
   const { buf, mime } = await normalizeUploadImage(rawBuf, file.type || '', file.name || '');
+  if (isDangerousUploadMime(mime)) {
+    return NextResponse.json({ error: 'formato de imagen no permitido' }, { status: 415 });
+  }
   // cid único por comprobante → URL única. Antes todas las cargas de una sesión
   // compartían URL y `/file` servía siempre la última, "borrando" las anteriores.
   const cid = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;

@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
-import { readComprobante } from '@/lib/storage';
+import { readComprobante, safeServeContentType } from '@/lib/storage';
 import { getSession } from '@/lib/session';
 import { verifyFileToken, withinLegacyWindow } from '@/lib/chat/fileToken';
 
@@ -43,14 +43,24 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     return NextResponse.json({ error: 'no autorizado' }, { status: 401 });
   }
 
+  // Headers de servido seguro: nunca dejamos que el navegador ejecute el archivo.
+  // safeServeContentType fuerza octet-stream (descarga) si el mime no es una
+  // imagen/PDF conocida; nosniff evita el MIME-sniffing; CSP sandbox neutraliza
+  // cualquier script embebido (svg/pdf legacy). inline para las imágenes reales.
+  const serveHeaders = (m: string): Record<string, string> => ({
+    'Content-Type': safeServeContentType(m),
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'none'; sandbox; style-src 'unsafe-inline'",
+    'Content-Disposition': 'inline',
+    'Cache-Control': 'private, max-age=300',
+  });
+
   const relPath = entry ? entry.path : (data.comprobantePath as string | undefined);
   if (relPath) {
     const buf = await readComprobante(relPath);
-    if (buf) return new NextResponse(new Uint8Array(buf), { headers: { 'Content-Type': mime, 'Cache-Control': 'private, max-age=300' } });
+    if (buf) return new NextResponse(new Uint8Array(buf), { headers: serveHeaders(mime) });
   }
   const b64 = entry ? entry.b64 : (data.comprobante as string | undefined);
   if (!b64) return NextResponse.json({ error: 'sin comprobante' }, { status: 404 });
-  return new NextResponse(Buffer.from(b64, 'base64'), {
-    headers: { 'Content-Type': mime, 'Cache-Control': 'private, max-age=300' },
-  });
+  return new NextResponse(Buffer.from(b64, 'base64'), { headers: serveHeaders(mime) });
 }
