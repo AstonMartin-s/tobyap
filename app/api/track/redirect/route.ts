@@ -91,7 +91,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, noCode: true, bono, campaignId }, { headers: CORS });
   }
 
-  let code = generateCode();
+  // Afiliados Telegram → prefijo TG (la landing lo marca); resto → PB.
+  const codePrefix = raw.telegram === true || raw.telegram === 'true' ? 'TG' : 'PB';
+  let code = generateCode(codePrefix);
   for (let i = 0; i < 3; i++) {
     try {
       await db.insert(attributions).values({
@@ -111,7 +113,7 @@ export async function POST(req: NextRequest) {
       });
       break;
     } catch {
-      code = generateCode();
+      code = generateCode(codePrefix);
     }
   }
 

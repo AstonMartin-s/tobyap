@@ -105,6 +105,7 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
       campaign:p('campaign')||C.campaign,
       ccpp:p('CCPP')||p('ccpp')||C.ccpp,
       noCode:C.noCode,
+      telegram:!!C.telegramBot,
       utmSource:p('utm_source'),
       utmCampaign:p('utm_campaign'),
       utmContent:p('utm_content'),

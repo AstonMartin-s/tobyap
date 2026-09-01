@@ -23,15 +23,20 @@ export function resolveBono(tenant: ResolvedTenant, ccpp: string | null | undefi
 
 // Token único que viaja en el mensaje de WhatsApp. Distintivo (prefijo PB) para
 // poder extraerlo del texto del primer mensaje con un regex simple.
-export function generateCode(): string {
+// prefix: `PB` = pauta común (wa/chat/portal) · `TG` = afiliados Telegram (bot).
+// El prefijo nos deja distinguir la fuente de un vistazo y en las métricas, sin
+// cambiar el resto del formato (6 chars, alfabeto sin ambiguos, largo fijo 8).
+export function generateCode(prefix: 'PB' | 'TG' = 'PB'): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin caracteres ambiguos
   let s = '';
   const bytes = crypto.randomBytes(6);
   for (const b of bytes) s += alphabet[b % alphabet.length];
-  return `PB${s}`;
+  return `${prefix}${s}`;
 }
 
-export const CODE_REGEX = /PB[A-HJ-NP-Z2-9]{6}/;
+// Matchea ambos prefijos (PB pauta común, TG afiliados Telegram). El resto del
+// cuerpo es idéntico, así que parseLeadId / webhook Kommo funcionan igual.
+export const CODE_REGEX = /(?:PB|TG)[A-HJ-NP-Z2-9]{6}/;
 
 // Extrae nuestro `code` del `lead_id` que devuelve el webhook de afiliados. Como
 // mandamos el code limpio en ?start=, normalmente es identidad; igual somos

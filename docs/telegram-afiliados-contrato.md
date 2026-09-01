@@ -14,7 +14,10 @@ Anuncio Meta → NUESTRA landing (capta fbclid + dispara pixel, genera <code>)
             → nosotros disparamos el evento a Meta (CAPI)
 ```
 
-El `<code>` es un sub-id único por click/usuario (formato `PBxxxxxx`, ej. `PBAB3K9X`).
+El `<code>` es un sub-id único por click/usuario (afiliados Telegram → prefijo `TG`,
+formato `TG` + 6 chars alfanuméricos en mayúsculas, largo fijo 8, ej. `TGAB3K9X`;
+regex `TG[A-HJ-NP-Z2-9]{6}`, alfabeto sin I/O/0/1). Si lo separan de su cuenta con
+guión bajo (`BMSHOP_TGAB3K9X`) también sirve: extraemos el `TGxxxxxx` por regex.
 Es lo que nos permite atar cada conversión a su `fbclid`/campaña. **El bot es caja
 negra: no le pegamos nada; toda la señal a Meta vive de nuestro lado.**
 
@@ -26,7 +29,7 @@ Content-Type: application/json
 Authorization: Bearer <token>          # el secreto va ACÁ, en el header (no en la URL)
 
 {
-  "lead_id": "PBAB3K9X",                 // el valor de ?start= que recibió el bot, VERBATIM
+  "lead_id": "TGAB3K9X",                 // el valor de ?start= que recibió el bot, VERBATIM (o CUENTA_TGAB3K9X)
   "event_type": "registro",              // "registro" | "carga"
   "timestamp": "2026-08-31T14:05:00Z"    // ISO 8601 (UTC)
 }
