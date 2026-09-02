@@ -42,7 +42,7 @@ export const DEFAULT_TEMPLATES: Record<MessageTemplateId, string> = {
   account_creating: 'Genial 🙌 Te estoy creando tu usuario, dame un segundo…',
   account_checking: 'Dejame chequear tu cuenta… 👀',
   account_done: '✅ *¡Felicitaciones!* Tu usuario ya está creado:{creds_block}',
-  account_agent_followup: '👀 En un momento vas a seguir siendo atendido por un agente. Si necesitás algo, pedí por *Soporte* cuando quieras 🙌',
+  account_agent_followup: '👍 Tu cuenta ya está. Seguí por acá cuando quieras — si necesitás una mano, pedí *Soporte* y un agente te atiende 🙌',
   account_existing: '👋 *¡Ya tenés cuenta con nosotros!* Te la recuerdo:{creds_block}',
   account_error: 'Uy, tuve un problemita con tu usuario. Un asesor te ayuda en un momento 🙌',
   cbu_intro: 'Perfecto 🙌 Datos para tu carga:\n🏦 Titular: *{titular}*',
