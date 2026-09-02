@@ -5,7 +5,8 @@ import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { onFreeText, accountStep, WANT_ACCOUNT_RE } from '@/lib/chat/flow';
 import { onFreeTextTienda } from '@/lib/chat/flows/tienda';
-import { loadTiendaConfig } from '@/lib/chat/loadTienda';
+import { loadTiendaConfig, loadChatFlow } from '@/lib/chat/loadTienda';
+import { advanceByText } from '@/lib/chat/flowGraph';
 import { prepareBotBatch } from '@/lib/chat/stagger';
 import { appendChatMessages } from '@/lib/chat/mutations';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
@@ -33,8 +34,27 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // ── Nicho TIENDA: guion propio. Sin "quiero mi cuenta"/Pagoda. ─────────────
   if (tenant.niche === 'tienda') {
     const cfg = await loadTiendaConfig(tenant.id, tenant.name);
+    const sdata = (s.data as Record<string, unknown> | null) ?? {};
+
+    // Flow custom: si estamos en un nodo 'capture' avanzamos con el texto; si no,
+    // respondemos el fallback global del flow (sin romper el guion).
+    const flow = await loadChatFlow(tenant.id);
+    if (flow.enabled && !sdata.operatorTookOver) {
+      const fromNode = typeof sdata.flowNodeId === 'string' ? sdata.flowNodeId : flow.startId;
+      const run = advanceByText(flow, fromNode, b.text, { cfg, name: s.name, data: sdata });
+      let replies = run ? run.messages : (flow.fallback ? [{ from: 'bot' as const, delayMs: 600, at: Date.now(), text: flow.fallback }] : []);
+      const botMsgs = prepareBotBatch(replies);
+      const upd: Record<string, unknown> = { updatedAt: new Date() };
+      if (run) { upd.data = { ...run.data, flowNodeId: run.nodeId }; if (run.step) upd.step = run.step; }
+      await appendChatMessages(s.id, [userMsg, ...botMsgs], { markUnread: true });
+      if (run) await db.update(chatSessions).set(upd).where(eq(chatSessions.id, s.id));
+      const history = [...(s.messages ?? []), userMsg, ...botMsgs];
+      if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, `👤 Lead: ${b.text}`);
+      return NextResponse.json({ ok: true, messages: botMsgs, total: history.length });
+    }
+
     let replies = onFreeTextTienda(s.step ?? 'welcome', cfg);
-    if ((s.data as Record<string, unknown> | null)?.operatorTookOver) replies = [];
+    if (sdata.operatorTookOver) replies = [];
     const prevMsgs = (s.messages ?? []) as Array<{ from: string; text?: string }>;
     const lastBot = [...prevMsgs].reverse().find((m) => m.from === 'bot');
     if (replies.length === 1 && lastBot && (lastBot.text ?? '') === (replies[0].text ?? '')) replies = [];

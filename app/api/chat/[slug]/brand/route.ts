@@ -24,5 +24,5 @@ export async function GET(_req: NextRequest, { params }: { params: { slug: strin
     }
   } catch { /* defaults */ }
 
-  return NextResponse.json({ ok: true, brand, waBtn }, { headers: { 'Cache-Control': 'no-store' } });
+  return NextResponse.json({ ok: true, brand, waBtn, niche: tenant.niche }, { headers: { 'Cache-Control': 'no-store' } });
 }

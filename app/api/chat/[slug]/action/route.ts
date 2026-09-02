@@ -5,7 +5,8 @@ import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { accountStep, cbuStep, postActionMessages, comprobanteReviewMessages } from '@/lib/chat/flow';
 import { BUY_ACTION_PREFIX, productStepTienda, comprobanteReviewTienda, onFreeTextTienda } from '@/lib/chat/flows/tienda';
-import { loadTiendaConfig } from '@/lib/chat/loadTienda';
+import { loadTiendaConfig, loadChatFlow } from '@/lib/chat/loadTienda';
+import { advanceByButton } from '@/lib/chat/flowGraph';
 import { prepareBotBatch } from '@/lib/chat/stagger';
 import { appendChatMessages } from '@/lib/chat/mutations';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
@@ -34,6 +35,27 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // ── Nicho TIENDA: guion propio (producto → pago → comprobante). ───────────
   if (tenant.niche === 'tienda') {
     const cfg = await loadTiendaConfig(tenant.id, tenant.name);
+
+    // Flow custom (nodos+conectores): si está activo, lo maneja el intérprete.
+    const flow = await loadChatFlow(tenant.id);
+    if (flow.enabled) {
+      const sdata = (s.data as Record<string, unknown> | null) ?? {};
+      const fromNode = typeof sdata.flowNodeId === 'string' ? sdata.flowNodeId : flow.startId;
+      const run = advanceByButton(flow, fromNode, b.action, { cfg, name: s.name, data: sdata });
+      if (run) {
+        const botMsgs = prepareBotBatch(run.messages);
+        const history = [...(s.messages ?? []), ...botMsgs];
+        const nextData = { ...run.data, flowNodeId: run.nodeId };
+        const upd: Record<string, unknown> = { data: nextData, messages: history, updatedAt: new Date() };
+        if (run.step) upd.step = run.step;
+        await db.update(chatSessions).set(upd).where(eq(chatSessions.id, s.id));
+        return NextResponse.json({ ok: true, messages: botMsgs, buttons: run.buttons, step: run.step ?? s.step, total: history.length });
+      }
+      // Sin transición para esa acción: no rompemos.
+      const persisted = s.messages ?? [];
+      if (label) await db.update(chatSessions).set({ messages: persisted, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+      return NextResponse.json({ ok: true, messages: [], buttons: [], step: s.step, total: persisted.length });
+    }
 
     if (b.action.startsWith(BUY_ACTION_PREFIX)) {
       const productId = b.action.slice(BUY_ACTION_PREFIX.length);

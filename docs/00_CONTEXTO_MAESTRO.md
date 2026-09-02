@@ -6,6 +6,16 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-02 — Tienda: dominios trackerapp.site + constructor de flujo (backend)
+
+- **Dominios casaurbana VERDES:** `go.trackerapp.site` (landing) y `chat.trackerapp.site` (widget) con cert **VÁLIDO** en Railway. La traba era ownership: faltaban los TXT `_railway-verify.go` / `_railway-verify.chat` en Hostinger (el CNAME solo no alcanza). Agregados → validó y emitió al instante. Config de casaurbana ya apunta ahí (`chat_config.landingDomain` + `chatDomain`).
+- **Constructor de flujo (Fase 1, backend) — LISTO, tsc verde:**
+  - `lib/chat/flowGraph.ts` (NUEVO): modelo `ChatFlow` (nodos `message`/`products`/`buttons`/`capture`/`action` + conectores `next`/botón→destino + `fallback` global), parser `parseChatFlow`, intérprete puro (`runFlow`, `advanceByButton`, `advanceByText`, `flowButtons`), interpolación `{brand}/{name}/{first_name}`, seed por defecto `seedTiendaFlow()`. Nodos `products`/`payment(ask_receipt)` leen la matriz TiendaConfig (catálogo/precios/medios de pago siguen data-driven).
+  - Dispatch aditivo en `start`/`action`/`message`: si `chat_config.flow.enabled` (solo niche tienda), lo maneja el intérprete; si no, cae al guion por defecto del nicho. Nada rompe Circo ni Tienda sin flow.
+  - `app/api/panel/flow/route.ts` (NUEVO): GET/PUT del guion (GET devuelve seed si no hay nada). Gate niche=tienda en PUT.
+  - `lib/chat/loadTienda.ts`: + `loadChatFlow()`.
+- **Pendiente (Fase 2, FRONT — R1 a Claude TOB):** editor visual React Flow (canvas nodos+conectores) en pestaña "Guion" del panel Tienda, consumiendo `/api/panel/flow`. Contrato del grafo ya congelado en `flowGraph.ts`.
+
 ## Instancias (PTM)
 
 | Instancia | Carpeta | Rama | Responsabilidad | No pisar |

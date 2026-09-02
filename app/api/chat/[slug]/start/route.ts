@@ -7,7 +7,8 @@ import { getTenantBySlug } from '@/lib/tenants';
 import { checkWhatsApp } from '@/lib/chat/wachecker';
 import { welcomeStep, welcomeButtons, hasAgentButton, type Btn } from '@/lib/chat/flow';
 import { welcomeStepTienda, productButtons } from '@/lib/chat/flows/tienda';
-import { loadTiendaConfig } from '@/lib/chat/loadTienda';
+import { loadTiendaConfig, loadChatFlow } from '@/lib/chat/loadTienda';
+import { runFlow, flowButtons, EMPTY_FLOW } from '@/lib/chat/flowGraph';
 import { prepareBotBatch } from '@/lib/chat/stagger';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { createChatLead, addLeadNote } from '@/lib/chat/kommoMirror';
@@ -38,13 +39,27 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const runtime = await loadChatRuntime(tenant.id, tenant.name, wa.phone, tenant.slug);
 
   // Nicho: TIENDA usa un guion propio (producto/pago/comprobante), sin cuenta/CBU.
+  // Si además hay un flow custom (chat_config.flow enabled), lo ejecuta el intérprete.
   const isTienda = tenant.niche === 'tienda';
   const tiendaCfg = isTienda ? await loadTiendaConfig(tenant.id, tenant.name) : null;
+  const flow = isTienda ? await loadChatFlow(tenant.id) : EMPTY_FLOW;
+  const useFlow = isTienda && flow.enabled;
   // King/Paradise: 2º botón "Hablar con un agente" en el welcome.
   const agentBtn = hasAgentButton(tenant.slug);
-  const buildWelcome = (name?: string | null): { messages: ReturnType<typeof welcomeStep>['messages']; buttons: Btn[] } =>
-    isTienda ? welcomeStepTienda(name, tiendaCfg!) : welcomeStep(name, runtime, { agentButton: agentBtn });
-  const buttonsForStep = (step: string): Btn[] => {
+  type Welcome = { messages: ReturnType<typeof welcomeStep>['messages']; buttons: Btn[]; step: string; data: Record<string, unknown> };
+  const buildWelcome = (name?: string | null): Welcome => {
+    if (useFlow) {
+      const run = runFlow(flow, flow.startId, { cfg: tiendaCfg!, name, data: {} });
+      return { messages: run.messages, buttons: run.buttons, step: run.step ?? 'welcome', data: { flowNodeId: run.nodeId } };
+    }
+    if (isTienda) { const w = welcomeStepTienda(name, tiendaCfg!); return { messages: w.messages, buttons: w.buttons, step: 'welcome', data: {} }; }
+    const w = welcomeStep(name, runtime, { agentButton: agentBtn }); return { messages: w.messages, buttons: w.buttons, step: 'welcome', data: {} };
+  };
+  const buttonsForStep = (step: string, data?: Record<string, unknown> | null): Btn[] => {
+    if (useFlow) {
+      const nodeId = (data && typeof data.flowNodeId === 'string') ? data.flowNodeId : flow.startId;
+      return flowButtons(flow, nodeId, tiendaCfg!);
+    }
     if (isTienda) return step === 'welcome' ? productButtons(tiendaCfg!) : [];
     return step === 'welcome'
       ? welcomeButtons(agentBtn)
@@ -71,13 +86,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       const w = buildWelcome(b.name ?? existing.name);
       const welcomeMsgs = prepareBotBatch(w.messages);
       const history = [...(existing.messages ?? []), ...welcomeMsgs];
-      await db.update(chatSessions).set({ step: 'welcome', messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, existing.id));
-      return NextResponse.json({ ok: true, resumed: true, sessionKey: existing.sessionKey, messages: history, buttons: w.buttons, step: 'welcome', total: history.length, leadId: existing.kommoLeadId ?? null });
+      await db.update(chatSessions).set({ step: w.step, data: { ...((existing.data as Record<string, unknown> | null) ?? {}), ...w.data }, messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, existing.id));
+      return NextResponse.json({ ok: true, resumed: true, sessionKey: existing.sessionKey, messages: history, buttons: w.buttons, step: w.step, total: history.length, leadId: existing.kommoLeadId ?? null });
     }
     // Sesión activa: la reanudamos tal cual (historial + estado actuales).
     if (b.name && !existing.name) await db.update(chatSessions).set({ name: b.name, updatedAt: new Date() }).where(eq(chatSessions.id, existing.id));
     const step = existing.step ?? 'welcome';
-    const buttons = buttonsForStep(step);
+    const buttons = buttonsForStep(step, existing.data as Record<string, unknown> | null);
     const msgs = existing.messages ?? [];
     return NextResponse.json({ ok: true, resumed: true, sessionKey: existing.sessionKey, messages: msgs, buttons, step, total: msgs.length, leadId: existing.kommoLeadId ?? null });
   }
@@ -88,8 +103,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     console.error(`[chat start] ${tenant.slug}: no se pudo crear el lead en Kommo (tel ${wa.phone}). Igual medimos la conversión a Meta.`);
   }
 
-  const { messages, buttons } = buildWelcome(b.name);
-  const welcomeMsgs = prepareBotBatch(messages);
+  const w = buildWelcome(b.name);
+  const welcomeMsgs = prepareBotBatch(w.messages);
+  const buttons = w.buttons;
 
   await db.insert(chatSessions).values({
     tenantId: tenant.id,
@@ -100,9 +116,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     token: b.token ?? null,
     campaign: b.campaign ?? null,
     ccpp: b.ccpp ?? null,
-    step: 'welcome',
+    step: w.step,
     kommoLeadId: leadId,
-    data: {},
+    data: w.data,
     messages: welcomeMsgs,
     updatedAt: new Date(),
   });
@@ -145,5 +161,5 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     }
   }
 
-  return NextResponse.json({ ok: true, sessionKey, messages: welcomeMsgs, buttons, step: 'welcome', leadId: leadId ?? null });
+  return NextResponse.json({ ok: true, sessionKey, messages: welcomeMsgs, buttons, step: w.step, leadId: leadId ?? null });
 }
