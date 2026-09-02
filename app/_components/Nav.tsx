@@ -75,7 +75,12 @@ export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?:
 
   // Solapas opcionales por cliente (default: todas on hasta que cargue).
   const [feat, setFeat] = useState<Features>(ALL_ON);
-  const [niche, setNiche] = useState<'circo' | 'tienda'>('circo');
+  // Nicho: cacheado en localStorage para que en navegaciones cliente el menú
+  // arranque con el valor correcto (evita el flash "Producto"→"Embudo").
+  const [niche, setNiche] = useState<'circo' | 'tienda'>(() => {
+    if (typeof window === 'undefined') return 'circo';
+    try { return localStorage.getItem('tk_niche') === 'tienda' ? 'tienda' : 'circo'; } catch { return 'circo'; }
+  });
   useEffect(() => {
     if (isAdmin) return; // el panel admin global no usa solapas por cliente
     let alive = true;
@@ -84,7 +89,10 @@ export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?:
       .then((d) => {
         if (!alive) return;
         if (d?.features) setFeat(d.features);
-        if (d?.niche === 'tienda' || d?.niche === 'circo') setNiche(d.niche);
+        if (d?.niche === 'tienda' || d?.niche === 'circo') {
+          setNiche(d.niche);
+          try { localStorage.setItem('tk_niche', d.niche); } catch { /* ignore */ }
+        }
       })
       .catch(() => { /* mantiene ALL_ON */ });
     return () => { alive = false; };
