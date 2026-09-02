@@ -6,17 +6,24 @@ import { getTenantBySlug } from '@/lib/tenants';
 import { onComprobante, comprobanteReviewMessages } from '@/lib/chat/flow';
 import { comprobanteReviewTienda } from '@/lib/chat/flows/tienda';
 import { prepareBotBatch } from '@/lib/chat/stagger';
-import { appendChatMessages } from '@/lib/chat/mutations';
+import { appendChatMessages, mergeChatData } from '@/lib/chat/mutations';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadStatus } from '@/lib/kommo';
-import { saveComprobante } from '@/lib/storage';
+import { saveComprobante, isDangerousUploadMime } from '@/lib/storage';
 import { signFilePath } from '@/lib/chat/fileToken';
 import { normalizeUploadImage } from '@/lib/chat/image';
 
 export const dynamic = 'force-dynamic';
 
 const MAX_BYTES = 10 * 1024 * 1024; // 10MB — cubre fotos grandes y PDFs de comprobante
+
+// Anti-spam de subidas: máx N imágenes por ventana; si se pasa, bloqueo temporal
+// de la subida (el resto del chat sigue funcionando). No afecta al uso normal
+// (un cliente sube 1-3 comprobantes), solo frena el flood.
+const RATE_MAX = 5;
+const RATE_WINDOW_MS = 60_000; // 1 minuto
+const RATE_BLOCK_MS = 3 * 60_000; // 3 minutos de enfriamiento
 
 // POST /api/chat/[slug]/upload  (multipart: sessionKey, image) — guarda la IMAGEN
 // real del comprobante (base64 en la sesión), la sirve vía /file y deja el link
@@ -35,10 +42,43 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (!s) return NextResponse.json({ error: 'sesión desconocida' }, { status: 404 });
   if ((s.data as Record<string, unknown> | null)?.blocked) return NextResponse.json({ ok: true, messages: [], blocked: true });
 
+  // Rate limit por sesión: si ya está en enfriamiento, o si superó RATE_MAX en la
+  // última ventana, rechazamos 429 (y activamos el enfriamiento). Contamos por el
+  // `at` de los comprobantes ya guardados en la sesión.
+  const dataRl = (s.data as Record<string, unknown> | null) ?? {};
+  const nowMs = Date.now();
+  const blockUntil = typeof dataRl.uploadBlockUntil === 'number' ? dataRl.uploadBlockUntil : 0;
+  if (blockUntil > nowMs) {
+    const secs = Math.ceil((blockUntil - nowMs) / 1000);
+    return NextResponse.json(
+      { ok: false, rateLimited: true, error: `Estás enviando imágenes muy seguido. Esperá ${secs}s e intentá de nuevo.`, retryAfter: secs },
+      { status: 429, headers: { 'Retry-After': String(secs) } },
+    );
+  }
+  const recentCount = Array.isArray(dataRl.comprobantes)
+    ? (dataRl.comprobantes as Array<{ at?: number; op?: boolean }>).filter((c) => !c?.op && typeof c?.at === 'number' && nowMs - (c.at as number) < RATE_WINDOW_MS).length
+    : 0;
+  if (recentCount >= RATE_MAX) {
+    await mergeChatData(s.id, { uploadBlockUntil: nowMs + RATE_BLOCK_MS });
+    const secs = Math.ceil(RATE_BLOCK_MS / 1000);
+    return NextResponse.json(
+      { ok: false, rateLimited: true, error: `Estás enviando demasiadas imágenes. Esperá unos minutos e intentá de nuevo.`, retryAfter: secs },
+      { status: 429, headers: { 'Retry-After': String(secs) } },
+    );
+  }
+
   const rawBuf = Buffer.from(await file.arrayBuffer());
   // iPhone sube HEIC/HEIF (no lo renderizan los navegadores) → lo pasamos a JPEG
   // para no "perder" comprobantes invisibles. El resto de formatos pasa igual.
+  // Rechazamos formatos que ejecutan script al servirse (svg/html/xml). Un
+  // comprobante legítimo es una foto o PDF, nunca esto.
+  if (isDangerousUploadMime(file.type) || isDangerousUploadMime(file.name)) {
+    return NextResponse.json({ error: 'formato de imagen no permitido' }, { status: 415 });
+  }
   const { buf, mime } = await normalizeUploadImage(rawBuf, file.type || '', file.name || '');
+  if (isDangerousUploadMime(mime)) {
+    return NextResponse.json({ error: 'formato de imagen no permitido' }, { status: 415 });
+  }
   // cid único por comprobante → URL única. Antes todas las cargas de una sesión
   // compartían URL y `/file` servía siempre la última, "borrando" las anteriores.
   const cid = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent } from 'react';
 import { TZ_AR } from '@/lib/datetime/ar';
 import { DEFAULT_PANEL_QUICK, type PanelQuickTexts } from '@/lib/chat/templates';
 import OperationsPanel from './OperationsPanel';
@@ -524,6 +524,37 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     }
   }
 
+  // Pegar imagen (Ctrl+V) en la caja de respuesta → la manda el operador al chat.
+  async function sendPastedImage(file: File) {
+    if (!sel || busy) return;
+    setBusy(true);
+    const fd = new FormData();
+    fd.append('sessionKey', sel);
+    fd.append('image', file);
+    const r = await fetch('/api/panel/chats/upload', { method: 'POST', body: fd })
+      .then((x) => x.json())
+      .catch(() => null);
+    setBusy(false);
+    if (r?.ok) {
+      setToast('Imagen enviada ✓');
+      forceScrollRef.current = true;
+      await loadDetail(sel);
+      await loadList();
+    } else {
+      setToast(r?.error ?? 'No se pudo enviar la imagen');
+    }
+    setTimeout(() => setToast(null), 2200);
+  }
+
+  function onReplyPaste(e: ClipboardEvent<HTMLInputElement>) {
+    const item = Array.from(e.clipboardData?.items ?? []).find((it) => it.type.startsWith('image/'));
+    if (!item) return; // pegado de texto normal: no interferimos
+    const file = item.getAsFile();
+    if (!file) return;
+    e.preventDefault();
+    void sendPastedImage(file);
+  }
+
   async function confirmDelete() {
     if (!delChat && !delLead) return;
     await act('delete', undefined, undefined, { deleteChat: delChat || delLead, deleteLead: delLead });
@@ -1009,9 +1040,10 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                 );
               })()}
               <div style={{ display: 'flex', gap: '.4rem' }}>
-                <input className="input" placeholder={panelQuick.barPlaceholder?.trim() || DEFAULT_PANEL_QUICK.barPlaceholder || 'Mensaje libre al cliente…'} value={custom}
+                <input className="input" placeholder={panelQuick.barPlaceholder?.trim() || DEFAULT_PANEL_QUICK.barPlaceholder || 'Mensaje libre al cliente… (podés pegar una imagen)'} value={custom}
                   onChange={(e) => setCustom(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && custom.trim()) { act('custom', custom); setCustom(''); } }}
+                  onPaste={onReplyPaste}
                   style={{ flex: 1, padding: '.5rem .7rem', fontSize: '.85rem' }} />
                 <button disabled={busy || !custom.trim()} onClick={() => { act('custom', custom); setCustom(''); }} style={abtn('var(--accent)', true)}>Enviar</button>
               </div>

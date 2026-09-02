@@ -14,7 +14,10 @@ Anuncio Meta → NUESTRA landing (capta fbclid + dispara pixel, genera <code>)
             → nosotros disparamos el evento a Meta (CAPI)
 ```
 
-El `<code>` es un sub-id único por click/usuario (formato `PBxxxxxx`, ej. `PBAB3K9X`).
+El `<code>` es un sub-id único por click/usuario (afiliados Telegram → prefijo `TG`,
+formato `TG` + 6 chars alfanuméricos en mayúsculas, largo fijo 8, ej. `TGAB3K9X`;
+regex `TG[A-HJ-NP-Z2-9]{6}`, alfabeto sin I/O/0/1). Si lo separan de su cuenta con
+guión bajo (`BMSHOP_TGAB3K9X`) también sirve: extraemos el `TGxxxxxx` por regex.
 Es lo que nos permite atar cada conversión a su `fbclid`/campaña. **El bot es caja
 negra: no le pegamos nada; toda la señal a Meta vive de nuestro lado.**
 
@@ -23,42 +26,49 @@ negra: no le pegamos nada; toda la señal a Meta vive de nuestro lado.**
 ```
 POST https://tobyap-production.up.railway.app/api/webhooks/affiliate/candywin
 Content-Type: application/json
-X-Signature: <hex hmac-sha256(secret, rawBody)>     # firma sobre el body CRUDO
+Authorization: Bearer <token>          # el secreto va ACÁ, en el header (no en la URL)
 
 {
-  "lead_id": "PBAB3K9X",                 // el valor de ?start= que recibió el bot, VERBATIM
+  "lead_id": "TGAB3K9X",                 // el valor de ?start= que recibió el bot, VERBATIM (o CUENTA_TGAB3K9X)
   "event_type": "registro",              // "registro" | "carga"
   "timestamp": "2026-08-31T14:05:00Z"    // ISO 8601 (UTC)
 }
 ```
 
+- **La URL NO lleva ningún secreto.** Es fija y pública (identifica al cliente por el
+  slug `candywin`). El secreto viaja en el header `Authorization`. Lo que veían "en la
+  URL" era solo el path del endpoint, nada sensible.
 - `lead_id`: el `start` que recibió el bot, **devuelto tal cual** (es nuestro `<code>`).
 - `event_type`:
   - `"registro"` → alta / conversación iniciada.
   - `"carga"` → depósito. **Manden TODAS las cargas.** Nosotros medimos la **primera**
     por usuario: la 1ª dispara el evento a Meta, las siguientes devuelven
     `200 {duplicate:true}` (no duplican). No tienen que filtrar nada.
-- `secret`: se los pasamos por canal seguro (link de un solo uso).
 
-## 3. Firma (HMAC-SHA256 sobre el body crudo)
+## 3. Autenticación (elijan una — recomendamos Bearer token)
 
-Se firma **exactamente los bytes** que envían en el body (no un JSON re-serializado).
-El header puede ir como hex pelado o con prefijo `sha256=`.
+El endpoint acepta **cualquiera** de las dos. Con que valide una, alcanza. Ambas usan
+el **mismo token/secreto** que les pasamos, así que si lo **rotan** (y nos avisan),
+invalida las dos a la vez.
 
-**Node.js**
-```js
-const crypto = require('crypto');
-const raw = JSON.stringify(payload);              // el MISMO string que mandan como body
-const signature = crypto.createHmac('sha256', secret).update(raw, 'utf8').digest('hex');
-// headers: { 'Content-Type': 'application/json', 'X-Signature': signature }
+**Opción A — Bearer token (recomendada, la que propusieron)**
 ```
+Authorization: Bearer <token>
+```
+Nosotros comparamos el token en tiempo constante contra el del cliente. Match → `200`.
+No hay que firmar nada. (También aceptamos el token en el header `X-Webhook-Token` si
+les resulta más cómodo.) **Este es el camino simple que pidieron: validan el 200 contra el token.**
 
-**Python**
-```python
-import hmac, hashlib, json
-raw = json.dumps(payload, separators=(",", ":"))   # el MISMO string que mandan como body
-signature = hmac.new(secret.encode(), raw.encode(), hashlib.sha256).hexdigest()
-# headers: {"Content-Type": "application/json", "X-Signature": signature}
+**Opción B — Firma HMAC-SHA256 (alternativa, si prefieren firmar el body)**
+```
+X-Signature: <hex hmac-sha256(secret, rawBody)>   # hex pelado o con prefijo sha256=
+```
+Se firma **exactamente los bytes** del body (no un JSON re-serializado).
+
+```js
+// Node
+const sig = require('crypto').createHmac('sha256', secret).update(rawBody, 'utf8').digest('hex');
+// header: X-Signature: sig
 ```
 
 ## 4. Respuestas
@@ -68,7 +78,7 @@ signature = hmac.new(secret.encode(), raw.encode(), hashlib.sha256).hexdigest()
 | `200` | `{ok:true}` | procesado (evento enviado a Meta) |
 | `200` | `{ok:true, unmatched:true}` | `lead_id` sin match → **no reintentar** |
 | `200` | `{ok:true, duplicate:true}` | ya procesado (dedup) → OK |
-| `401` | `{error:"firma inválida"}` | firma HMAC incorrecta |
+| `401` | `{error:"no autorizado"}` | token/firma inválidos o ausentes |
 | `400` | `{error:...}` | payload inválido / `event_type` desconocido |
 | `5xx` | | error transitorio → **reintentar con backoff** |
 
@@ -81,7 +91,8 @@ Deduplicamos por `lead_id` + `event_type`. Reenvíos = seguros (nunca duplican e
 1. **Persistir el `start`**: guardar el `<code>` que llega en `?start=` contra el usuario
    y devolverlo **verbatim** como `lead_id` en el webhook.
 2. **Webhook saliente**: POST a la URL de arriba en los dos momentos (`registro` y `carga`),
-   firmado con HMAC-SHA256 (`X-Signature`) usando el secreto que les pasamos.
+   con el token en `Authorization: Bearer <token>` (o firma HMAC si eligen la opción B).
+3. **Rotación**: si rotan el token, avísennos y lo actualizamos de nuestro lado.
 
 ## 7. Que nos confirmen (para cerrar)
 
@@ -89,8 +100,9 @@ Deduplicamos por `lead_id` + `event_type`. Reenvíos = seguros (nunca duplican e
 - [ ] `registro`: con qué disparador exacto lo emiten (¿alta en su plataforma / primer `/start`?).
 - [ ] `carga`: mandan **todas** las cargas con `event_type:"carga"`.
 - [ ] El webhook **reintenta** ante `5xx`/timeout (¿backoff y timeout?).
-- [ ] Firman **HMAC-SHA256** sobre el **body crudo**, `Content-Type: application/json`.
 - [ ] `timestamp` en ISO 8601 (UTC).
+- [ ] Método de auth elegido (Bearer token recomendado) y quién genera el token
+      (lo generamos nosotros y se los pasamos, o nos pasan el suyo — cualquiera sirve).
 
 ---
 

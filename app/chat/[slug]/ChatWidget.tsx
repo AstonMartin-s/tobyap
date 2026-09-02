@@ -130,8 +130,14 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         pollBase.current = d.total;
         setStep(d.step ?? 'done');
         if (d.assignedWa) setAssignedWa(String(d.assignedWa));
-        if (d.step === 'welcome') setButtons([{ id: 'want_account', label: 'Quiero mi cuenta' }]);
-        else if (d.step === 'credenciales') setButtons([{ id: 'want_cbu', label: 'Quiero el CBU' }]);
+        if (d.step === 'welcome') {
+          // King/Paradise muestran el 2º botón "Hablar con un agente" también al
+          // reconectar (el start ya lo devuelve; esto es el fallback del resume).
+          const welcomeBtns = ['king', 'paradise'].includes(slug)
+            ? [{ id: 'want_account', label: 'Quiero mi cuenta 🎁' }, { id: 'want_agent', label: 'Hablar con un agente 🧑‍💼' }]
+            : [{ id: 'want_account', label: 'Quiero mi cuenta' }];
+          setButtons(welcomeBtns);
+        } else if (d.step === 'credenciales') setButtons([{ id: 'want_cbu', label: 'Quiero el CBU' }]);
       } catch { /* sin resume */ }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -334,12 +340,31 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     fd.append('image', file);
     const r = await fetch(`/api/chat/${slug}/upload`, { method: 'POST', body: fd });
     const d = await r.json().catch(() => ({}));
+    // Rate limit / rechazo: avisamos en el chat y no seguimos (la imagen optimista
+    // queda, pero el cliente entiende que no se envió y debe esperar/reintentar).
+    if (!r.ok || d?.rateLimited) {
+      await play([{ from: 'bot', text: d?.error ?? 'No pudimos recibir la imagen. Probá de nuevo en un momento 🙌' }], []);
+      return;
+    }
     // Sincronizamos el contador y el estado ANTES de animar, para que el poll de
     // fondo no reproduzca de nuevo estos mensajes mientras dura la animación
     // (era la causa del doble envío del comprobante).
     if (typeof d.total === 'number') pollBase.current = d.total;
     if (d.step) setStep(d.step);
     await play(d.messages ?? [], []);
+  }
+
+  // Pegar comprobante desde el portapapeles (Ctrl/Cmd+V en PC, pegar imagen del
+  // teclado en cel): si el clipboard trae una imagen, la subimos igual que el clip 📎.
+  function handlePaste(e: React.ClipboardEvent) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const it of Array.from(items)) {
+      if (it.kind === 'file' && it.type.startsWith('image/')) {
+        const f = it.getAsFile();
+        if (f) { e.preventDefault(); void upload(f); return; }
+      }
+    }
   }
 
   const isStandalone = () => typeof window !== 'undefined' && (window.matchMedia?.('(display-mode: standalone)').matches || (navigator as any).standalone === true);
@@ -511,8 +536,8 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
               disabled={appInstall}
               title={appInstall ? 'App instalada' : 'Descargar app'}
               aria-label="Descargar app"
-              className={appInstall ? '' : 'hdr-pulse'}
-              style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: appInstall ? 'default' : 'pointer', background: appInstall ? 'rgba(255,255,255,.28)' : 'rgba(255,255,255,.18)', color: '#fff' }}
+              className={appInstall ? '' : 'dl-attn'}
+              style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: appInstall ? 'default' : 'pointer', background: appInstall ? 'rgba(255,255,255,.28)' : '#f59e0b', color: '#fff' }}
             >
               {appInstall ? (
                 <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -623,7 +648,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
             <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path></svg>
           </button>
           <input ref={fileRef} type="file" accept="image/*,application/pdf,.pdf,.heic,.heif" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.currentTarget.value = ''; }} />
-          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send(); }} placeholder="Escribe un mensaje" style={{ flex: 1, border: 'none', borderRadius: 20, padding: '10px 14px', fontSize: 15, outline: 'none', background: '#fff', color: '#111827' }} />
+          <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send(); }} onPaste={handlePaste} placeholder="Escribe un mensaje" style={{ flex: 1, border: 'none', borderRadius: 20, padding: '10px 14px', fontSize: 15, outline: 'none', background: '#fff', color: '#111827' }} />
           <button onClick={send} style={{ background: C.send, color: '#fff', border: 'none', width: 40, height: 40, borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', transform: 'translate(-1px, 1px)' }}>
               <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
@@ -692,7 +717,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         </div>
       )}
 
-      <style>{`.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#9aa;animation:b 1.2s infinite}.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}@keyframes b{0%,60%,100%{opacity:.3}30%{opacity:1}}.wa-hdr{animation:waH 5s infinite}@keyframes waH{0%,88%,100%{transform:scale(1)}93%{transform:scale(1.08)}96%{transform:scale(1)}}.wa-hdr--fast{animation:waHF 2s infinite}@keyframes waHF{0%,70%,100%{transform:scale(1)}35%{transform:scale(1.08)}}.hdr-pulse{animation:hp 1.6s infinite}@keyframes hp{0%{box-shadow:0 0 0 0 rgba(255,255,255,.55)}70%{box-shadow:0 0 0 8px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style>
+      <style>{`.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#9aa;animation:b 1.2s infinite}.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}@keyframes b{0%,60%,100%{opacity:.3}30%{opacity:1}}.wa-hdr{animation:waH 5s infinite}@keyframes waH{0%,88%,100%{transform:scale(1)}93%{transform:scale(1.08)}96%{transform:scale(1)}}.wa-hdr--fast{animation:waHF 2s infinite}@keyframes waHF{0%,70%,100%{transform:scale(1)}35%{transform:scale(1.08)}}.hdr-pulse{animation:hp 1.6s infinite}@keyframes hp{0%{box-shadow:0 0 0 0 rgba(255,255,255,.55)}70%{box-shadow:0 0 0 8px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}.dl-attn{animation:dlAttn 1.8s infinite;box-shadow:0 0 0 0 rgba(245,158,11,.6)}@keyframes dlAttn{0%{transform:translateY(0) scale(1);box-shadow:0 0 0 0 rgba(245,158,11,.6)}25%{transform:translateY(-3px) scale(1.12)}50%{transform:translateY(0) scale(1)}70%{box-shadow:0 0 0 7px rgba(245,158,11,0)}100%{transform:translateY(0) scale(1);box-shadow:0 0 0 0 rgba(245,158,11,0)}}`}</style>
     </div>
   );
 }

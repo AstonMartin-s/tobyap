@@ -18,7 +18,9 @@ export const dynamic = 'force-dynamic';
 // atribución por ese code y disparamos el evento CAPI a Meta.
 //
 //   Body: { lead_id: "<code>", event_type: "registro"|"carga", timestamp: ISO8601 }
-//   Auth: header X-Signature = hex(hmac-sha256(secret, rawBody)) del tenant.
+//   Auth (cualquiera de las dos, el cliente elige):
+//     · Authorization: Bearer <secret>   ← simple, recomendado (lo que pidió el bot)
+//     · X-Signature: hex(hmac-sha256(secret, rawBody))   ← alternativa firmada
 //   Mapeo: registro → Conversacion · carga → Cargo.
 //   Dedup: event_id = conv-<lead_id> / cargo-<lead_id> (reintentos seguros).
 //
@@ -27,6 +29,25 @@ export const dynamic = 'force-dynamic';
 // evento Meta y las siguientes vuelven 200 {duplicate:true} sin duplicar en Meta.
 // Aceptamos "carga" y "primera carga" como sinónimos por compatibilidad.
 // ---------------------------------------------------------------------------
+
+/** Comparación en tiempo constante de dos strings (evita timing attacks). */
+function safeEqual(a: string, b: string): boolean {
+  const ba = Buffer.from(a, 'utf8');
+  const bb = Buffer.from(b, 'utf8');
+  if (ba.length !== bb.length) return false;
+  try {
+    return crypto.timingSafeEqual(ba, bb);
+  } catch {
+    return false;
+  }
+}
+
+/** Bearer token en el header Authorization (o X-Webhook-Token como alias). */
+function verifyBearer(secret: string, authHeader: string | null, altHeader: string | null): boolean {
+  const fromAuth = authHeader?.trim().replace(/^Bearer\s+/i, '') ?? '';
+  const token = fromAuth || altHeader?.trim() || '';
+  return token.length > 0 && safeEqual(token, secret);
+}
 
 function verifySignature(secret: string, rawBody: string, header: string | null): boolean {
   if (!header) return false;
@@ -56,9 +77,16 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     // Sin secreto configurado no podemos autenticar → tratamos como no autorizado.
     return NextResponse.json({ error: 'webhook no configurado' }, { status: 401 });
   }
+  // Autenticación: aceptamos Bearer token (recomendado por el cliente) O firma
+  // HMAC. Con que una valide, alcanza. Ambas comparan contra el mismo secreto
+  // cifrado del tenant, así que rotarlo invalida las dos a la vez.
+  const authHeader = req.headers.get('authorization');
+  const altToken = req.headers.get('x-webhook-token');
   const sig = req.headers.get('x-signature') ?? req.headers.get('x-signature-256');
-  if (!verifySignature(secret, rawBody, sig)) {
-    return NextResponse.json({ error: 'firma inválida' }, { status: 401 });
+  const authorized =
+    verifyBearer(secret, authHeader, altToken) || verifySignature(secret, rawBody, sig);
+  if (!authorized) {
+    return NextResponse.json({ error: 'no autorizado' }, { status: 401 });
   }
 
   let body: Record<string, unknown>;

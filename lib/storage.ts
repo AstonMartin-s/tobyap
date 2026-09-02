@@ -20,6 +20,46 @@ export function storageEnabled(): boolean {
   return DIR.length > 0;
 }
 
+// Tipos raster/PDF que aceptamos y servimos INLINE de forma segura. Cualquier
+// otra cosa (svg/html/xml → ejecutan JS al servirse como image/svg+xml) se sirve
+// como octet-stream (descarga), nunca inline ejecutable.
+const SAFE_MIMES = new Set([
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+  'image/bmp', 'image/tiff', 'image/heic', 'image/heif', 'application/pdf',
+]);
+
+function normMime(mime: string): string {
+  return (mime || '').toLowerCase().split(';')[0].trim();
+}
+
+/** true si el mime es un formato de comprobante seguro para servir inline. */
+export function isSafeServeMime(mime: string): boolean {
+  return SAFE_MIMES.has(normMime(mime));
+}
+
+/** Mime de subida claramente peligroso (ejecuta script al servirse). */
+export function isDangerousUploadMime(mime: string): boolean {
+  return /svg|html|xml|javascript|xhtml/i.test(mime || '');
+}
+
+/** Content-Type seguro para /file: si no está en la whitelist, forzamos descarga. */
+export function safeServeContentType(mime: string): string {
+  const m = normMime(mime);
+  return SAFE_MIMES.has(m) ? m : 'application/octet-stream';
+}
+
+/** Resuelve `rel` dentro de DIR o null si escapa (anti path-traversal). */
+function safeFullPath(rel: string): string | null {
+  const root = path.resolve(DIR);
+  const full = path.resolve(DIR, rel);
+  return full === root || full.startsWith(root + path.sep) ? full : null;
+}
+
+/** Sanea un segmento para usar en nombre de archivo (sin separadores ni `..`). */
+function safeSegment(s: string): string {
+  return (s || '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80) || 'x';
+}
+
 const extFromMime = (mime: string): string => {
   const m = (mime || '').toLowerCase();
   if (m.includes('png')) return 'png';
@@ -37,8 +77,9 @@ const extFromMime = (mime: string): string => {
 // si el storage no está configurado (el caller cae a base64).
 export async function saveComprobante(sessionKey: string, buf: Buffer, mime: string): Promise<string | null> {
   if (!storageEnabled()) return null;
-  const rel = path.join('comprobantes', `${sessionKey}-${Date.now()}.${extFromMime(mime)}`);
-  const full = path.join(DIR, rel);
+  const rel = path.join('comprobantes', `${safeSegment(sessionKey)}-${Date.now()}.${extFromMime(mime)}`);
+  const full = safeFullPath(rel);
+  if (!full) return null;
   await fs.mkdir(path.dirname(full), { recursive: true });
   await fs.writeFile(full, buf);
   return rel;
@@ -46,8 +87,9 @@ export async function saveComprobante(sessionKey: string, buf: Buffer, mime: str
 
 export async function saveBrandAvatar(tenantId: string, buf: Buffer, mime: string): Promise<string | null> {
   if (!storageEnabled()) return null;
-  const rel = path.join('brand', `${tenantId}.${extFromMime(mime)}`);
-  const full = path.join(DIR, rel);
+  const rel = path.join('brand', `${safeSegment(tenantId)}.${extFromMime(mime)}`);
+  const full = safeFullPath(rel);
+  if (!full) return null;
   await fs.mkdir(path.dirname(full), { recursive: true });
   await fs.writeFile(full, buf);
   return rel;
