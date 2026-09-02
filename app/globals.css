@@ -422,22 +422,27 @@ input[type='date']:hover::-webkit-calendar-picker-indicator { opacity: 0.9; }
 @media (max-width: 860px) {
   :root { --sidebar-w: 0px; }
   .shell { margin-left: 0; padding: 1.25rem 1rem 4rem; }
+  /* Mobile: la barra ENVUELVE a varias líneas y MUESTRA las etiquetas. Antes era
+     una fila de solo íconos con scroll horizontal poco visible → no se podía
+     encontrar/tocar "Chats" en el celular. Con wrap + labels todo queda a la vista. */
   .sidebar {
     position: sticky; width: auto; inset: auto; flex-direction: row; align-items: center;
-    gap: 0.3rem; padding: 0.6rem 0.8rem; border-right: none; border-bottom: 1px solid var(--border);
-    overflow-x: auto;
+    flex-wrap: wrap; gap: 0.3rem 0.4rem; padding: 0.6rem 0.8rem; border-right: none;
+    border-bottom: 1px solid var(--border); overflow: visible;
   }
-  .sidebar__brand { padding: 0 0.6rem 0 0.2rem; }
+  /* Línea 1: logo (crece) + tema + salir. Línea 2: las pestañas del nav. */
+  .sidebar__brand { padding: 0 0.6rem 0 0.2rem; flex: 1 1 auto; order: 0; }
   .sidebar__mark { width: 30px; height: 30px; border-radius: 9px; }
   .sidebar__tag { display: none; }
-  .sidebar__nav { flex-direction: row; }
-  .sidebar__link { padding: 0.5rem 0.7rem; white-space: nowrap; }
-  .sidebar__link span { display: none; }
-  .sidebar__spacer { margin: 0 0 0 auto; }
+  /* Nav = tabs con etiqueta, envuelven a la línea siguiente si no entran. */
+  .sidebar__nav { flex-direction: row; flex-wrap: wrap; flex: 1 1 100%; gap: 0.3rem 0.4rem; order: 3; }
+  .sidebar__link { padding: 0.5rem 0.8rem; white-space: nowrap; font-size: 0.9rem; }
+  .sidebar__link span { display: inline; }
+  .sidebar__spacer { display: none; }
   .sidebar__status { display: none; }
-  .sidebar__logout { width: auto; padding: 0.5rem 0.6rem; }
+  .sidebar__logout { width: auto; padding: 0.5rem 0.6rem; order: 2; }
   .sidebar__logout span { display: none; }
-  .sidebar__theme { width: auto; padding: 0.5rem 0.6rem; margin: 0 0.3rem 0 0; }
+  .sidebar__theme { width: auto; padding: 0.5rem 0.6rem; margin: 0 0.3rem 0 0; order: 1; }
   .sidebar__theme span { display: none; }
   .kpis { grid-template-columns: repeat(2, 1fr); }
   .grid-2 { grid-template-columns: 1fr; }
