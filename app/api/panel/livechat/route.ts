@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { clientSettings } from '@/db/schema';
 import { getSession } from '@/lib/session';
-import { parseChatConfig } from '@/lib/chat/brand';
+import { parseChatConfig, parseGateCopy } from '@/lib/chat/brand';
 import {
   applyTenantRuntimeOverrides,
   buildConversationPreview,
@@ -84,6 +84,7 @@ export async function PUT(req: NextRequest) {
     panelQuick?: { barPlaceholder?: string; barPresets?: string[] };
     waBtnEnabled?: boolean;
     waBtnUrl?: string;
+    gate?: { title?: string; note?: string; confirm?: string };
   };
 
   // Normaliza el dominio del landing del cliente a un origin https limpio (sin
@@ -124,6 +125,7 @@ export async function PUT(req: NextRequest) {
       : parsePanelQuick(prev.panelQuick),
     waBtnEnabled: typeof body.waBtnEnabled === 'boolean' ? body.waBtnEnabled : prev.waBtnEnabled ?? true,
     waBtnUrl: typeof body.waBtnUrl === 'string' ? body.waBtnUrl.trim() : (prev.waBtnUrl ?? ''),
+    gate: body.gate && typeof body.gate === 'object' ? parseGateCopy(body.gate) : parseGateCopy(prev.gate),
   };
   const [saved] = await db
     .insert(clientSettings)

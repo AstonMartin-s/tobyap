@@ -19,7 +19,8 @@ import {
   type PanelQuickTexts,
 } from '@/lib/chat/templates';
 
-type Brand = { brandName: string; primaryColor: string; avatarUrl: string | null };
+type GateCopy = { title: string; note: string; confirm: string };
+type Brand = { brandName: string; primaryColor: string; avatarUrl: string | null; gate?: GateCopy };
 
 const TABS = [
   { id: 'identidad', label: 'Identidad' },
@@ -186,6 +187,7 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
           landingDomain,
           templates: runtime.templates,
           panelQuick,
+          gate: brand.gate,
           waBtnEnabled,
           waBtnUrl: waBtnUrl.trim() || undefined,
         }),
@@ -300,6 +302,23 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
               <input className="input" value={brand.avatarUrl ?? ''} onChange={(e) => setBrand({ ...brand, avatarUrl: e.target.value || null })} placeholder="https://… o subí un archivo" style={{ maxWidth: 400 }} />
               <input type="file" accept="image/*" disabled={busy} onChange={(e) => onFile(e.target.files?.[0] ?? null)} style={{ marginTop: 8, fontSize: '.8rem', display: 'block' }} />
             </div>
+
+            <div className="card__title" style={{ marginTop: 22 }}>Formulario de inicio (lo primero que ve el lead)</div>
+            <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '0 0 10px' }}>
+              Personalizá los textos del formulario donde el lead deja su número. Dejalos vacíos para usar el texto por defecto de tu {isTienda ? 'tienda' : 'negocio'}.
+            </p>
+            {([
+              { key: 'title' as const, label: 'Título', ph: isTienda ? 'Dejanos tu número para coordinar tu compra y enviarte el producto' : 'Dejanos tu número para crear tu usuario y darte tu bonificación' },
+              { key: 'note' as const, label: 'Aviso de atención', ph: isTienda ? '🤖 La atención es automática, pero hay personas detrás. Pedí por Soporte cuando quieras 🙌' : '🤖 La atención para crear tu usuario es automática, pero hay personas detrás…' },
+              { key: 'confirm' as const, label: 'Confirmación de número', ph: isTienda ? 'Confirmo que este es mi número. Si no lo es, no podré recibir mi compra.' : 'Confirmo que este es mi número. Si no lo es, no podré recibir mi bonificación.' },
+            ]).map((f) => (
+              <div className="field" key={f.key}>
+                <label>{f.label}</label>
+                <textarea className="input" rows={2} value={brand.gate?.[f.key] ?? ''}
+                  onChange={(e) => setBrand({ ...brand, gate: { title: '', note: '', confirm: '', ...brand.gate, [f.key]: e.target.value } })}
+                  placeholder={f.ph} style={{ maxWidth: 520, resize: 'vertical' }} />
+              </div>
+            ))}
           </section>
         )}
 

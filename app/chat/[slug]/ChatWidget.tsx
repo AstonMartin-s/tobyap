@@ -61,7 +61,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   const fileRef = useRef<HTMLInputElement>(null);
   const pollBase = useRef<number | null>(null);
   const autoPromptedRef = useRef(false); // instalador nativo auto-disparado — solo 1 vez
-  const [skin, setSkin] = useState({ brand, primaryColor, avatarUrl });
+  const [skin, setSkin] = useState<{ brand: string; primaryColor?: string; avatarUrl?: string | null; gate?: { title: string; note: string; confirm: string } }>({ brand, primaryColor, avatarUrl });
   const [waBtn, setWaBtn] = useState<{ enabled: boolean; url: string }>({ enabled: false, url: '' });
   const [niche, setNiche] = useState<'circo' | 'tienda'>('circo');
   const [assignedWa, setAssignedWa] = useState<string | null>(null); // cajero sticky
@@ -74,7 +74,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
       .then((r) => r.json())
       .then((d) => {
         if (!d?.brand) return;
-        setSkin({ brand: d.brand.brandName, primaryColor: d.brand.primaryColor, avatarUrl: d.brand.avatarUrl });
+        setSkin({ brand: d.brand.brandName, primaryColor: d.brand.primaryColor, avatarUrl: d.brand.avatarUrl, gate: d.brand.gate });
         if (d.brand.brandName) document.title = `${d.brand.brandName} — Soporte`;
         if (d.waBtn) setWaBtn(d.waBtn);
         if (d.niche === 'tienda' || d.niche === 'circo') setNiche(d.niche);
@@ -671,12 +671,14 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
               )}
               <div style={{ fontWeight: 700, fontSize: 18, color: '#111827' }}>{skin.brand}</div>
             </div>
-            <p style={{ color: '#54656F', fontSize: 14, margin: '4px 0 16px' }}>{niche === 'tienda' ? 'Dejanos tu número para coordinar tu compra y enviarte el producto' : 'Dejanos tu número para crear tu usuario y darte tu bonificación'}</p>
+            <p style={{ color: '#54656F', fontSize: 14, margin: '4px 0 16px' }}>{skin.gate?.title || (niche === 'tienda' ? 'Dejanos tu número para coordinar tu compra y enviarte el producto' : 'Dejanos tu número para crear tu usuario y darte tu bonificación')}</p>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre o apodo" style={inputStyle} />
             <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="Tu WhatsApp (ej: 11 2345 6789)" style={inputStyle} />
             <div style={{ background: '#F0F7F4', border: '1px solid #cfe6dc', borderRadius: 10, padding: '11px 12px', margin: '4px 0 12px' }}>
               <p style={{ fontSize: 13, lineHeight: 1.45, color: '#1b3a30', margin: 0 }}>
-                {niche === 'tienda' ? (
+                {skin.gate?.note ? (
+                  skin.gate.note
+                ) : niche === 'tienda' ? (
                   <>🤖 La atención es <b>automática</b>, pero quedate tranquilo: <b>hay personas detrás</b> pendientes por si necesitás algo. Cuando quieras, pedí por <b>Soporte</b> y te atendemos 🙌</>
                 ) : (
                   <>🤖 La atención para crear tu usuario es <b>automática</b>, pero quedate tranquilo: <b> hay personas detrás</b> pendientes por si necesitás algo. Cuando quieras, pedí por <b>Soporte</b> y te atendemos 🙌</>
@@ -689,7 +691,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
             </div>
             <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, color: '#111827', margin: '6px 0 14px', cursor: 'pointer' }}>
               <input type="checkbox" checked={accept} onChange={(e) => setAccept(e.target.checked)} style={{ marginTop: 2 }} />
-              <span>{niche === 'tienda' ? <>Confirmo que este es <b>mi número</b>. Si no lo es, no podré recibir mi compra.</> : <>Confirmo que este es <b>mi número</b>. Si no lo es, no podré recibir mi bonificación.</>}</span>
+              <span>{skin.gate?.confirm ? skin.gate.confirm : niche === 'tienda' ? <>Confirmo que este es <b>mi número</b>. Si no lo es, no podré recibir mi compra.</> : <>Confirmo que este es <b>mi número</b>. Si no lo es, no podré recibir mi bonificación.</>}</span>
             </label>
             {formErr && <div style={{ color: '#C0392B', fontSize: 13, marginBottom: 10 }}>{formErr}</div>}
             <button onClick={start} disabled={starting} style={{ width: '100%', background: C.send, color: '#fff', border: 'none', borderRadius: 24, padding: '13px', fontSize: 16, fontWeight: 600, cursor: 'pointer', opacity: starting ? 0.7 : 1 }}>{starting ? 'Verificando…' : 'Comenzar'}</button>
