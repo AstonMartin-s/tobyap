@@ -155,7 +155,10 @@ export async function accountStep(
   let acc;
   try {
     acc = await createPortalAccount(tenant, { phone: session.phone, name: portalName });
-  } catch {
+  } catch (e) {
+    // Logueamos para poder RASTREAR qué cliente falla y por qué (antes el error se
+    // tragaba y solo veíamos "Uy, tuve un problemita" sin causa).
+    console.error(`[accountStep pagoda] tenant=${tenant.slug} phone=${session.phone}: ${(e as Error).message}`);
     return {
       messages: [{ from: 'bot', delayMs: 1200, at: now(), text: renderTemplate('account_error', cfg) }],
       buttons: [], data: { credsError: true }, step: 'error',
@@ -246,6 +249,8 @@ async function accountStepKingApi(
       // Solo reintentamos si parece "username tomado"; otro error corta.
       const taken = e instanceof KingApiError && /exist|tomad|ya\s|duplicad|taken/i.test(e.message);
       if (!taken || attempt === maxAttempts - 1) {
+        // Logueamos la causa real (King API) para rastrear qué cliente falla.
+        console.error(`[accountStep king] tenant=${tenant.slug} phone=${session.phone} attempt=${attempt}: ${(e as Error).message}`);
         return {
           messages: [{ from: 'bot', delayMs: 1200, at: now(), text: renderTemplate('account_error', cfg) }],
           buttons: [], data: { credsError: true }, step: 'error',
