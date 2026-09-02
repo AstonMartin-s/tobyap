@@ -90,6 +90,11 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
   // El generador de link debe usar la landing REAL, no un slug hardcodeado.
   const [chatLandings, setChatLandings] = useState<Array<{ id: string; landingSlug: string | null; name: string | null }>>([]);
   const [selLandingId, setSelLandingId] = useState('');
+  const [niche, setNiche] = useState<'circo' | 'tienda'>('circo');
+  const isTienda = niche === 'tienda';
+  // Tienda: solo Identidad + Vista previa (Oferta/Links/Guion son de circo; la
+  // venta se configura en Producto).
+  const visibleTabs = TABS.filter((t) => (isTienda ? t.id === 'identidad' || t.id === 'preview' : true));
 
   function templateVal(id: MessageTemplateId): string {
     return runtime.templates?.[id] ?? DEFAULT_TEMPLATES[id];
@@ -116,9 +121,21 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
   const preview = useMemo(() => buildConversationPreview(runtime, 'Martín'), [runtime]);
 
   useEffect(() => {
+    fetch('/api/panel/features')
+      .then((r) => r.json())
+      .then((d) => { if (d?.niche === 'tienda' || d?.niche === 'circo') setNiche(d.niche); })
+      .catch(() => { /* mantiene circo */ });
+  }, []);
+
+  // Si el tab activo dejó de ser visible (ej. tienda oculta Oferta/Links/Guion), cae a Identidad.
+  useEffect(() => {
+    if (!visibleTabs.some((t) => t.id === tab)) setTab('identidad');
+  }, [visibleTabs, tab]);
+
+  useEffect(() => {
     try {
       const p = new URL(window.location.href).searchParams.get('tab');
-      if (p === 'guion' || p === 'mensajes') setTab('guion');
+      if ((p === 'guion' || p === 'mensajes') && !isTienda) setTab('guion');
     } catch { /* ignore */ }
     fetch('/api/panel/livechat')
       .then((r) => r.json())
@@ -227,7 +244,7 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem', marginBottom: '.9rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'inline-flex', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 8, padding: 3, gap: 2 }}>
-          {TABS.map((t) => {
+          {visibleTabs.map((t) => {
             const active = tab === t.id;
             return (
               <button key={t.id} onClick={() => setTab(t.id)}
@@ -537,13 +554,15 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
                   onChange={(e) => setLandingDomain(e.target.value.trim())}
                   placeholder="bblack.fichaslibres.online" style={{ fontSize: '.82rem' }} />
               </div>
-              <div className="grid-2">
-                <div className="field">
-                  <label>Bono</label>
-                  <select className="input" value={linkBono} onChange={(e) => setLinkBono(e.target.value)}>
-                    {BONO_LINK_OPTS.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
-                  </select>
-                </div>
+              <div className={isTienda ? '' : 'grid-2'}>
+                {!isTienda && (
+                  <div className="field">
+                    <label>Bono</label>
+                    <select className="input" value={linkBono} onChange={(e) => setLinkBono(e.target.value)}>
+                      {BONO_LINK_OPTS.map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div className="field">
                   <label>Campaign ID <span style={{ color: 'var(--muted)', fontSize: '.72rem' }}>(letras/números)</span></label>
                   <input className="input" value={linkCampaign}

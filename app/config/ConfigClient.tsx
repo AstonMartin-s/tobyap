@@ -17,22 +17,112 @@ async function j(url: string, opts?: RequestInit) {
 }
 
 export function ConfigClient() {
+  const [niche, setNiche] = useState<'circo' | 'tienda'>('circo');
+  useEffect(() => {
+    j('/api/panel/features')
+      .then((d) => { if (d?.niche === 'tienda' || d?.niche === 'circo') setNiche(d.niche); })
+      .catch(() => {});
+  }, []);
+  const isTienda = niche === 'tienda';
+
   return (
     <>
       <div className="page-head">
         <div className="page-head__text">
           <h1>Configuración</h1>
-          <p>Gestioná los datos de tu cuenta, números y reglas del CRM.</p>
+          <p>{isTienda ? 'Gestioná los datos de tu cuenta, píxel y eventos de conversión.' : 'Gestioná los datos de tu cuenta, números y reglas del CRM.'}</p>
         </div>
       </div>
       <SettingsSection />
-      <LiberadorSection />
-      <AffiliateWebhookSection />
+      <MetaSection />
+      {/* Circo: liberador de fichas + webhook de afiliados. No aplica a tienda. */}
+      {!isTienda && <LiberadorSection />}
+      {!isTienda && <AffiliateWebhookSection />}
       <LandingsSection />
-      <NumbersSection />
-      <StatusSection />
-      <RulesSection />
+      {/* Números (cajeros) y estados/reglas de Kommo son de circo. */}
+      {!isTienda && <NumbersSection />}
+      {!isTienda && <StatusSection />}
+      {!isTienda && <RulesSection />}
     </>
+  );
+}
+
+// -------------------- Meta (Pixel + CAPI) --------------------
+function MetaSection() {
+  const [pixelId, setPixelId] = useState('');
+  const [token, setToken] = useState('');
+  const [hasToken, setHasToken] = useState(false);
+  const [events, setEvents] = useState<{ conversation: string; conversion: string } | null>(null);
+  const [niche, setNiche] = useState<'circo' | 'tienda'>('circo');
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    j('/api/panel/meta').then((d) => {
+      setPixelId(d.pixelId ?? '');
+      setHasToken(!!d.hasToken);
+      setEvents(d.events ?? null);
+      if (d.niche === 'tienda' || d.niche === 'circo') setNiche(d.niche);
+    }).catch(() => {});
+  }, []);
+
+  async function save() {
+    setBusy(true); setMsg('Guardando…');
+    try {
+      await j('/api/panel/meta', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pixelId: pixelId.trim(), capiToken: token.trim() || undefined }),
+      });
+      setMsg('✓ Guardado');
+      if (token.trim()) { setHasToken(true); setToken(''); }
+      setTimeout(() => setMsg(''), 2500);
+    } catch (e) {
+      setMsg('Error: ' + (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card">
+      <div className="card__title"><span className="ico">📊</span> Meta (Pixel + API de Conversiones)</div>
+      <p style={{ color: 'var(--muted)', fontSize: '.82rem', margin: '0 0 .6rem' }}>
+        Píxel y token de la API de Conversiones (CAPI) para trackear los eventos hacia Meta.
+        El token es secreto: se guarda cifrado y nunca se muestra de vuelta.
+      </p>
+      <div className="grid-2">
+        <div className="field">
+          <label>Pixel ID</label>
+          <input className="input" value={pixelId} onChange={(e) => setPixelId(e.target.value.replace(/[^\d]/g, ''))} placeholder="Ej: 901614269074086" />
+        </div>
+        <div className="field">
+          <label>Token CAPI {hasToken && <span style={{ color: 'var(--muted)', fontSize: '.72rem' }}>(ya hay uno guardado; dejá vacío para no cambiarlo)</span>}</label>
+          <input className="input" type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder={hasToken ? '•••••••• (guardado)' : 'EAAG...'} />
+        </div>
+      </div>
+
+      {events && (
+        <div style={{ marginTop: '.6rem', padding: '.6rem .7rem', borderRadius: 8, background: 'var(--blue-soft)', border: '1px solid var(--border)', fontSize: '.8rem' }}>
+          <div style={{ fontWeight: 600, marginBottom: '.35rem' }}>Eventos que se envían a Meta</div>
+          <div style={{ color: 'var(--muted)' }}>
+            {niche === 'tienda' ? 'Inicio de conversación' : 'Conversación'}: <b style={{ color: 'var(--text)' }}>{events.conversation}</b>
+            {' · '}
+            {niche === 'tienda' ? 'Compra / conversión' : 'Cargo'}: <b style={{ color: 'var(--text)' }}>{events.conversion}</b>
+          </div>
+          {niche === 'tienda' && (
+            <div style={{ color: 'var(--muted)', marginTop: '.35rem', fontSize: '.74rem' }}>
+              Eventos estándar de Meta (para maximizar conversaciones y luego conversión de la compra).
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="row" style={{ marginTop: '.6rem', alignItems: 'center' }}>
+        <button className="btn" onClick={save} disabled={busy}>Guardar</button>
+        {msg && <span style={{ fontSize: '.82rem', color: msg.startsWith('Error') ? 'var(--danger)' : 'var(--accent)' }}>{msg}</span>}
+      </div>
+    </section>
   );
 }
 

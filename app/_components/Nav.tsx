@@ -153,9 +153,14 @@ export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?:
           <>
             {feat.reportes && (pr === 'supervisor' || pr === 'admin') && NavLink('/reportes', 'Reportes', I.report)}
             {NavLink('/chats', 'Chats web', I.chat)}
-            {/* Tienda: Producto (matriz editable). Circo: Embudo (Kommo) + Ajustes chat. */}
+            {/* Tienda: Producto (matriz) + Ajustes chat (identidad). Circo: Embudo (Kommo) + Ajustes chat. */}
             {isTienda
-              ? (pr === 'supervisor' || pr === 'admin') && NavLink('/producto', 'Producto', I.product)
+              ? (
+                <>
+                  {(pr === 'supervisor' || pr === 'admin') && NavLink('/producto', 'Producto', I.product)}
+                  {feat.livechat && (pr === 'supervisor' || pr === 'admin') && NavLink('/livechat', 'Ajustes chat', I.live)}
+                </>
+              )
               : (
                 <>
                   {feat.embudo && (pr === 'supervisor' || pr === 'admin') && NavLink('/embudo', 'Embudo', I.funnel)}

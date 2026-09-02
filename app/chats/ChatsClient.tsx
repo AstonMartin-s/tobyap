@@ -220,6 +220,8 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   }
   const [toast, setToast] = useState<string | null>(null);
   const [panelQuick, setPanelQuick] = useState<PanelQuickTexts>({ barPresets: [] });
+  const [niche, setNiche] = useState<'circo' | 'tienda'>('circo');
+  const isTienda = niche === 'tienda';
   const bodyRef = useRef<HTMLDivElement>(null);
   // Autoscroll SOLO si el operador ya está al fondo (o abrió otro chat). Si está
   // leyendo hacia arriba, el poll no lo debe arrastrar hacia abajo.
@@ -342,6 +344,13 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
         });
       })
       .catch(() => { /* sin config */ });
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/panel/features')
+      .then((r) => r.json())
+      .then((d) => { if (d?.niche === 'tienda' || d?.niche === 'circo') setNiche(d.niche); })
+      .catch(() => { /* mantiene circo */ });
   }, []);
 
   useEffect(() => { loadList(); const t = setInterval(loadList, 8000); return () => clearInterval(t); }, [loadList]);
@@ -976,7 +985,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                 return (
                   <>
                     <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <Link href="/livechat?tab=guion" className="tt tt--down tt--down-left" data-tt="Ajustes de chat → Guion"
+                      <Link href={isTienda ? '/producto' : '/livechat?tab=guion'} className="tt tt--down tt--down-left" data-tt={isTienda ? 'Producto → matriz de venta' : 'Ajustes de chat → Guion'}
                         style={{
                           fontSize: '.6rem', fontWeight: 700, color: 'var(--accent,#7c5cff)', textTransform: 'uppercase',
                           letterSpacing: '.04em', marginRight: '.15rem', textDecoration: 'none', padding: '.2rem .35rem',
@@ -984,15 +993,16 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                         }}>
                         Editar
                       </Link>
-                      <button className="tt tt--down" data-tt="Comprobante válido → acredita y pasa a Cargo$ (dispara la conversión a Meta)" disabled={busy} onClick={() => act('approve')} style={opStyle('#16a34a', true)}>{ICONS.approve} Aprobar</button>
+                      <button className="tt tt--down" data-tt={isTienda ? 'Pago válido → entrega el producto y dispara la conversión (Purchase) a Meta' : 'Comprobante válido → acredita y pasa a Cargo$ (dispara la conversión a Meta)'} disabled={busy} onClick={() => act('approve')} style={opStyle('#16a34a', true)}>{ICONS.approve} {isTienda ? 'Liberar producto' : 'Aprobar'}</button>
                       <button className="tt tt--down" data-tt="En revisión — le avisa que estamos validando" disabled={busy} onClick={() => act('pending')} style={opStyle()}>{ICONS.pending} Pendiente</button>
                       <button className="tt tt--down" data-tt="Comprobante ilegible/incompleto — le pide reenviarlo" disabled={busy} onClick={() => act('reject')} style={opStyle('#f59e0b')}>{ICONS.reject} Erróneo</button>
-                      <button className="tt tt--down" data-tt="No depositó — lo pasa a No Cargo (sale de atención)" disabled={busy} onClick={() => act('set_step', undefined, 'no_cargo')} style={opStyle('#ef4444')}>{ICONS.noCargo} No cargó</button>
+                      <button className="tt tt--down" data-tt={isTienda ? 'No compró — lo saca de atención' : 'No depositó — lo pasa a No Cargo (sale de atención)'} disabled={busy} onClick={() => act('set_step', undefined, 'no_cargo')} style={opStyle('#ef4444')}>{ICONS.noCargo} {isTienda ? 'No compró' : 'No cargó'}</button>
                       <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 .1rem' }} />
                       <button className="tt tt--down" data-tt="Le pasa el WhatsApp de soporte (walink)" disabled={busy} onClick={() => act('support')} style={opStyle()}>{ICONS.support} Soporte</button>
-                      <button className="tt tt--down" data-tt="Le manda cómo cargar saldo" disabled={busy} onClick={() => act('deposit')} style={opStyle()}>{ICONS.deposit} Cargar</button>
-                      <button className="tt tt--down" data-tt="Le manda cómo retirar" disabled={busy} onClick={() => act('withdraw')} style={opStyle()}>{ICONS.withdraw} Retirar</button>
-                      <button className="tt tt--down" data-tt="Le reenvía usuario y contraseña" disabled={busy} onClick={() => act('forgot_user')} style={opStyle()}>{ICONS.datos} Datos</button>
+                      {/* Cargar / Retirar / Datos son de circo (portal de fichas). */}
+                      {!isTienda && <button className="tt tt--down" data-tt="Le manda cómo cargar saldo" disabled={busy} onClick={() => act('deposit')} style={opStyle()}>{ICONS.deposit} Cargar</button>}
+                      {!isTienda && <button className="tt tt--down" data-tt="Le manda cómo retirar" disabled={busy} onClick={() => act('withdraw')} style={opStyle()}>{ICONS.withdraw} Retirar</button>}
+                      {!isTienda && <button className="tt tt--down" data-tt="Le reenvía usuario y contraseña" disabled={busy} onClick={() => act('forgot_user')} style={opStyle()}>{ICONS.datos} Datos</button>}
                       <button className="tt tt--down tt--right" data-tt={isArch ? 'Volver a la bandeja' : 'Sacar de la bandeja; vuelve solo si el cliente escribe'} disabled={busy} onClick={() => act(isArch ? 'unarchive' : 'archive')} style={opStyle()}>{isArch ? ICONS.unarchive : ICONS.archive}{isArch ? ' Desarch.' : ' Archivar'}</button>
                     </div>
                   </>
