@@ -130,8 +130,14 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         pollBase.current = d.total;
         setStep(d.step ?? 'done');
         if (d.assignedWa) setAssignedWa(String(d.assignedWa));
-        if (d.step === 'welcome') setButtons([{ id: 'want_account', label: 'Quiero mi cuenta' }]);
-        else if (d.step === 'credenciales') setButtons([{ id: 'want_cbu', label: 'Quiero el CBU' }]);
+        if (d.step === 'welcome') {
+          // King/Paradise muestran el 2º botón "Hablar con un agente" también al
+          // reconectar (el start ya lo devuelve; esto es el fallback del resume).
+          const welcomeBtns = ['king', 'paradise'].includes(slug)
+            ? [{ id: 'want_account', label: 'Quiero mi cuenta 🎁' }, { id: 'want_agent', label: 'Hablar con un agente 🧑‍💼' }]
+            : [{ id: 'want_account', label: 'Quiero mi cuenta' }];
+          setButtons(welcomeBtns);
+        } else if (d.step === 'credenciales') setButtons([{ id: 'want_cbu', label: 'Quiero el CBU' }]);
       } catch { /* sin resume */ }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

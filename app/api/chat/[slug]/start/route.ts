@@ -5,7 +5,7 @@ import { db } from '@/db';
 import { chatSessions, metaEvents, attributions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { checkWhatsApp } from '@/lib/chat/wachecker';
-import { welcomeStep, type Btn } from '@/lib/chat/flow';
+import { welcomeStep, welcomeButtons, hasAgentButton, type Btn } from '@/lib/chat/flow';
 import { welcomeStepTienda, productButtons } from '@/lib/chat/flows/tienda';
 import { loadTiendaConfig } from '@/lib/chat/loadTienda';
 import { prepareBotBatch } from '@/lib/chat/stagger';
@@ -40,12 +40,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // Nicho: TIENDA usa un guion propio (producto/pago/comprobante), sin cuenta/CBU.
   const isTienda = tenant.niche === 'tienda';
   const tiendaCfg = isTienda ? await loadTiendaConfig(tenant.id, tenant.name) : null;
+  // King/Paradise: 2º botón "Hablar con un agente" en el welcome.
+  const agentBtn = hasAgentButton(tenant.slug);
   const buildWelcome = (name?: string | null): { messages: ReturnType<typeof welcomeStep>['messages']; buttons: Btn[] } =>
-    isTienda ? welcomeStepTienda(name, tiendaCfg!) : welcomeStep(name, runtime);
+    isTienda ? welcomeStepTienda(name, tiendaCfg!) : welcomeStep(name, runtime, { agentButton: agentBtn });
   const buttonsForStep = (step: string): Btn[] => {
     if (isTienda) return step === 'welcome' ? productButtons(tiendaCfg!) : [];
     return step === 'welcome'
-      ? [{ id: 'want_account', label: 'Quiero mi cuenta 🎁' }]
+      ? welcomeButtons(agentBtn)
       : step === 'credenciales'
         ? [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }]
         : [];

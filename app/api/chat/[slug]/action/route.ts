@@ -7,6 +7,7 @@ import { accountStep, cbuStep, postActionMessages, comprobanteReviewMessages } f
 import { BUY_ACTION_PREFIX, productStepTienda, comprobanteReviewTienda, onFreeTextTienda } from '@/lib/chat/flows/tienda';
 import { loadTiendaConfig } from '@/lib/chat/loadTienda';
 import { prepareBotBatch } from '@/lib/chat/stagger';
+import { appendChatMessages } from '@/lib/chat/mutations';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadFields, updateLeadName, addLeadTags, updateLeadStatus } from '@/lib/kommo';
@@ -83,6 +84,47 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       addLeadNote(tenant, s.kommoLeadId, `👤 Usuario Pagoda ${r.data.existing ? '(existente, recordado)' : 'creado'}: ${r.data.username}`);
     }
     return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length });
+  }
+
+  // "Hablar con un agente" (King/Paradise): crea IGUAL la cuenta por emergencia
+  // (para que vaya probando) y además marca la sesión para atención humana → cae
+  // en "Atención" del panel (markUnread) y mueve el lead a Atención manual en Kommo.
+  if (b.action === 'want_agent') {
+    const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name }, runtime);
+    const botMsgs = prepareBotBatch(r.messages);
+    const handoff = {
+      from: 'bot' as const,
+      delayMs: 900,
+      at: Date.now(),
+      text: '🙌 Listo, te dejé tu cuenta creada para que vayas probando la plataforma. En unos segundos un agente te escribe por acá para ayudarte 👇',
+    };
+    const userTap = label ? [{ from: 'user' as const, text: label, at: Date.now() }] : [];
+    await appendChatMessages(s.id, [...userTap, ...botMsgs, handoff], {
+      step: r.step,
+      dataMerge: { ...r.data, requestedAgent: true },
+      markUnread: true,
+    });
+    // Espejo Kommo: mismos campos PORTAL_* que want_account + mover a Atención manual.
+    if (s.kommoLeadId && r.data.username) {
+      const fields: Array<{ fieldId: number; value: string }> = [];
+      const uF = tenant.customFields['portal_url_field'];
+      const usF = tenant.customFields['portal_user_field'];
+      const pF = tenant.customFields['portal_pass_field'];
+      if (uF && r.data.loginUrl) fields.push({ fieldId: uF, value: String(r.data.loginUrl) });
+      if (usF) fields.push({ fieldId: usF, value: String(r.data.username) });
+      if (pF && r.data.password) fields.push({ fieldId: pF, value: String(r.data.password) });
+      if (fields.length) updateLeadFields(tenant, s.kommoLeadId, fields).catch(() => {});
+      updateLeadName(tenant, s.kommoLeadId, String(r.data.username)).catch(() => {});
+      addLeadNote(tenant, s.kommoLeadId, `🧑‍💼 El cliente pidió HABLAR CON UN AGENTE desde el chat. Usuario ${r.data.existing ? '(existente, recordado)' : 'creado'}: ${r.data.username}`);
+      addLeadTags(tenant, s.kommoLeadId, ['Atención agente']).catch(() => {});
+      const clientesPipe = tenant.customFields['clientes_pipeline'];
+      const atencionManual = tenant.customFields['status_atencion_manual'];
+      if (clientesPipe && atencionManual) {
+        updateLeadStatus(tenant, s.kommoLeadId, atencionManual, clientesPipe).catch(() => {});
+      }
+    }
+    const total = (s.messages?.length ?? 0) + botMsgs.length + 1;
+    return NextResponse.json({ ok: true, messages: [...botMsgs, handoff], buttons: r.buttons, step: r.step, total });
   }
 
   if (b.action === 'want_cbu') {
