@@ -8,7 +8,7 @@
 
 ```
 Anuncio Meta → NUESTRA landing (capta fbclid + dispara pixel, genera <code>)
-            → https://t.me/candywinvip_bot?start=<code>
+            → https://t.me/candywinvip_bot?start=ref_CW211_<code>
             → el usuario usa el bot / su plataforma
             → su plataforma nos POSTea el webhook por <code>
             → nosotros disparamos el evento a Meta (CAPI)
@@ -16,8 +16,9 @@ Anuncio Meta → NUESTRA landing (capta fbclid + dispara pixel, genera <code>)
 
 El `<code>` es un sub-id único por click/usuario (afiliados Telegram → prefijo `TG`,
 formato `TG` + 6 chars alfanuméricos en mayúsculas, largo fijo 8, ej. `TGAB3K9X`;
-regex `TG[A-HJ-NP-Z2-9]{6}`, alfabeto sin I/O/0/1). Si lo separan de su cuenta con
-guión bajo (`BMSHOP_TGAB3K9X`) también sirve: extraemos el `TGxxxxxx` por regex.
+regex `TG[A-HJ-NP-Z2-9]{6}`, alfabeto sin I/O/0/1). El `start` del bot Candywin
+lleva prefijo de referidos: `ref_CW211_<code>` (ej. `ref_CW211_TGAB3K9X`).
+Si lo envuelven (`CW211_TGAB3K9X`, `ref_CW211_TGAB3K9X`) extraemos el `TGxxxxxx` por regex.
 Es lo que nos permite atar cada conversión a su `fbclid`/campaña. **El bot es caja
 negra: no le pegamos nada; toda la señal a Meta vive de nuestro lado.**
 

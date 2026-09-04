@@ -101,6 +101,7 @@ export default async function NamedLanding({
     redirectUrl: c.redirectUrl != null && String(c.redirectUrl).trim() !== '' ? String(c.redirectUrl) : null,
     // Si tiene telegramBot, redirige a t.me/<bot>?start=<code> (afiliados Telegram).
     telegramBot: c.telegramBot != null && String(c.telegramBot).trim() !== '' ? String(c.telegramBot) : null,
+    telegramStartPrefix: c.telegramStartPrefix != null && String(c.telegramStartPrefix).trim() !== '' ? String(c.telegramStartPrefix) : null,
     noCode: c.noCode === true || lp.type === 'soporte',
   };
 

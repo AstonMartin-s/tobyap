@@ -421,7 +421,7 @@ function NumbersSection() {
 interface Landing { id: string; landingSlug: string | null; name: string | null; type: string | null; active: boolean | null; config: Record<string, string | number | null> | null }
 const LANDING_TYPES = ['publi', 'regular', 'spam', 'remarketing', 'soporte'];
 
-const emptyForm = { landingSlug: '', name: '', type: 'publi', brandName: '', logoUrl: '', primaryColor: '#25d366', waNumber: '', message: '', ccpp: '', campaign: '', destination: 'whatsapp', telegramBot: '' };
+const emptyForm = { landingSlug: '', name: '', type: 'publi', brandName: '', logoUrl: '', primaryColor: '#25d366', waNumber: '', message: '', ccpp: '', campaign: '', destination: 'whatsapp', telegramBot: '', telegramStartPrefix: '' };
 const cfgStr = (c: Landing['config'], k: string) => (c && c[k] != null ? String(c[k]) : '');
 
 function LandingsSection() {
@@ -477,6 +477,7 @@ function LandingsSection() {
       waNumber: cfgStr(l.config, 'waNumber'), message: cfgStr(l.config, 'message'), ccpp: cfgStr(l.config, 'ccpp'), campaign: cfgStr(l.config, 'campaign'),
       destination: cfgStr(l.config, 'chatSlug') ? 'livechat' : cfgStr(l.config, 'telegramBot') ? 'telegram' : 'whatsapp',
       telegramBot: cfgStr(l.config, 'telegramBot'),
+      telegramStartPrefix: cfgStr(l.config, 'telegramStartPrefix'),
     });
     setOpen(true);
   }
@@ -489,6 +490,7 @@ function LandingsSection() {
       // whatsapp → rotación de números. Solo uno queda seteado a la vez.
       chatSlug: n.destination === 'livechat' ? slug : '',
       telegramBot: n.destination === 'telegram' ? n.telegramBot.trim().replace(/^@/, '') : '',
+      telegramStartPrefix: n.destination === 'telegram' ? n.telegramStartPrefix.trim().replace(/[^A-Za-z0-9_]/g, '') : '',
     };
     try {
       if (editId) {
@@ -533,7 +535,10 @@ function LandingsSection() {
             {n.destination === 'livechat' ? (
               <div className="field"><label>Destino livechat</label><div className="input" style={{ display: 'flex', alignItems: 'center', color: 'var(--muted)', fontSize: '.82rem' }}>Redirige al chat web <b style={{ margin: '0 .3rem', color: 'var(--text)' }}>/chat/{slug}</b></div></div>
             ) : n.destination === 'telegram' ? (
-              <div className="field"><label>Bot de Telegram (usuario, sin @)</label><input className="input" value={n.telegramBot} onChange={(e) => setN({ ...n, telegramBot: e.target.value })} placeholder="MiBonoBot" /></div>
+              <>
+                <div className="field"><label>Bot de Telegram (usuario, sin @)</label><input className="input" value={n.telegramBot} onChange={(e) => setN({ ...n, telegramBot: e.target.value })} placeholder="MiBonoBot" /></div>
+                <div className="field"><label>Prefijo start (opcional)</label><input className="input" value={n.telegramStartPrefix} onChange={(e) => setN({ ...n, telegramStartPrefix: e.target.value })} placeholder="ref_CW211_" /></div>
+              </>
             ) : (
               <div className="field"><label>WhatsApp (con código país)</label><input className="input" value={n.waNumber} onChange={(e) => setN({ ...n, waNumber: e.target.value })} placeholder="5491155550000" /></div>
             )}

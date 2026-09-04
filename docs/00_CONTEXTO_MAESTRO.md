@@ -6,6 +6,25 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-04 — candywin: start de referidos `ref_CW211_<code>`
+
+- El bot no toma el `?start=` pelado. Formato de ellos: `t.me/candywinvip_bot?start=ref_CW211_TG22Y4RK`.
+- Landing: `telegramStartPrefix` (config por landing). Candywin = `ref_CW211_`. `parseLeadId` ya extrae el `TG…` del webhook.
+
+## Bitácora 2026-09-04 — candywin: HMAC del cliente + smoke webhook
+
+- Candywin habilitó POST a `/api/webhooks/affiliate/candywin` (firma `X-Signature` HMAC-SHA256). Rotamos el secreto cifrado del tenant al que ellos mandaron (el anterior no coincidía).
+- Smoke prod: HMAC mala → 401; HMAC ok + lead desconocido → `200 unmatched`; `CW211_TGM8KAAP` (code real de landing) → `200 ConversacionCRMA6`. Bearer con el mismo secreto también entra.
+- Contrato intacto: `lead_id` puede venir `CW211_<TGxxxxxx>`; extraemos el `TG…` por regex. Sin deploy.
+
+## Bitácora 2026-09-04 — KingCba: rotación Kommo + login panel
+
+- Tenant `kingplay` (KingCba): token nuevo ya estaba en DB pero el subdomain seguía en la cuenta vieja → Kommo 401.
+- DB: subdomain + pipeline a la cuenta nueva; email/pass Kommo cifrados; login panel rotado (legacy `tenants.panel_user` + `panel_users` admin).
+- Heal: campos `ad_code` / `CBU` / `TITULAR` + etapas TOBYAP en el embudo nuevo; mapeo `status_*` + utm/fbclid de la cuenta nueva.
+- Webhook Kommo ya apuntaba a `/api/webhooks/kommo/kingplay` (sin tocarlo).
+- Sin deploy (solo DB). Sin secretos en git.
+
 ## Bitácora 2026-09-03 — bblack: promo cajera ignoraba el Guion
 
 - Síntoma (Cliente A3): Guardar en Ajustes → Guion → "Promo cajera (2° mensaje)" no cambiaba el chat. Seguía el texto viejo "captura de tu **carga**" en vez de "captura de que **agendaste su número**".
