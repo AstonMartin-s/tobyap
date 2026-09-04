@@ -33,9 +33,9 @@ type Msg = { from: 'bot' | 'user'; text?: string; image?: string; at: number; op
 
 // GET /api/panel/chats  → lista de sesiones del tenant logueado (panel operador).
 // Por defecto devuelve las 200 más recientes (Inbox de trabajo). Las pestañas
-// terminales (Acreditados / No cargó / Archivadas) son estados viejos que caen
-// fuera de esas 200, así que se piden aparte con ?view= para que la lista no
-// quede vacía aunque el contador (calculado sobre toda la base) diga que hay.
+// terminales (Acreditados / No cargó / Archivadas / Estafa / Precaución) son estados viejos
+// que caen fuera de esas 200, así que se piden aparte con ?view= para que la
+// lista no quede vacía aunque el contador (calculado sobre toda la base) diga que hay.
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'no autorizado' }, { status: 401 });
@@ -53,6 +53,12 @@ export async function GET(req: NextRequest) {
     limit = 500;
   } else if (view === 'archived') {
     where = and(base, sql`(${chatSessions.data} ->> 'archived') = 'true'`)!;
+    limit = 500;
+  } else if (view === 'estafa') {
+    where = and(base, sql`(${chatSessions.data} ->> 'estafa') = 'true'`)!;
+    limit = 500;
+  } else if (view === 'precaucion') {
+    where = and(base, sql`(${chatSessions.data} ->> 'precaucion') = 'true'`)!;
     limit = 500;
   }
 
@@ -113,7 +119,13 @@ export async function GET(req: NextRequest) {
   // Stats sobre TODA la base (solo step + fecha, liviano) para que los KPIs no
   // queden capados por el límite de 200 de la lista. Excluye campaña Test (testeo).
   const statRowsRaw = await db
-    .select({ step: chatSessions.step, createdAt: chatSessions.createdAt, campaign: chatSessions.campaign })
+    .select({
+      step: chatSessions.step,
+      createdAt: chatSessions.createdAt,
+      campaign: chatSessions.campaign,
+      estafa: sql<boolean>`(${chatSessions.data} ->> 'estafa') = 'true'`,
+      precaucion: sql<boolean>`(${chatSessions.data} ->> 'precaucion') = 'true'`,
+    })
     .from(chatSessions)
     .where(eq(chatSessions.tenantId, session.tenantId));
   const statRows = statRowsRaw.filter((s) => (s.campaign ?? '').toLowerCase() !== 'test');
@@ -142,6 +154,8 @@ export async function GET(req: NextRequest) {
       name: s.name,
       username: username ?? null, // usuario del portal (ej. camilo787) — búscable
       archived: sdata.archived === true,
+      estafa: sdata.estafa === true,
+      precaucion: sdata.precaucion === true,
       unread: sdata.unread === true,
       unreadCount: typeof sdata.unreadCount === 'number' && sdata.unreadCount > 0
         ? sdata.unreadCount
@@ -418,6 +432,36 @@ export async function POST(req: NextRequest) {
     const blocked = b.op === 'block';
     await mergeChatData(s.id, { blocked, ...(blocked ? { archived: true, unread: false, unreadCount: 0 } : {}) });
     return NextResponse.json({ ok: true, blocked });
+  }
+
+  // Estafa: flag en data (no toca el embudo). Lista aparte + sale de Inbox.
+  // El operador marca comprobante trucho / reincidente; Kommo solo recibe nota.
+  if (b.op === 'mark_estafa' || b.op === 'unmark_estafa') {
+    const estafa = b.op === 'mark_estafa';
+    await mergeChatData(s.id, {
+      estafa,
+      ...(estafa ? { archived: true, unread: false, unreadCount: 0 } : {}),
+    });
+    if (estafa && s.kommoLeadId) {
+      const tenant = await getTenantBySlug(session.slug);
+      if (tenant) {
+        addLeadNote(tenant, s.kommoLeadId, 'Marcado como ESTAFA (comprobante trucho) desde el panel TrackerIO.');
+      }
+    }
+    return NextResponse.json({ ok: true, estafa });
+  }
+
+  // Precaución: flag de vigilancia (no toca embudo ni archiva). Sigue en Inbox.
+  if (b.op === 'mark_precaucion' || b.op === 'unmark_precaucion') {
+    const precaucion = b.op === 'mark_precaucion';
+    await mergeChatData(s.id, { precaucion });
+    if (precaucion && s.kommoLeadId) {
+      const tenant = await getTenantBySlug(session.slug);
+      if (tenant) {
+        addLeadNote(tenant, s.kommoLeadId, 'Marcado como PRECAUCIÓN desde el panel TrackerIO.');
+      }
+    }
+    return NextResponse.json({ ok: true, precaucion });
   }
 
   // Detalle: devuelve el transcript completo (para abrir la conversación). Quitamos

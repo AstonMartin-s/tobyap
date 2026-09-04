@@ -6,6 +6,23 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-03 — bblack: promo cajera ignoraba el Guion
+
+- Síntoma (Cliente A3): Guardar en Ajustes → Guion → "Promo cajera (2° mensaje)" no cambiaba el chat. Seguía el texto viejo "captura de tu **carga**" en vez de "captura de que **agendaste su número**".
+- Causa: `buildCajeraMsg` en `lib/chat/flow.ts` usaba `CAJERA_BTN_TEXT` hardcodeado cuando hay cajero sticky o URL de soporte (siempre en bblack). El template `accredited_cajera` solo se usaba en el preview del panel.
+- Fix: el 2° mensaje post-carga renderiza `accredited_cajera` del tenant. Con sticky, `{support}` = número del cajero (no wa.me). El botón WhatsApp se mantiene.
+- Overlap Claude: `flow.ts` (R1).
+
+## Bitácora 2026-09-03 — Panel: pestaña Estafa (comprobante trucho)
+
+Pedido de cliente: categoría **Estafa** para jugadores que meten comprobante trucho / reincidentes.
+
+- **No** es un step del embudo (no se toca la máquina de estados). Flag `data.estafa` (mismo patrón que `archived` / `blocked`).
+- Backend `GET /api/panel/chats?view=estafa` + ops `mark_estafa` / `unmark_estafa`. Al marcar: archiva (sale de Inbox) + nota en Kommo. No bloquea solo; Bloquear sigue aparte.
+- Front `ChatsClient.tsx`: pestaña Estafa (lista dedicada, contador sobre toda la base), badge, botón en el header del chat.
+- **Precaución** (mismo día): flag `data.precaucion`, `?view=precaucion`, ops `mark_precaucion` / `unmark_precaucion`. **No archiva** — sigue en Inbox con badge ámbar. Lista dedicada para encontrarlos después.
+- Overlap Claude (`ChatsClient.tsx`, `app/api/panel/chats`): R1 abajo. Pull antes de tocar esos archivos.
+
 ## Bitácora 2026-09-02 — Tienda: dominios trackerapp.site + constructor de flujo (backend)
 
 - **Dominios casaurbana VERDES:** `go.trackerapp.site` (landing) y `chat.trackerapp.site` (widget) con cert **VÁLIDO** en Railway. La traba era ownership: faltaban los TXT `_railway-verify.go` / `_railway-verify.chat` en Hostinger (el CNAME solo no alcanza). Agregados → validó y emitió al instante. Config de casaurbana ya apunta ahí (`chat_config.landingDomain` + `chatDomain`).

@@ -14,7 +14,6 @@ import {
   offerCbuLine,
   offerDepositLine,
   type ChatRuntimeConfig,
-  postAccreditCajeraText,
   renderTemplate,
 } from '@/lib/chat/runtime';
 
@@ -77,7 +76,6 @@ export function supportOverride(data: Record<string, unknown>): Record<string, s
 // el cuerpo (queda feo y con mil parámetros); solo el botón verde de WhatsApp.
 // Si el usuario quiere que aprieten el botón, no le tiramos el link al lado.
 const SUPPORT_BTN_TEXT = '🙋 Tocá el botón de acá abajo y hablás directo con tu cajero por WhatsApp. Te atendemos al toque, 24hs 👇';
-const CAJERA_BTN_TEXT = '¿Querés un EXTRA? 📲 Agendá a tu cajero para no perderte las promos 🔥\n📸 Pasale la captura de tu carga y sumá +1000 EXTRAS de regalo 🎁🤑\n\nTocá el botón de acá abajo 👇';
 
 /** Mensaje de soporte. Si hay cajero sticky asignado → texto limpio + botón
  *  "Abrir WhatsApp" (campo wa) al cajero, sin link crudo en el cuerpo. Si no hay
@@ -93,17 +91,17 @@ function buildSupportMsg(cfg: ChatRuntimeConfig, data: Record<string, unknown>, 
   return { from: 'bot', delayMs, at: now(), text: renderTemplate('support', cfg) };
 }
 
-/** Derivación al cajero POST-carga (promo cajera). Misma lógica: si hay cajero
- *  sticky → texto limpio + botón al MISMO cajero asignado (coordinado con soporte
- *  y el botón superior). Si no hay cajero → template con link. */
+/** Derivación al cajero POST-carga (promo cajera). El texto sale del guion
+ *  (`accredited_cajera`) — si no, Guardar en Ajustes no cambia lo que manda el bot
+ *  (bblack/a3 tenía un hardcode "captura de tu carga"). Con cajero sticky,
+ *  `{support}` es el número (para "agendá y pasá captura"), no el wa.me crudo. */
 function buildCajeraMsg(cfg: ChatRuntimeConfig, data: Record<string, unknown>, delayMs: number): BotMsg {
   const wa = data.assignedWa ? String(data.assignedWa).replace(/\D/g, '') : '';
-  if (wa) return { from: 'bot', delayMs, at: now(), text: CAJERA_BTN_TEXT, wa: stickyWaUrl(wa) };
-  // Sin cajero sticky: si el soporte es una URL (landing/wa.me), botón limpio en
-  // vez del link crudo (mismo formato que a3).
   const url = (cfg.links.support || '').trim();
-  if (/^https?:\/\//i.test(url)) return { from: 'bot', delayMs, at: now(), text: CAJERA_BTN_TEXT, wa: url };
-  return { from: 'bot', delayMs, at: now(), text: postAccreditCajeraText(cfg) };
+  const text = renderTemplate('accredited_cajera', cfg, wa ? { support: wa } : {});
+  if (wa) return { from: 'bot', delayMs, at: now(), text, wa: stickyWaUrl(wa) };
+  if (/^https?:\/\//i.test(url)) return { from: 'bot', delayMs, at: now(), text, wa: url };
+  return { from: 'bot', delayMs, at: now(), text };
 }
 
 // ── Paso 1: WELCOME ────────────────────────────────────────────────────────

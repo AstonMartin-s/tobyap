@@ -12,6 +12,8 @@ type Item = {
   name: string | null;
   username: string | null;
   archived: boolean;
+  estafa: boolean;
+  precaucion: boolean;
   unread: boolean;
   unreadCount?: number;
   blocked: boolean;
@@ -69,6 +71,8 @@ const ICONS = {
   unarchive: <Ico><polyline points="17 11 12 6 7 11" /><line x1="12" y1="6" x2="12" y2="18" /></Ico>,
   block: <Ico><circle cx="12" cy="12" r="9" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></Ico>,
   unblock: <Ico><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" /></Ico>,
+  estafa: <Ico><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></Ico>,
+  precaucion: <Ico><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></Ico>,
   revisar: <Ico><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></Ico>,
   delete: <Ico><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></Ico>,
   phone: <Ico size={12}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" /></Ico>,
@@ -147,7 +151,8 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [detail, setDetail] = useState<{ messages: Msg[]; phone: string | null; name: string | null; username: string | null; step: string | null; kommoLeadId: number | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [custom, setCustom] = useState('');
-  const [filter, setFilter] = useState<'inbox' | 'revisar' | 'no_leidos' | 'activos' | 'acreditados' | 'no_cargo' | 'archivadas'>('inbox');
+  type ChatFilter = 'inbox' | 'revisar' | 'no_leidos' | 'activos' | 'acreditados' | 'no_cargo' | 'archivadas' | 'estafa' | 'precaucion';
+  const [filter, setFilter] = useState<ChatFilter>('inbox');
   const [q, setQ] = useState('');
   const [kpiRange, setKpiRange] = useState<'hoy' | 'ayer' | 'siempre'>('hoy');
   const [exportOpen, setExportOpen] = useState(false);
@@ -158,7 +163,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [delChat, setDelChat] = useState(false);
   const [delLead, setDelLead] = useState(false);
-  const [stats, setStats] = useState<Array<{ step: string | null; createdAt: string | null }>>([]);
+  const [stats, setStats] = useState<Array<{ step: string | null; createdAt: string | null; estafa?: boolean; precaucion?: boolean }>>([]);
   const [tenantProvider, setTenantProvider] = useState<string>('pagoda');
   const [fichasEnabled, setFichasEnabled] = useState<boolean>(true);
   const [opsOpen, setOpsOpen] = useState(false);
@@ -269,7 +274,12 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     }
     prevAttn.current = attnNow;
     setItems(its);
-    setStats(r.stats ?? []);
+    setStats((r.stats ?? []).map((s: { step: string | null; createdAt: string | null; estafa?: unknown; precaucion?: unknown }) => ({
+      step: s.step,
+      createdAt: s.createdAt,
+      estafa: s.estafa === true || s.estafa === 't' || s.estafa === 'true',
+      precaucion: s.precaucion === true || s.precaucion === 't' || s.precaucion === 'true',
+    })));
     if (r.tenantProvider) setTenantProvider(r.tenantProvider);
     if (typeof r.fichasEnabled === 'boolean') setFichasEnabled(r.fichasEnabled);
   }, []);
@@ -277,7 +287,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   // Pestañas terminales (Acreditados / No cargó / Archivadas): son estados viejos
   // que quedan fuera de las 200 recientes, así que se piden aparte al server.
   const [termItems, setTermItems] = useState<Item[]>([]);
-  const termView = filter === 'acreditados' ? 'done' : filter === 'no_cargo' ? 'no_cargo' : filter === 'archivadas' ? 'archived' : '';
+  const termView = filter === 'acreditados' ? 'done' : filter === 'no_cargo' ? 'no_cargo' : filter === 'archivadas' ? 'archived' : filter === 'estafa' ? 'estafa' : filter === 'precaucion' ? 'precaucion' : '';
   const loadTerm = useCallback(async (view: string) => {
     if (!view) return;
     const r = await fetch(`/api/panel/chats?view=${view}`).then((x) => x.json()).catch(() => null);
@@ -512,10 +522,20 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
         setToast(r.deletedLead ? 'Chat y lead eliminados ✓' : 'Chat eliminado ✓');
         await loadList();
       } else {
-        setToast(op === 'mark_revisar' ? 'Movido a Revisar ✓' : 'Enviado al chat ✓');
+        setToast(
+          op === 'mark_estafa' ? 'Marcado como estafa ✓'
+            : op === 'unmark_estafa' ? 'Sacado de Estafa ✓'
+              : op === 'mark_precaucion' ? 'Marcado como precaución ✓'
+                : op === 'unmark_precaucion' ? 'Sacado de Precaución ✓'
+                  : op === 'mark_revisar' ? 'Movido a Revisar ✓'
+                    : 'Enviado al chat ✓',
+        );
         forceScrollRef.current = op === 'custom';
+        if (op === 'mark_estafa') setFilter('estafa');
         await loadDetail(sel);
         await loadList();
+        const nextTerm = op === 'mark_estafa' ? 'estafa' : termView;
+        if (nextTerm) await loadTerm(nextTerm);
       }
       setTimeout(() => setToast(null), 2200);
     } else {
@@ -583,6 +603,8 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     // para que la lista coincida con el contador (calculado sobre toda la base).
     if (filter === 'acreditados') return i.step === 'done';
     if (filter === 'no_cargo') return i.step === 'no_cargo';
+    if (filter === 'estafa') return i.estafa;
+    if (filter === 'precaucion') return i.precaucion;
     // Revisar / No leídos: incluyen archivados auto (comprobante o mensaje pendiente).
     if (filter === 'revisar') return needsReview(i);
     if (filter === 'no_leidos') return noLeido(i);
@@ -604,8 +626,13 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     // Acreditados / No cargó: de la BASE COMPLETA (stats) para que coincidan con Kommo.
     acreditados: stats.filter((s) => s.step === 'done').length,
     no_cargo: stats.filter((s) => s.step === 'no_cargo').length,
+    estafa: stats.filter((s) => s.estafa).length,
+    precaucion: stats.filter((s) => s.precaucion).length,
     archivadas: items.filter((i) => i.archived).length,
   };
+  const selectedItem = sel
+    ? (termItems.find((i) => i.sessionKey === sel) ?? items.find((i) => i.sessionKey === sel))
+    : undefined;
 
   // KPIs por rango de fecha (creación). Conversión = acreditados / chats del rango.
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -743,20 +770,30 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
             onChange={(e) => setQ(e.target.value)} style={{ width: '100%', fontSize: '.8rem', padding: '.4rem .6rem' }} />
         </div>
         <div style={{ display: 'flex', gap: '.3rem', padding: '0 .6rem .6rem', borderBottom: '1px solid var(--border)', flexShrink: 0, flexWrap: 'wrap' }}>
-          {([
-            ['inbox', 'Inbox', null, '#8b93a9'],
-            ['no_leidos', 'No leídos', counts.noLeidos, '#22c55e'],
-            ['revisar', 'Revisar', counts.revisar, '#f97316'],
-            ['activos', 'Activos', counts.activos, '#8b93a9'],
-            ['acreditados', 'Acreditados', counts.acreditados, '#22c55e'],
-            ['no_cargo', 'No cargó', counts.no_cargo, '#ef4444'],
-            ['archivadas', 'Archivadas', counts.archivadas, '#8b93a9'],
-          ] as const).map(([f, label, n, c]) => {
+          {(
+            [
+              { f: 'inbox', label: 'Inbox', n: null, c: '#8b93a9' },
+              { f: 'no_leidos', label: 'No leídos', n: counts.noLeidos, c: '#22c55e' },
+              { f: 'revisar', label: 'Revisar', n: counts.revisar, c: '#f97316' },
+              { f: 'activos', label: 'Activos', n: counts.activos, c: '#8b93a9' },
+              { f: 'acreditados', label: 'Acreditados', n: counts.acreditados, c: '#22c55e' },
+              { f: 'no_cargo', label: 'No cargó', n: counts.no_cargo, c: '#ef4444' },
+              { f: 'estafa', label: 'Estafa', n: counts.estafa, c: '#e11d48', loud: true },
+              { f: 'precaucion', label: 'Precaución', n: counts.precaucion, c: '#f59e0b', loud: true },
+              { f: 'archivadas', label: 'Archivadas', n: counts.archivadas, c: '#8b93a9' },
+            ] as Array<{ f: ChatFilter; label: string; n: number | null; c: string; loud?: boolean }>
+          ).map(({ f, label, n, c, loud }) => {
             const on = filter === f;
             return (
               <button key={f} onClick={() => setFilter(f)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem', padding: '.28rem .55rem', fontSize: '.72rem', fontWeight: on ? 700 : 500, borderRadius: 7, cursor: 'pointer', border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`, background: on ? 'var(--accent-soft)' : 'transparent', color: on ? 'var(--accent)' : 'var(--muted)' }}>
-                {label}{n ? <span style={{ fontWeight: 700, color: on ? 'var(--accent)' : c }}>{n}</span> : ''}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '.3rem', padding: '.28rem .55rem',
+                  fontSize: '.72rem', fontWeight: on || loud ? 700 : 500, borderRadius: 7, cursor: 'pointer',
+                  border: `1px solid ${on ? 'var(--accent)' : loud ? c : 'var(--border)'}`,
+                  background: on ? 'var(--accent-soft)' : loud ? `${c}26` : 'transparent',
+                  color: on ? 'var(--accent)' : loud ? c : 'var(--muted)',
+                }}>
+                {label}{(n != null && (n > 0 || loud)) ? <span style={{ fontWeight: 700, color: on ? 'var(--accent)' : c }}>{n}</span> : ''}
               </button>
             );
           })}
@@ -793,6 +830,8 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                 </div>
                 <div style={{ display: 'flex', gap: '.35rem', alignItems: 'center', margin: '.28rem 0' }}>
                   <span style={{ fontSize: '.62rem', fontWeight: 700, color: '#fff', background: si.color, padding: '.05rem .4rem', borderRadius: 5 }}>{si.label}</span>
+                  {i.estafa && <span title="Marcado como estafa" style={{ fontSize: '.68rem', fontWeight: 800, color: '#fff', background: '#e11d48', padding: '.12rem .45rem', borderRadius: 5, display: 'inline-flex', alignItems: 'center', gap: '.25rem', letterSpacing: '.02em' }}>{ICONS.estafa} Estafa</span>}
+                  {i.precaucion && <span title="Marcado como precaución" style={{ fontSize: '.68rem', fontWeight: 800, color: '#111', background: '#f59e0b', padding: '.12rem .45rem', borderRadius: 5, display: 'inline-flex', alignItems: 'center', gap: '.25rem', letterSpacing: '.02em' }}>{ICONS.precaucion} Precaución</span>}
                   {i.blocked && <span title="Bloqueado" style={{ fontSize: '.6rem', fontWeight: 700, color: '#fff', background: '#b91c1c', padding: '.05rem .4rem', borderRadius: 5, display: 'inline-flex', alignItems: 'center', gap: '.2rem' }}>{ICONS.block} Bloqueado</span>}
                   {i.campaign && <span style={{ fontSize: '.62rem', color: 'var(--muted-2,#5d6478)' }}>{i.campaign}</span>}
                 </div>
@@ -879,7 +918,9 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                 )}
                 <span style={{ whiteSpace: 'nowrap' }}>{detail.kommoLeadId ? `· Kommo #${detail.kommoLeadId}` : '· sin lead Kommo'}</span>
                 {(() => {
-                  const blk = items.find((i) => i.sessionKey === sel)?.blocked;
+                  const blk = selectedItem?.blocked;
+                  const isEstafa = selectedItem?.estafa;
+                  const isPrecaucion = selectedItem?.precaucion;
                   const hdrBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: '.3rem', borderRadius: 6, cursor: 'pointer', fontSize: '.7rem', fontWeight: 600, padding: '.18rem .5rem', whiteSpace: 'nowrap' };
                   return (
                     <>
@@ -888,6 +929,16 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                         onClick={() => act('mark_revisar')}
                         style={{ ...hdrBtn, background: 'rgba(249,115,22,.12)', border: '1px solid rgba(249,115,22,.45)', color: '#fb923c' }}>
                         {ICONS.revisar} Revisar
+                      </button>
+                      <button className="tt tt--down" data-tt={isPrecaucion ? 'Sacar de la lista Precaución' : 'Vigilar — queda en Inbox y en la pestaña Precaución'} disabled={busy}
+                        onClick={() => act(isPrecaucion ? 'unmark_precaucion' : 'mark_precaucion')}
+                        style={{ ...hdrBtn, background: isPrecaucion ? '#f59e0b' : 'transparent', border: `1px solid ${isPrecaucion ? '#f59e0b' : '#b45309'}`, color: isPrecaucion ? '#111' : '#fbbf24' }}>
+                        {ICONS.precaucion}{isPrecaucion ? ' Precaución ✓' : ' Precaución'}
+                      </button>
+                      <button className="tt tt--down" data-tt={isEstafa ? 'Sacar de la lista Estafa' : 'Comprobante trucho / reincidente — sale del Inbox y queda en Estafa'} disabled={busy}
+                        onClick={() => act(isEstafa ? 'unmark_estafa' : 'mark_estafa')}
+                        style={{ ...hdrBtn, background: isEstafa ? '#be123c' : 'transparent', border: `1px solid ${isEstafa ? '#be123c' : '#9f1239'}`, color: isEstafa ? '#fff' : '#fb7185' }}>
+                        {ICONS.estafa}{isEstafa ? ' Estafa ✓' : ' Estafa'}
                       </button>
                       <button className="tt tt--down" data-tt={blk ? 'Podrá volver a escribir' : 'No podrá seguir en el chat; se archiva'} disabled={busy}
                         onClick={() => act(blk ? 'unblock' : 'block')}
@@ -904,6 +955,21 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                 })()}
               </div>
             </div>
+            {(selectedItem?.estafa || selectedItem?.precaucion) && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap',
+                padding: '.5rem 1rem', fontSize: '.8rem', fontWeight: 800, letterSpacing: '.04em',
+                textTransform: 'uppercase',
+                background: selectedItem.estafa ? 'rgba(225,29,72,.22)' : 'rgba(245,158,11,.22)',
+                color: selectedItem.estafa ? '#fb7185' : '#fbbf24',
+                borderBottom: `2px solid ${selectedItem.estafa ? '#e11d48' : '#f59e0b'}`,
+              }}>
+                {selectedItem.estafa ? ICONS.estafa : ICONS.precaucion}
+                {selectedItem.estafa && selectedItem.precaucion
+                  ? 'Estafa · Precaución'
+                  : selectedItem.estafa ? 'Marcado como estafa' : 'Marcado como precaución'}
+              </div>
+            )}
 
             {cajeros.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', padding: '.4rem 1rem', borderBottom: '1px solid var(--border)', background: 'var(--card-2, rgba(255,255,255,.02))', fontSize: '.74rem' }}>
@@ -1011,8 +1077,10 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                 </div>
               )}
               {(() => {
-                const cur = items.find((i) => i.sessionKey === sel);
+                const cur = selectedItem;
                 const isArch = cur?.archived;
+                const isPrecaucion = cur?.precaucion;
+                const isEstafa = cur?.estafa;
                 return (
                   <>
                     <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -1028,6 +1096,9 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                       <button className="tt tt--down" data-tt="En revisión — le avisa que estamos validando" disabled={busy} onClick={() => act('pending')} style={opStyle()}>{ICONS.pending} Pendiente</button>
                       <button className="tt tt--down" data-tt="Comprobante ilegible/incompleto — le pide reenviarlo" disabled={busy} onClick={() => act('reject')} style={opStyle('#f59e0b')}>{ICONS.reject} Erróneo</button>
                       <button className="tt tt--down" data-tt={isTienda ? 'No compró — lo saca de atención' : 'No depositó — lo pasa a No Cargo (sale de atención)'} disabled={busy} onClick={() => act('set_step', undefined, 'no_cargo')} style={opStyle('#ef4444')}>{ICONS.noCargo} {isTienda ? 'No compró' : 'No cargó'}</button>
+                      <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 .1rem' }} />
+                      <button className="tt tt--down" data-tt={isPrecaucion ? 'Sacar de Precaución' : 'Vigilar — queda en Inbox y en la pestaña Precaución'} disabled={busy} onClick={() => act(isPrecaucion ? 'unmark_precaucion' : 'mark_precaucion')} style={opStyle('#f59e0b', !!isPrecaucion)}>{ICONS.precaucion} Precaución</button>
+                      <button className="tt tt--down" data-tt={isEstafa ? 'Sacar de Estafa' : 'Comprobante trucho — sale del Inbox y queda en Estafa'} disabled={busy} onClick={() => act(isEstafa ? 'unmark_estafa' : 'mark_estafa')} style={opStyle('#e11d48', !!isEstafa)}>{ICONS.estafa} Estafa</button>
                       <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 .1rem' }} />
                       <button className="tt tt--down" data-tt="Le pasa el WhatsApp de soporte (walink)" disabled={busy} onClick={() => act('support')} style={opStyle()}>{ICONS.support} Soporte</button>
                       {/* Cargar / Retirar / Datos son de circo (portal de fichas). */}
