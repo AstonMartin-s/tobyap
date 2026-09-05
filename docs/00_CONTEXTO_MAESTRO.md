@@ -6,6 +6,11 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-05 — Panel de fichas: bono 100%
+
+- `OperationsPanel` (todos los clientes partner_api/king): opción **Bono 100%** en el dropdown. El backend ya reenvía `bonusPercent` sin tope.
+- Overlap Claude: `OperationsPanel.tsx`.
+
 ## Bitácora 2026-09-05 — Panel: renombrar lead
 
 - En el header del chat se puede cambiar el nombre: doble click o botón "Cambiar nombre".
