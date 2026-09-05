@@ -6,6 +6,12 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-05 — goldenc: Embudo + Ajustes chat; chips Estafa/Precaución
+
+- Tenant `goldenc` (Golden Chance) nació no-Kommo → `feat_embudo`/`feat_livechat` en 0. Encendidos en DB (fichas sigue off).
+- `/api/panel/features` + Nav: `Cache-Control: no-store` para que el panel no quede con las solapas viejas.
+- Chips Estafa/Precaución del panel chats: mismo estilo que Inbox/Archivadas (sin borde rojo/ámbar). Overlap Claude: `ChatsClient.tsx`, `Nav.tsx`.
+
 ## Bitácora 2026-09-05 — Admin: usuario + clave de cada panel
 
 - En `/admin/clientes/[slug]` se puede editar el usuario y la contraseña de acceso al panel del cliente.

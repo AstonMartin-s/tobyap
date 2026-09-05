@@ -778,22 +778,22 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
               { f: 'activos', label: 'Activos', n: counts.activos, c: '#8b93a9' },
               { f: 'acreditados', label: 'Acreditados', n: counts.acreditados, c: '#22c55e' },
               { f: 'no_cargo', label: 'No cargó', n: counts.no_cargo, c: '#ef4444' },
-              { f: 'estafa', label: 'Estafa', n: counts.estafa, c: '#e11d48', loud: true },
-              { f: 'precaucion', label: 'Precaución', n: counts.precaucion, c: '#f59e0b', loud: true },
+              { f: 'estafa', label: 'Estafa', n: counts.estafa, c: '#8b93a9' },
+              { f: 'precaucion', label: 'Precaución', n: counts.precaucion, c: '#8b93a9' },
               { f: 'archivadas', label: 'Archivadas', n: counts.archivadas, c: '#8b93a9' },
-            ] as Array<{ f: ChatFilter; label: string; n: number | null; c: string; loud?: boolean }>
-          ).map(({ f, label, n, c, loud }) => {
+            ] as Array<{ f: ChatFilter; label: string; n: number | null; c: string }>
+          ).map(({ f, label, n, c }) => {
             const on = filter === f;
             return (
               <button key={f} onClick={() => setFilter(f)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: '.3rem', padding: '.28rem .55rem',
-                  fontSize: '.72rem', fontWeight: on || loud ? 700 : 500, borderRadius: 7, cursor: 'pointer',
-                  border: `1px solid ${on ? 'var(--accent)' : loud ? c : 'var(--border)'}`,
-                  background: on ? 'var(--accent-soft)' : loud ? `${c}26` : 'transparent',
-                  color: on ? 'var(--accent)' : loud ? c : 'var(--muted)',
+                  fontSize: '.72rem', fontWeight: on ? 700 : 500, borderRadius: 7, cursor: 'pointer',
+                  border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
+                  background: on ? 'var(--accent-soft)' : 'transparent',
+                  color: on ? 'var(--accent)' : 'var(--muted)',
                 }}>
-                {label}{(n != null && (n > 0 || loud)) ? <span style={{ fontWeight: 700, color: on ? 'var(--accent)' : c }}>{n}</span> : ''}
+                {label}{(n != null && n > 0) ? <span style={{ fontWeight: 700, color: on ? 'var(--accent)' : c }}>{n}</span> : ''}
               </button>
             );
           })}

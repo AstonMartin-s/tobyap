@@ -365,8 +365,8 @@ function resolve(row: TenantRow): ResolvedTenant {
     // Solapas opcionales: ausente = habilitado; solo 0 lo apaga.
     features: {
       reportes: cf['feat_reportes'] !== 0,
-      embudo: cf['feat_embudo'] !== 0,
-      livechat: cf['feat_livechat'] !== 0,
+      embudo: Number(cf['feat_embudo']) !== 0,
+      livechat: Number(cf['feat_livechat']) !== 0,
       fichas: cf['feat_fichas'] !== 0,
     },
   };

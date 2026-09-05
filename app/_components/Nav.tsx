@@ -84,7 +84,7 @@ export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?:
   useEffect(() => {
     if (isAdmin) return; // el panel admin global no usa solapas por cliente
     let alive = true;
-    fetch('/api/panel/features')
+    fetch('/api/panel/features', { cache: 'no-store' })
       .then((r) => r.json())
       .then((d) => {
         if (!alive) return;

@@ -12,5 +12,8 @@ export async function GET() {
   const tenant = await getTenantBySlug(session.slug);
   const features = tenant?.features ?? { reportes: true, embudo: true, livechat: true, fichas: true };
   const niche = tenant?.niche ?? 'circo';
-  return NextResponse.json({ features, niche });
+  return NextResponse.json(
+    { features, niche },
+    { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } },
+  );
 }
