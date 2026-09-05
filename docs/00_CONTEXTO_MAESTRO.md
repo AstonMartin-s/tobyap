@@ -6,6 +6,12 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-05 — Panel: renombrar lead
+
+- En el header del chat se puede cambiar el nombre: doble click o botón "Cambiar nombre".
+- `POST /api/panel/chats` op `rename`: actualiza `chat_sessions.name`, `leads.name` y el título del lead en Kommo (best-effort). Enter guarda, Esc cancela. No toca el @usuario del portal.
+- Overlap Claude: `ChatsClient.tsx`.
+
 ## Bitácora 2026-09-05 — goldenc: Embudo + Ajustes chat; chips Estafa/Precaución
 
 - Tenant `goldenc` (Golden Chance) nació no-Kommo → `feat_embudo`/`feat_livechat` en 0. Encendidos en DB (fichas sigue off).

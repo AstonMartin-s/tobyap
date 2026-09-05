@@ -163,6 +163,9 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [delChat, setDelChat] = useState(false);
   const [delLead, setDelLead] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const skipNameSave = useRef(false);
   const [stats, setStats] = useState<Array<{ step: string | null; createdAt: string | null; estafa?: boolean; precaucion?: boolean }>>([]);
   const [tenantProvider, setTenantProvider] = useState<string>('pagoda');
   const [fichasEnabled, setFichasEnabled] = useState<boolean>(true);
@@ -503,8 +506,14 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     setTimeout(() => setToast(null), 2800);
   }
 
+  useEffect(() => {
+    skipNameSave.current = true;
+    setEditingName(false);
+    setNameDraft('');
+  }, [sel]);
+
   async function act(op: string, text?: string, step?: string, extra?: { deleteChat?: boolean; deleteLead?: boolean }) {
-    if (!sel || busy) return;
+    if (!sel || busy) return false;
     setBusy(true);
     const r = await fetch('/api/panel/chats', {
       method: 'POST',
@@ -523,12 +532,13 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
         await loadList();
       } else {
         setToast(
-          op === 'mark_estafa' ? 'Marcado como estafa ✓'
-            : op === 'unmark_estafa' ? 'Sacado de Estafa ✓'
-              : op === 'mark_precaucion' ? 'Marcado como precaución ✓'
-                : op === 'unmark_precaucion' ? 'Sacado de Precaución ✓'
-                  : op === 'mark_revisar' ? 'Movido a Revisar ✓'
-                    : 'Enviado al chat ✓',
+          op === 'rename' ? 'Nombre actualizado ✓'
+            : op === 'mark_estafa' ? 'Marcado como estafa ✓'
+              : op === 'unmark_estafa' ? 'Sacado de Estafa ✓'
+                : op === 'mark_precaucion' ? 'Marcado como precaución ✓'
+                  : op === 'unmark_precaucion' ? 'Sacado de Precaución ✓'
+                    : op === 'mark_revisar' ? 'Movido a Revisar ✓'
+                      : 'Enviado al chat ✓',
         );
         forceScrollRef.current = op === 'custom';
         if (op === 'mark_estafa') setFilter('estafa');
@@ -538,10 +548,33 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
         if (nextTerm) await loadTerm(nextTerm);
       }
       setTimeout(() => setToast(null), 2200);
+      return true;
     } else {
       setToast(r?.error ?? 'Error');
       setTimeout(() => setToast(null), 2500);
+      return false;
     }
+  }
+
+  function startRename() {
+    if (busy || !detail) return;
+    setNameDraft(detail.name ?? '');
+    setEditingName(true);
+  }
+
+  async function saveName() {
+    const next = nameDraft.trim();
+    if (!next) {
+      setToast('El nombre no puede estar vacío');
+      setTimeout(() => setToast(null), 2200);
+      return;
+    }
+    if (next === (detail?.name ?? '').trim()) {
+      setEditingName(false);
+      return;
+    }
+    const ok = await act('rename', next);
+    if (ok) setEditingName(false);
   }
 
   // Pegar imagen (Ctrl+V) en la caja de respuesta → la manda el operador al chat.
@@ -872,7 +905,40 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', minWidth: 0, justifyContent: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap' }}>
-                    <strong style={{ fontSize: '1.05rem', whiteSpace: 'nowrap' }}>{detail.name || detail.phone}</strong>
+                    {editingName ? (
+                      <input
+                        className="input"
+                        autoFocus
+                        value={nameDraft}
+                        disabled={busy}
+                        maxLength={80}
+                        onChange={(e) => setNameDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); void saveName(); }
+                          if (e.key === 'Escape') { skipNameSave.current = true; setEditingName(false); }
+                        }}
+                        onBlur={() => {
+                          if (skipNameSave.current) { skipNameSave.current = false; return; }
+                          void saveName();
+                        }}
+                        style={{ fontSize: '1.05rem', fontWeight: 700, width: 200, padding: '.2rem .45rem' }}
+                      />
+                    ) : (
+                      <strong
+                        title="Doble click para cambiar el nombre"
+                        onDoubleClick={startRename}
+                        style={{ fontSize: '1.05rem', whiteSpace: 'nowrap', cursor: 'text' }}
+                      >{detail.name || detail.phone}</strong>
+                    )}
+                    {!editingName && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={startRename}
+                        title="Cambiar el nombre del lead"
+                        style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', color: 'var(--muted,#94a3b8)', fontSize: '.7rem', padding: '.05rem .4rem', whiteSpace: 'nowrap' }}
+                      >Cambiar nombre</button>
+                    )}
                     {detail.username && <span title="Usuario del portal" style={{ fontSize: '.78rem', fontWeight: 700, color: 'var(--accent,#7c5cff)', whiteSpace: 'nowrap', background: 'rgba(124, 92, 255, 0.1)', padding: '0.1rem 0.4rem', borderRadius: 4 }}>@{detail.username}</span>}
                     <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }} title="Cambiar estado">
                       <select

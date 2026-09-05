@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { and, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { chatSessions } from '@/db/schema';
+import { chatSessions, leads } from '@/db/schema';
 import { getSession, isPanelAdmin } from '@/lib/session';
 import { getTenantBySlug } from '@/lib/tenants';
 import { phoneForExport } from '@/lib/phone';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
-import { updateLeadStatus, deleteKommoLead } from '@/lib/kommo';
+import { updateLeadStatus, deleteKommoLead, updateLeadName } from '@/lib/kommo';
 import { kommoStatusFromPanelStep, acreditarChat } from '@/lib/chat/release';
 import { purgeChatSession } from '@/lib/chat/deleteSession';
 import { trimBandeja } from '@/lib/chat/bandeja';
@@ -278,6 +278,25 @@ export async function POST(req: NextRequest) {
 
   const data = (s.data ?? {}) as Record<string, unknown>;
   const loginUrl = data.loginUrl as string | undefined;
+
+  // Renombrar el lead desde el panel: chat + tabla leads + título en Kommo.
+  if (b.op === 'rename') {
+    const name = String(b.text ?? '').trim();
+    if (name.length < 1 || name.length > 80) {
+      return NextResponse.json({ error: 'el nombre debe tener entre 1 y 80 caracteres' }, { status: 400 });
+    }
+    await db.update(chatSessions).set({ name, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+    if (s.kommoLeadId) {
+      await db
+        .update(leads)
+        .set({ name, updatedAt: new Date() })
+        .where(and(eq(leads.tenantId, session.tenantId), eq(leads.kommoLeadId, s.kommoLeadId)))
+        .catch(() => {});
+      const tenant = await getTenantBySlug(session.slug);
+      if (tenant) await updateLeadName(tenant, s.kommoLeadId, name).catch(() => {});
+    }
+    return NextResponse.json({ ok: true, name });
+  }
 
   // ── Cajero sticky ──────────────────────────────────────────────────────────
   // Lista de cajeros disponibles + el asignado actual (para la solapa del lead).
