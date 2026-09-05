@@ -47,6 +47,12 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 export async function PATCH(req: NextRequest, { params }: { params: { slug: string } }) {
   if (!(await isAdmin(req))) return NextResponse.json({ error: 'no autorizado' }, { status: 401 });
   const patch = (await req.json().catch(() => ({}))) as UpdateTenantPatch;
-  await updateTenantFields(params.slug, patch);
-  return NextResponse.json({ ok: true });
+  try {
+    await updateTenantFields(params.slug, patch);
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'error';
+    const status = /ya existe|al menos|no existe/i.test(msg) ? 400 : 500;
+    return NextResponse.json({ error: msg }, { status });
+  }
 }

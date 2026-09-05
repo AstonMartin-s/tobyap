@@ -6,6 +6,19 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-05 — Admin: usuario + clave de cada panel
+
+- En `/admin/clientes/[slug]` se puede editar el usuario y la contraseña de acceso al panel del cliente.
+- Backend: `updateTenantFields` acepta `panelUser` y alinea `tenants.panel_user` + admin de `panel_users` (el login mira esa tabla primero). Vacío = no cambia. Usuario duplicado → 400.
+- Overlap Claude: `ManageClient.tsx`.
+
+## Bitácora 2026-09-04 — KingCba: 2ª rotación Kommo (sin tocar panel)
+
+- Tenant `kingplay`: token nuevo ya estaba en DB (`account_id` distinto). Subdomain seguía en la cuenta anterior → API 401.
+- DB: solo `kommo_subdomain` + `kommo_pipeline_id` + remap `customFields`/`status_*` de la cuenta nueva. **No** se tocó `panel_user` / `panel_password_hash` / `panel_users`. CBU/titular intactos.
+- Heal: `ad_code` / `CBU` / `TITULAR` + etapas TOBYAP en el embudo default (mezcladas con las etapas stock de Kommo).
+- Webhook sigue `/api/webhooks/kommo/kingplay`. Sin deploy.
+
 ## Bitácora 2026-09-04 — candywin: start de referidos `ref_CW211_<code>`
 
 - El bot no toma el `?start=` pelado. Formato de ellos: `t.me/candywinvip_bot?start=ref_CW211_TG22Y4RK`.

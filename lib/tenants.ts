@@ -212,6 +212,7 @@ export interface UpdateTenantPatch {
   readonly?: boolean;
   allowTags?: boolean;
   active?: boolean;
+  panelUser?: string; // rename main panel login
   panelPassword?: string; // reset
   metaPixelId?: string;
   metaCapiToken?: string;
@@ -223,7 +224,61 @@ export interface UpdateTenantPatch {
   affiliateWebhookSecret?: string;
 }
 
+// Login mira panel_users primero y después tenants.panel_user. El admin
+// general edita el acceso principal: hay que mantener las dos tablas alineadas.
+async function findMainPanelUser(row: TenantRow) {
+  const users = await db.select().from(panelUsers).where(eq(panelUsers.tenantId, row.id));
+  return users.find((u) => u.username === row.panelUser) ?? users.find((u) => u.role === 'admin') ?? null;
+}
+
+async function assertPanelUserFree(username: string, tenantId: string, excludeUserId?: string): Promise<void> {
+  const takenTenant = await db.query.tenants.findFirst({ where: eq(tenants.panelUser, username) });
+  if (takenTenant && takenTenant.id !== tenantId) {
+    throw new Error('ese usuario ya existe en otro cliente');
+  }
+  const takenPu = await db
+    .select({ id: panelUsers.id, tenantId: panelUsers.tenantId })
+    .from(panelUsers)
+    .where(eq(panelUsers.username, username));
+  if (takenPu.some((u) => u.id !== excludeUserId)) {
+    throw new Error('ese usuario ya existe');
+  }
+}
+
+async function syncMainPanelUser(
+  row: TenantRow,
+  next: { username: string; passwordHash?: string },
+): Promise<void> {
+  const main = await findMainPanelUser(row);
+
+  if (main) {
+    await db
+      .update(panelUsers)
+      .set({
+        username: next.username,
+        ...(next.passwordHash ? { passwordHash: next.passwordHash } : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(panelUsers.id, main.id));
+    return;
+  }
+
+  const hash = next.passwordHash ?? row.panelPasswordHash;
+  if (!hash) return;
+  await db.insert(panelUsers).values({
+    tenantId: row.id,
+    username: next.username,
+    passwordHash: hash,
+    displayName: row.name,
+    role: 'admin',
+    active: true,
+  });
+}
+
 export async function updateTenantFields(slug: string, patch: UpdateTenantPatch): Promise<void> {
+  const row = await db.query.tenants.findFirst({ where: eq(tenants.slug, slug) });
+  if (!row) throw new Error(`tenant ${slug} no existe`);
+
   const set: Record<string, unknown> = { updatedAt: new Date() };
   if (patch.name !== undefined) set.name = patch.name;
   if (patch.eventSuffix !== undefined) set.eventSuffix = patch.eventSuffix;
@@ -238,9 +293,27 @@ export async function updateTenantFields(slug: string, patch: UpdateTenantPatch)
   if (patch.partnerApiUrl !== undefined) set.partnerApiUrl = patch.partnerApiUrl;
   if (patch.partnerApiKey) set.partnerApiKey = encrypt(patch.partnerApiKey);
   if (patch.affiliateWebhookSecret) set.affiliateWebhookSecret = encrypt(patch.affiliateWebhookSecret);
-  if (patch.panelPassword) set.panelPasswordHash = await bcrypt.hash(patch.panelPassword, 10);
+
+  const nextUser = typeof patch.panelUser === 'string' ? patch.panelUser.trim() : undefined;
+  const nextPass = patch.panelPassword?.trim() || undefined;
+  if (nextUser !== undefined && nextUser.length > 0 && nextUser !== row.panelUser) {
+    if (nextUser.length < 3) throw new Error('el usuario del panel debe tener al menos 3 caracteres');
+    const main = await findMainPanelUser(row);
+    await assertPanelUserFree(nextUser, row.id, main?.id);
+    set.panelUser = nextUser;
+  }
+  if (nextPass) set.panelPasswordHash = await bcrypt.hash(nextPass, 10);
 
   await db.update(tenants).set(set).where(eq(tenants.slug, slug));
+
+  const username = (typeof set.panelUser === 'string' ? set.panelUser : row.panelUser)?.trim();
+  if (username && (set.panelUser || set.panelPasswordHash)) {
+    await syncMainPanelUser(row, {
+      username,
+      passwordHash: typeof set.panelPasswordHash === 'string' ? set.panelPasswordHash : undefined,
+    });
+  }
+
   invalidateTenant(slug);
 }
 
