@@ -11,6 +11,7 @@
 - Solo `paradise` + landing de chat. King/goldenc/kingplay/bblack y el resto **siguen** `go.* → chat.fichaslibres` + spinner "WhatsApp".
 - URL de pauta: `https://go.fichaslibres.online/l/paradise?ccpp=A5&campaign=M1` → same-origin `/chat/paradise?token=…&campaign=M1&ccpp=A5`.
 - Copy "Bienvenido a Paradise Queens" + CTA Continuar. Pixel/token/auto-avance iguales. Soporte `walink` no se tocó.
+- Skin piloto: acento `#F5C400` + avatar circular `/logos/paradise-queens.jpg` (solo landing chat de paradise).
 
 ## Bitácora 2026-09-05 — Comprobantes PDF
 
