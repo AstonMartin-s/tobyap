@@ -6,6 +6,18 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-06 — Landing paradise (piloto Meta, solo ese tenant)
+
+- Solo `paradise` + landing de chat. King/goldenc/kingplay/bblack y el resto **siguen** `go.* → chat.fichaslibres` + spinner "WhatsApp".
+- URL de pauta: `https://go.fichaslibres.online/l/paradise?ccpp=A5&campaign=M1` → same-origin `/chat/paradise?token=…&campaign=M1&ccpp=A5`.
+- Copy "Bienvenido a Paradise Queens" + CTA Continuar. Pixel/token/auto-avance iguales. Soporte `walink` no se tocó.
+
+## Bitácora 2026-09-05 — Comprobantes PDF
+
+- El 404 `sin comprobante` al abrir era un PDF: el panel lo trataba como `<img>` y `/file` a veces lo servía como jpeg.
+- Se detecta `%PDF-`, se sirve `application/pdf`, y en el chat/panel aparece un botón "Comprobante PDF" (no miniatura).
+- Revertida la idea de alargar la limpieza a 14 días: no era eso.
+
 ## Bitácora 2026-09-05 — Panel de fichas: bono 100%
 
 - `OperationsPanel` (todos los clientes partner_api/king): opción **Bono 100%** en el dropdown. El backend ya reenvía `bonusPercent` sin tope.

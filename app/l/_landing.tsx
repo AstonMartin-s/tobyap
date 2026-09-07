@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 
 // Vista de landing compartida (servida por nuestra app en Railway).
 // Capta fbclid/fbp/fbc + utm, dispara el Pixel, registra la visita vía
-// /api/track/redirect (que además genera el token de atribución) y redirige a
-// WhatsApp con el código en el mensaje. Mismo origen => sin CORS.
+// /api/track/redirect (token de atribución) y redirige al destino de la
+// landing: chat web, Telegram, portal, URL fija o WhatsApp. Mismo origen => sin CORS.
 
 // Fichas a partir del bono ("Bono50000" -> "50.000"). Ignora bonos porcentuales.
 export function fichasFromBono(bono: string | null | undefined): string | null {
@@ -56,11 +56,28 @@ export interface LandingConfig {
   noCode?: boolean; // no incluir "Codigo Promocion:" en el mensaje (CRM sin webhook, no matchea)
 }
 
+// Piloto Meta solo paradise (chat): copy de página, no de redirect.
+// El resto de tenants conserva el default histórico (pauta en vivo).
+export function landingSpinnerCopy(cfg: Pick<LandingConfig, 'tenantSlug' | 'headline' | 'subtext' | 'chatSlug' | 'brandName'>): {
+  headline: string;
+  subtext: string;
+} {
+  if (cfg.tenantSlug === 'paradise' && cfg.chatSlug) {
+    return {
+      headline: cfg.headline || (cfg.brandName ? `Bienvenido a ${cfg.brandName}` : 'Bienvenido'),
+      subtext: cfg.subtext || 'Ingresá para reclamar tu beneficio.',
+    };
+  }
+  return {
+    headline: cfg.headline || 'Verificando tu acceso…',
+    subtext: cfg.subtext || 'Te redirigimos a WhatsApp en un instante.',
+  };
+}
+
 export function LandingView(cfg: LandingConfig) {
   const accent = cfg.primaryColor || '#25d366';
   const brand = cfg.brandName || 'Acceso';
-  const headline = cfg.headline || 'Verificando tu acceso…';
-  const subtext = cfg.subtext || 'Te redirigimos a WhatsApp en un instante.';
+  const { headline, subtext } = landingSpinnerCopy(cfg);
   const delay = cfg.redirectDelayMs ?? 1500;
 
   const pixelScript = cfg.pixelId
@@ -162,13 +179,13 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
       window.location.href=pu;
       return;
     }
-    // Destino CHAT WEB: redirige al chat embebido con el token + campaña + ccpp.
+    // Destino CHAT WEB. Si chatOrigin está vacío (piloto paradise) = same-origin.
     if(C.chatSlug){
       var camp=p('campaign')||C.campaign||'';
       var cc=p('CCPP')||p('ccpp')||C.ccpp||'';
       var base=C.chatOrigin||'';
       var u=base+'/chat/'+C.chatSlug+'?token='+encodeURIComponent(code||'')+'&campaign='+encodeURIComponent(camp)+'&ccpp='+encodeURIComponent(cc);
-      window.location.href=u;
+      if(base) window.location.href=u; else window.location.replace(u);
       return;
     }
     // Sin número asignado (ni fijo ni por rotación): NO redirigimos.
@@ -185,11 +202,18 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
     window.location.href=wa;
   }
   var done=false;
+  var pending=null;
   var fallback=setTimeout(function(){ if(!done){done=true; go(null);} }, C.redirectDelayMs+2000);
+  var cta=document.getElementById('ll-cta');
+  if(cta) cta.addEventListener('click', function(e){
+    e.preventDefault();
+    if(done) return;
+    if(pending){ done=true; clearTimeout(fallback); go(pending); }
+  });
   function send(){
     fetch('/api/track/redirect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(buildPayload())})
       .then(function(r){return r.json();})
-      .then(function(d){ if(!done){done=true; clearTimeout(fallback); setTimeout(function(){go(d);}, C.redirectDelayMs);} })
+      .then(function(d){ pending=d; if(!done){done=true; clearTimeout(fallback); setTimeout(function(){go(d);}, C.redirectDelayMs);} })
       .catch(function(){ if(!done){done=true; clearTimeout(fallback); go(null);} });
   }
   // Esperamos a que el Pixel setee _fbp (hasta ~1s) para capturarlo; si no llega,
@@ -202,6 +226,11 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
   })();
 })();`;
 
+  const paradiseChat = cfg.tenantSlug === 'paradise' && !!cfg.chatSlug;
+  const chatHref = paradiseChat
+    ? `${cfg.chatOrigin || ''}/chat/${encodeURIComponent(cfg.chatSlug as string)}`
+    : '';
+
   return (
     <main style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', textAlign: 'center', padding: '1rem', background: '#0a0d12', color: '#e6edf3' }}>
       <div
@@ -211,9 +240,29 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
             : `<div style="font-weight:800;font-size:1.3rem;letter-spacing:-0.02em;color:${accent}">${brand}</div>`,
         }}
       />
-      <div id="ll-spin" style={{ width: 42, height: 42, border: '4px solid #2a2f36', borderTopColor: accent, borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-      <p id="ll-headline" style={{ margin: 0, color: accent, fontWeight: 700 }}>{headline}</p>
-      <p id="ll-subtext" style={{ color: '#8a93a0', fontSize: '.9rem', margin: 0 }}>{subtext}</p>
+      {!paradiseChat && (
+        <div id="ll-spin" style={{ width: 42, height: 42, border: '4px solid #2a2f36', borderTopColor: accent, borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+      )}
+      <p id="ll-headline" style={{ margin: 0, color: accent, fontWeight: 700, fontSize: paradiseChat ? '1.25rem' : undefined }}>{headline}</p>
+      <p id="ll-subtext" style={{ color: '#8a93a0', fontSize: '.9rem', margin: 0, maxWidth: paradiseChat ? 360 : undefined }}>{subtext}</p>
+      {chatHref ? (
+        <a
+          id="ll-cta"
+          href={chatHref}
+          style={{
+            display: 'inline-block',
+            marginTop: 4,
+            padding: '12px 28px',
+            borderRadius: 10,
+            background: accent,
+            color: '#0a0d12',
+            fontWeight: 700,
+            textDecoration: 'none',
+          }}
+        >
+          Continuar
+        </a>
+      ) : null}
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       {pixelScript ? <script dangerouslySetInnerHTML={{ __html: pixelScript }} /> : null}
       <script dangerouslySetInnerHTML={{ __html: logic }} />

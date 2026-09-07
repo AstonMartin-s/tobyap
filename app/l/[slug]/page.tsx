@@ -16,12 +16,21 @@ export const dynamic = 'force-dynamic';
 async function resolveBySlugOrAlias(slug: string) {
   const direct = await getTenantBySlug(slug);
   if (direct) {
-    const [lp] = await db
+    const rows = await db
       .select()
       .from(landings)
-      .where(and(eq(landings.tenantId, direct.id), eq(landings.active, true)))
-      .limit(1);
-    return { tenant: direct, landing: lp ?? null };
+      .where(and(eq(landings.tenantId, direct.id), eq(landings.active, true)));
+    // paradise: /l/paradise debe ser la landing de chat (no walink, no /bestwin).
+    // El resto sigue tomando la primera activa (pauta en vivo).
+    let lp = rows[0] ?? null;
+    if (direct.slug === 'paradise') {
+      const chatLp = rows.find((l) => {
+        const cfg = (l.config ?? {}) as Record<string, unknown>;
+        return typeof cfg.chatSlug === 'string' && String(cfg.chatSlug).trim() !== '';
+      });
+      if (chatLp) lp = chatLp;
+    }
+    return { tenant: direct, landing: lp };
   }
   const [lp] = await db.select().from(landings).where(and(eq(landings.alias, slug), eq(landings.active, true))).limit(1);
   if (!lp) return null;
@@ -95,6 +104,9 @@ export default async function Landing({
     redirectDelayMs: c.redirectDelayMs != null ? Number(c.redirectDelayMs) : undefined,
     portalUrl: c.portalUrl != null && String(c.portalUrl).trim() !== '' ? String(c.portalUrl) : null,
     redirectUrl: c.redirectUrl != null && String(c.redirectUrl).trim() !== '' ? String(c.redirectUrl) : null,
+    // Solo paradise: honrar chatSlug + same-origin. Los demás /l/<slug> no cambian.
+    chatSlug: t.slug === 'paradise' && c.chatSlug ? String(c.chatSlug) : null,
+    chatOrigin: t.slug === 'paradise' && c.chatSlug ? '' : undefined,
     noCode: c.noCode === true,
   };
 

@@ -63,13 +63,15 @@ export default async function NamedLanding({
 
   const [s] = await db.select().from(clientSettings).where(eq(clientSettings.tenantId, t.id));
   const c = (lp.config ?? {}) as Record<string, string | number | boolean | null>;
-  // Override de origen del chat por-tenant (subdominio propio del cliente, ej
-  // chat.trackerapp.site). Vacío = CHAT_ORIGIN global (chat.fichaslibres.online).
+  // Override de origen del chat por-tenant (ej chat.trackerapp.site).
+  // Default = CHAT_ORIGIN (chat.fichaslibres.online) — pauta en vivo depende de ese hop.
+  // Solo paradise: same-origin en el host de la landing (piloto Meta, sin tocar al resto).
   const scc = (s?.chatConfig ?? {}) as Record<string, unknown>;
   const chatDomainOverride =
     typeof scc.chatDomain === 'string' && scc.chatDomain.trim()
       ? `https://${scc.chatDomain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '')}`
       : '';
+  const sameOriginChat = t.slug === 'paradise' && !chatDomainOverride;
   const fixedWa =
     c.waNumber != null && String(c.waNumber).replace(/\D/g, '') !== ''
       ? String(c.waNumber).replace(/\D/g, '')
@@ -94,7 +96,7 @@ export default async function NamedLanding({
     redirectDelayMs: c.redirectDelayMs != null ? Number(c.redirectDelayMs) : undefined,
     // Si la landing tiene chatSlug, redirige al chat web en vez de wa.me.
     chatSlug: c.chatSlug != null ? String(c.chatSlug) : null,
-    chatOrigin: chatDomainOverride || process.env.CHAT_ORIGIN || '', // por-tenant → global
+    chatOrigin: chatDomainOverride || (sameOriginChat ? '' : process.env.CHAT_ORIGIN || ''),
     // Si tiene portalUrl, redirige a un portal externo del cliente con el token.
     portalUrl: c.portalUrl != null && String(c.portalUrl).trim() !== '' ? String(c.portalUrl) : null,
     // Si tiene redirectUrl, redirige tal cual (ej soporte wa.link) sin query extra.
