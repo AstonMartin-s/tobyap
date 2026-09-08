@@ -4,7 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { attributions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
-import { sendCapiEvent, eventExists, type BaseEventName } from '@/lib/meta';
+import { sendCapiEvent, eventExistsAny, type BaseEventName } from '@/lib/meta';
 import { parseLeadId } from '@/lib/attribution';
 
 export const dynamic = 'force-dynamic';
@@ -22,11 +22,12 @@ export const dynamic = 'force-dynamic';
 //     · Authorization: Bearer <secret>   ← simple, recomendado (lo que pidió el bot)
 //     · X-Signature: hex(hmac-sha256(secret, rawBody))   ← alternativa firmada
 //   Mapeo: registro → Conversacion · carga → Cargo.
-//   Dedup: event_id = conv-<lead_id> / cargo-<lead_id> (reintentos seguros).
+//   Dedup: event_id = conv-<code> / cargo-<code> (code canónico TGxxxxxx).
+//   Reintentos o lead_id envuelto (CW211_/ref_CW211_) no reenvían a Meta.
 //
 // El cliente nos manda TODAS las cargas (depósitos), pero la métrica que medimos
-// es la PRIMERA: como el event_id de carga es cargo-<lead_id>, la 1ª dispara el
-// evento Meta y las siguientes vuelven 200 {duplicate:true} sin duplicar en Meta.
+// es la PRIMERA: event_id canónico cargo-<TGxxxxxx>. La 1ª dispara a Meta y las
+// siguientes vuelven 200 {duplicate:true} sin duplicar.
 // Aceptamos "carga" y "primera carga" como sinónimos por compatibilidad.
 // ---------------------------------------------------------------------------
 
@@ -104,13 +105,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
 
   const base: BaseEventName | null =
-    eventType === 'registro'
+    eventType === 'registro' || eventType === 'conversation' || eventType === 'user_created'
       ? 'Conversacion'
-      : eventType === 'carga' || eventType === 'primera carga'
+      : eventType === 'carga' || eventType === 'primera carga' || eventType === 'first_deposit'
         ? 'Cargo'
         : null;
+  // Recibimos todo lo que manden; a Meta solo van alta (1ª) y carga (1ª).
   if (!base) {
-    return NextResponse.json({ error: 'event_type desconocido' }, { status: 400 });
+    return NextResponse.json({ ok: true, ignored: true });
   }
 
   const code = parseLeadId(leadIdRaw);
@@ -123,8 +125,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ ok: true, unmatched: true });
   }
 
-  const eventId = `${base === 'Conversacion' ? 'conv' : 'cargo'}-${leadIdRaw}`;
-  if (await eventExists(tenant.id, eventId)) {
+  // Dedup por code canónico (TGxxxxxx). También miramos el lead_id crudo por
+  // eventos viejos (conv-CW211_TG…) para no reenviar si ellos cambian el wrap.
+  const prefix = base === 'Conversacion' ? 'conv' : 'cargo';
+  const eventId = `${prefix}-${code}`;
+  const already = [eventId, `${prefix}-${leadIdRaw}`, `${prefix}-CW211_${code}`, `${prefix}-ref_CW211_${code}`];
+  if (await eventExistsAny(tenant.id, [...new Set(already)])) {
     return NextResponse.json({ ok: true, duplicate: true });
   }
 

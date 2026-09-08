@@ -85,7 +85,10 @@ const sig = require('crypto').createHmac('sha256', secret).update(rawBody, 'utf8
 
 ## 5. Idempotencia
 
-Deduplicamos por `lead_id` + `event_type`. Reenvíos = seguros (nunca duplican en Meta).
+Deduplicamos por **code canónico** (`TGxxxxxx`) + tipo. Si envuelven el `lead_id`
+(`CW211_TG…`, `ref_CW211_TG…`) cuenta como el mismo usuario. Reenvíos = seguros
+(nunca duplican en Meta). Otros `event_type` se aceptan con `200 {ignored:true}`
+y no van a Meta.
 
 ## 6. Lo que necesitamos de su lado
 

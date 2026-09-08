@@ -6,6 +6,12 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-08 — candywin: panel + primer registro/carga
+
+- Tenant `candywin` activo (pixel `…71070`, suffix A6, secreto afiliados, landing `telegram`). Panel: usuario `Candywin` (admin). Flags: solo Reportes + Config.
+- Webhook ya recibía `registro`/`carga` y mandaba 1º de cada uno a Meta. Hueco: `event_id` usaba el `lead_id` crudo (`conv-CW211_TG…`); el mismo user envuelto distinto podía duplicar CAPI.
+- Fix: dedup por code canónico `conv-/cargo-<TGxxxxxx>` + aliases del wrap Candywin. `event_type` desconocido → `200 ignored` (recibimos todo, a Meta solo alta + 1ª carga).
+
 ## Bitácora 2026-09-06 — Landing paradise (piloto Meta, solo ese tenant)
 
 - Solo `paradise` + landing de chat. King/goldenc/kingplay/bblack y el resto **siguen** `go.* → chat.fichaslibres` + spinner "WhatsApp".
