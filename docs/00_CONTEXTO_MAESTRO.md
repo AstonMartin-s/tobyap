@@ -6,6 +6,10 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-08 — candywin landing: copy Telegram (no WhatsApp)
+
+- El spinner decía "Te redirigimos a WhatsApp" aunque el hop es `t.me/candywinvip_bot`. Copy según `telegramBot`. Paradise/chat y el resto no se tocan.
+
 ## Bitácora 2026-09-08 — candywin: panel + primer registro/carga
 
 - Tenant `candywin` activo (pixel `…71070`, suffix A6, secreto afiliados, landing `telegram`). Panel: usuario `Candywin` (admin). Flags: solo Reportes + Config.

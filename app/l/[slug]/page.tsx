@@ -107,6 +107,8 @@ export default async function Landing({
     // Solo paradise: honrar chatSlug + same-origin. Los demás /l/<slug> no cambian.
     chatSlug: t.slug === 'paradise' && c.chatSlug ? String(c.chatSlug) : null,
     chatOrigin: t.slug === 'paradise' && c.chatSlug ? '' : undefined,
+    telegramBot: t.slug === 'candywin' && c.telegramBot ? String(c.telegramBot) : null,
+    telegramStartPrefix: t.slug === 'candywin' && c.telegramStartPrefix ? String(c.telegramStartPrefix) : null,
     noCode: c.noCode === true,
   };
 

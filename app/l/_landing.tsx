@@ -58,7 +58,7 @@ export interface LandingConfig {
 
 // Piloto Meta solo paradise (chat): copy de página, no de redirect.
 // El resto de tenants conserva el default histórico (pauta en vivo).
-export function landingSpinnerCopy(cfg: Pick<LandingConfig, 'tenantSlug' | 'headline' | 'subtext' | 'chatSlug' | 'brandName'>): {
+export function landingSpinnerCopy(cfg: Pick<LandingConfig, 'tenantSlug' | 'headline' | 'subtext' | 'chatSlug' | 'brandName' | 'telegramBot'>): {
   headline: string;
   subtext: string;
 } {
@@ -66,6 +66,12 @@ export function landingSpinnerCopy(cfg: Pick<LandingConfig, 'tenantSlug' | 'head
     return {
       headline: cfg.headline || (cfg.brandName ? `Bienvenido a ${cfg.brandName}` : 'Bienvenido'),
       subtext: cfg.subtext || 'Ingresá para reclamar tu beneficio.',
+    };
+  }
+  if (cfg.telegramBot) {
+    return {
+      headline: cfg.headline || 'Verificando tu acceso…',
+      subtext: cfg.subtext || 'Te redirigimos a Telegram en un instante.',
     };
   }
   return {
