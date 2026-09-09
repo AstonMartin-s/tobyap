@@ -14,9 +14,8 @@ const BRAND = 'PiliKing';
 const SLUG = 'piliking';
 const SUFFIX = 'A9';
 const KC_URL = 'https://ag.kingcash7.net';
-// ⚠️ CONFIRMAR: dominio de LOGIN del jugador (ag.kingcash7.net es el backoffice
-// del agente, NO la URL del jugador). Placeholder hasta confirmar con el cliente.
-const PLAYER_PORTAL = 'https://kingcash7.net';
+// Portal del jugador (confirmado por el cliente).
+const PLAYER_PORTAL = 'https://piliking.click/';
 
 async function main() {
   const kcLogin = process.env.KC_LOGIN;
