@@ -422,6 +422,8 @@ input[type='date']:hover::-webkit-calendar-picker-indicator { opacity: 0.9; }
 @media (max-width: 860px) {
   :root { --sidebar-w: 0px; }
   .shell { margin-left: 0; padding: 1.25rem 1rem 4rem; }
+  /* Chats a pantalla completa: el padding de 4rem del .shell dejaba un hueco tosco. */
+  .shell--wide { padding: .55rem .55rem calc(.45rem + env(safe-area-inset-bottom, 0px)); }
   /* Mobile: la barra ENVUELVE a varias líneas y MUESTRA las etiquetas. Antes era
      una fila de solo íconos con scroll horizontal poco visible → no se podía
      encontrar/tocar "Chats" en el celular. Con wrap + labels todo queda a la vista. */

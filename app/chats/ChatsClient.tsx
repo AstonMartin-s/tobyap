@@ -187,6 +187,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [tenantProvider, setTenantProvider] = useState<string>('pagoda');
   const [fichasEnabled, setFichasEnabled] = useState<boolean>(true);
   const [opsOpen, setOpsOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
   // Cajero sticky asignado al lead + pool disponible (para reasignar a mano).
   const [cajeros, setCajeros] = useState<Array<{ phone: string; name: string | null }>>([]);
   const [assignedWa, setAssignedWa] = useState<string | null>(null);
@@ -225,7 +226,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   // Responsive: en celular pasamos a una sola columna con patrón toggle
   // (lista <-> conversación). Sin esto, el grid de 3 columnas se salía de la
   // pantalla y parecía que "no abría" el chat al tocarlo.
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches);
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 820px)');
     const apply = () => setIsMobile(mq.matches);
@@ -233,6 +234,9 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     mq.addEventListener('change', apply);
     return () => mq.removeEventListener('change', apply);
   }, []);
+  // Desktop: rail fijo. Mobile: hoja inferior (si no, 340px se come el chat).
+  const dockManual = showManualPanel && !isMobile;
+  const sheetManual = showManualPanel && isMobile && manualOpen;
   const [soundOn, setSoundOn] = useState(true);
   const soundRef = useRef(true);
   const prevAttn = useRef<Set<string> | null>(null);
@@ -485,6 +489,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     if (sel) loadDetail(sel);
   }, [sel, loadDetail]);
   useEffect(() => { setOpsOpen(false); }, [sel]); // el drawer de fichas arranca cerrado en cada chat
+  useEffect(() => { if (showManualPanel) setManualOpen(true); }, [showManualPanel, sel]);
   useEffect(() => {
     if (!sel) return;
     const t = setInterval(() => loadDetail(sel), 6000);
@@ -818,7 +823,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
 
   return (
     <>
-    <div style={{ display: 'flex', gap: '1rem', marginBottom: '.6rem', alignItems: 'center' }}>
+    <div style={{ display: 'flex', gap: '.5rem', marginBottom: '.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
       <button 
         onClick={() => setShowKpis(!showKpis)}
         className="btn"
@@ -831,7 +836,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
       </button>
 
       {/* 4. Acciones alineadas a la derecha arriba de todo */}
-      <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', marginLeft: 'auto' }}>
+      <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', marginLeft: 'auto', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
         {counts.atencion > 0 && (
           <button onClick={() => setFilter('revisar')}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem', padding: '.3rem .6rem', fontSize: '.76rem', fontWeight: 700, border: '1px solid #e8883855', borderRadius: 8, background: '#e888381a', color: '#e8a050', cursor: 'pointer', transition: 'all .2s' }}
@@ -846,7 +851,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
-            {opPushOn ? 'Notif ✓' : 'Activar notif + acceso'}
+            {opPushOn ? 'Notif ✓' : (isMobile ? 'Activar notif' : 'Activar notif + acceso')}
           </button>
         )}
         <button onClick={toggleSound} aria-label="Sonido de atención"
@@ -907,7 +912,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
       </div>
     )}
 
-    <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : `${listW}px 10px minmax(0,1fr)`, alignItems: 'stretch', height: `calc(100vh - ${showKpis ? '150px' : '90px'})`, minHeight: isMobile ? 0 : 560 }}>
+    <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : `${listW}px 10px minmax(0,1fr)`, alignItems: 'stretch', height: isMobile ? `calc(100dvh - ${showKpis ? '15.5rem' : '11rem'} - env(safe-area-inset-bottom, 0px))` : `calc(100vh - ${showKpis ? '150px' : '90px'})`, minHeight: isMobile ? 280 : 560 }}>
       {/* LISTA — en mobile se oculta cuando hay un chat abierto */}
       <div className="card" style={{ padding: 0, overflow: 'hidden', display: isMobile && sel ? 'none' : 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ padding: '.6rem .6rem .35rem', flexShrink: 0 }}>
@@ -1181,7 +1186,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
 
             <div ref={bodyRef}
               onScroll={(e) => { const el = e.currentTarget; atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}
-              style={{ flex: 1, overflowY: 'auto', padding: '1.1rem 1.2rem', paddingRight: showManualPanel ? '356px' : (showOpsPanel && !opsOpen ? '3.2rem' : '1.2rem'), transition: 'padding-right .2s ease', display: 'flex', flexDirection: 'column', gap: '.7rem', minHeight: 0, backgroundColor: 'var(--bg, rgba(0,0,0,.18))', backgroundImage: 'radial-gradient(circle, rgba(124, 92, 255, 0.15) 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
+              style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '.8rem .85rem' : '1.1rem 1.2rem', paddingRight: dockManual ? '356px' : (showOpsPanel && !opsOpen && !isMobile ? '3.2rem' : (isMobile ? '.85rem' : '1.2rem')), transition: 'padding-right .2s ease', display: 'flex', flexDirection: 'column', gap: '.7rem', minHeight: 0, backgroundColor: 'var(--bg, rgba(0,0,0,.18))', backgroundImage: 'radial-gradient(circle, rgba(124, 92, 255, 0.15) 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
               {detail.messages.slice(0, visibleMsgCount).map((m, idx) => {
                 // Vista de operador: el LEAD (cliente) va a la izquierda, NOSOTROS
                 // (bot/operador) a la derecha — estilo Black Dragon.
@@ -1245,7 +1250,14 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
             </div>
 
             {/* ACCIONES */}
-            <div style={{ borderTop: '1px solid var(--border)', padding: '.7rem .9rem', display: 'flex', flexDirection: 'column', gap: '.5rem', background: 'var(--bg-2, rgba(255,255,255,.012))', flexShrink: 0, overflow: 'visible', position: 'relative', zIndex: 4 }}>
+            <div style={{ borderTop: '1px solid var(--border)', padding: isMobile ? '.55rem .7rem calc(.55rem + env(safe-area-inset-bottom, 0px))' : '.7rem .9rem', display: 'flex', flexDirection: 'column', gap: '.5rem', background: 'var(--bg-2, rgba(255,255,255,.012))', flexShrink: 0, overflow: 'visible', position: 'relative', zIndex: 4 }}>
+              {showManualPanel && isMobile && !manualOpen && (
+                <button type="button" onClick={() => setManualOpen(true)}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', width: '100%', padding: '.65rem .75rem', borderRadius: 10, border: '1px solid rgba(22,163,74,.45)', background: 'rgba(22,163,74,.12)', color: '#4ade80', fontWeight: 800, fontSize: '.82rem', cursor: 'pointer' }}>
+                  <span>El cliente espera — crear usuario</span>
+                  <span style={{ fontSize: '.7rem', fontWeight: 700 }}>Abrir ›</span>
+                </button>
+              )}
               {(panelQuick.barPresets ?? []).length > 0 && (
                 <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   {(panelQuick.barPresets ?? []).map((p) => (
@@ -1347,9 +1359,9 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
           </>
         )}
 
-        {/* PANEL de creación MANUAL — solo tenants manual (goldenC/ElGanador) con la
-            sesión esperando confirmación. Fijo a la derecha (no drawer). */}
-        {showManualPanel && detail && sel && (
+        {/* PANEL de creación MANUAL. Desktop: rail fijo. Mobile: hoja inferior
+            (el rail de 340px dejaba el chat ilegible). */}
+        {dockManual && detail && sel && (
           <div style={{
             position: 'absolute', top: 0, right: 0, bottom: 0, width: 340, maxWidth: '85%',
             zIndex: 9, background: 'var(--card, #14151b)', borderLeft: '1px solid var(--border)',
@@ -1370,6 +1382,37 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
               />
             </div>
           </div>
+        )}
+        {sheetManual && detail && sel && (
+          <>
+            <button type="button" aria-label="Cerrar crear usuario" onClick={() => setManualOpen(false)}
+              style={{ position: 'absolute', inset: 0, zIndex: 10, border: 'none', background: 'rgba(0,0,0,.45)', cursor: 'pointer' }} />
+            <div style={{
+              position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 11,
+              maxHeight: 'min(78dvh, 560px)',
+              background: 'var(--card, #14151b)', borderTop: '1px solid var(--border)',
+              borderRadius: '16px 16px 0 0', boxShadow: '0 -12px 40px rgba(0,0,0,.4)',
+              display: 'flex', flexDirection: 'column', minHeight: 0,
+              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '.45rem 0 .15rem' }}>
+                <span aria-hidden style={{ width: 40, height: 4, borderRadius: 4, background: 'var(--border-2, #3a3f4d)' }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.35rem .9rem .6rem', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                <span style={{ fontSize: '.85rem', fontWeight: 800, color: 'var(--accent,#7c5cff)' }}>Crear usuario</span>
+                <button type="button" onClick={() => setManualOpen(false)} title="Cerrar"
+                  style={{ border: 'none', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', fontSize: '1.2rem', lineHeight: 1, padding: '.2rem .35rem' }}>✕</button>
+              </div>
+              <div style={{ padding: '.85rem .9rem 1rem', overflowY: 'auto', minHeight: 0, flex: 1 }}>
+                <ManualAccountPanel
+                  sessionKey={sel}
+                  suggestedUsername={String(detail.data?.suggestedUsername ?? '')}
+                  suggestedPassword={String(detail.data?.suggestedPassword ?? '')}
+                  onDone={() => sel && loadDetail(sel)}
+                />
+              </div>
+            </div>
+          </>
         )}
       </div>
 

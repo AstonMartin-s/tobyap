@@ -50,7 +50,7 @@ export default function ManualAccountPanel({
 
   const box: React.CSSProperties = { border: '1px solid var(--border)', borderRadius: 10, padding: '.6rem .7rem', background: 'var(--card-2, rgba(255,255,255,.02))' };
   const lbl: React.CSSProperties = { fontSize: '.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--muted-2,#5d6478)' };
-  const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '.45rem .6rem', fontSize: '.9rem', marginTop: '.2rem' };
+  const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: '.55rem .7rem', fontSize: 16, marginTop: '.25rem' };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
