@@ -180,7 +180,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [cajeros, setCajeros] = useState<Array<{ phone: string; name: string | null }>>([]);
   const [assignedWa, setAssignedWa] = useState<string | null>(null);
   const [assignedWaName, setAssignedWaName] = useState<string | null>(null);
-  const showOpsPanel = fichasEnabled && (tenantProvider === 'partner_api' || tenantProvider === 'king') && !!sel && !!detail?.username;
+  const showOpsPanel = fichasEnabled && (tenantProvider === 'partner_api' || tenantProvider === 'king' || tenantProvider === 'kingcash') && !!sel && !!detail?.username;
   // Ancho de la lista (barra divisora arrastrable, estilo Black Dragon).
   const [listW, setListW] = useState(380);
   const listWRef = useRef(380);

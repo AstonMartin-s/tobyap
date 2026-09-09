@@ -22,7 +22,7 @@ const LANDING_COLOR = '#B8860B'; // dorado marca PiliKing
 const LANDING_HOST = 'go.fichaslibres.online';
 const SUPPORT_LANDING_URL = `https://${LANDING_HOST}/l/${SLUG}/walink?campaign=Soporte`;
 
-async function upsertLanding(tenantId: string, landingSlug: string, name: string, type: string, config: Record<string, unknown>) {
+async function upsertLanding(tenantId: string, landingSlug: string, name: string, type: string, config: Record<string, string | number | boolean | null>) {
   const [existing] = await db
     .select({ id: landings.id })
     .from(landings)

@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 
-// Panel de operaciones de SALDO REAL (Partner API — bblack/KingPlay). Autocontenido.
-// Se monta SOLO cuando el tenant es provider='partner_api'. Consulta saldo, carga y
+// Panel de operaciones de SALDO REAL (partner_api / king / kingcash). Autocontenido.
+// Se monta cuando el tenant tiene API de fichas. Consulta saldo, carga y
 // retira fichas. Toda operación de plata pide CONFIRMACIÓN explícita del operario.
 
 type Summary = { cargado: number; retirado: number; balance: number };
