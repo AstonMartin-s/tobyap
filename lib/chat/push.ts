@@ -39,6 +39,28 @@ export function vapidPublicKey(): string | null {
 }
 
 /**
+ * Envío genérico de Web Push a una suscripción cualquiera (cliente u operador).
+ * Best-effort, nunca lanza. Devuelve `gone:true` si la suscripción murió
+ * (404/410) para que el caller la limpie de su tabla.
+ */
+export async function sendWebPush(
+  sub: unknown,
+  payload: { title: string; body: string; url?: string },
+): Promise<{ ok: boolean; gone: boolean }> {
+  if (!ensureVapid()) return { ok: false, gone: false };
+  if (!sub || typeof sub !== 'object') return { ok: false, gone: false };
+  const s = sub as PushSub;
+  if (!s.endpoint) return { ok: false, gone: false };
+  try {
+    await webpush.sendNotification(s as webpush.PushSubscription, JSON.stringify(payload));
+    return { ok: true, gone: false };
+  } catch (e) {
+    const code = (e as { statusCode?: number })?.statusCode;
+    return { ok: false, gone: code === 404 || code === 410 };
+  }
+}
+
+/**
  * Envía un push a la suscripción guardada en la sesión. Best-effort, nunca lanza:
  * si no hay VAPID o suscripción, es no-op. Si la suscripción murió (404/410), la
  * limpia de la sesión para no reintentar.

@@ -25,6 +25,7 @@ import {
   supportMessage,
   postActionMessages,
 } from '@/lib/chat/flow';
+import { renderTemplate } from '@/lib/chat/runtime';
 import { prepareBotBatch } from '@/lib/chat/stagger';
 import { listCajeros } from '@/lib/rotation';
 
@@ -210,6 +211,8 @@ export async function POST(req: NextRequest) {
     deleteLead?: boolean;
     amount?: number;
     bonusPercent?: number;
+    username?: string;
+    password?: string;
   };
 
   // Export CSV flexible: rango de creación + filtro opcional por estado. Para cruzar
@@ -323,6 +326,45 @@ export async function POST(req: NextRequest) {
     if (!match) return NextResponse.json({ error: 'cajero no está en el pool' }, { status: 400 });
     await mergeChatData(s.id, { assignedWa: match.phone, assignedWaName: match.name ?? null }, undefined, { touchUpdatedAt: false });
     return NextResponse.json({ ok: true, assignedWa: match.phone, assignedWaName: match.name ?? null });
+  }
+
+  // ── Creación MANUAL semi-automatizada (goldenC / ElGanador) ────────────────
+  // El operador crea la cuenta A MANO en la plataforma del cliente y confirma acá
+  // con el usuario/contraseña (editables). Persistimos las credenciales, mandamos
+  // al cliente el bloque de credenciales + follow-up y avanzamos a 'credenciales'
+  // (de ahí el flujo sigue igual: "Quiero el CBU 💳" → CBU → comprobante…).
+  if (b.op === 'manual_account_confirm') {
+    const tenant = await getTenantBySlug(session.slug);
+    if (!tenant || tenant.provider !== 'manual') {
+      return NextResponse.json({ ok: false, skip: true, error: 'cliente sin creación manual' });
+    }
+    const username = String(b.username ?? '').trim();
+    const password = String(b.password ?? '').trim();
+    if (!username || !password) {
+      return NextResponse.json({ error: 'usuario y contraseña requeridos' }, { status: 400 });
+    }
+    const runtime = await loadChatRuntime(session.tenantId, session.slug, s.phone);
+    const creds = `\n\n👤 Usuario: *${username}*\n🔑 Contraseña: *${password}*\n\n🔗 Entrá acá:\n${runtime.links.portal_login}`;
+    const botMsgs = prepareBotBatch(
+      [
+        { from: 'bot', delayMs: 400, at: Date.now(), text: renderTemplate('account_done', runtime, { creds_block: creds }) },
+        { from: 'bot', delayMs: 1200, at: Date.now(), text: renderTemplate('account_agent_followup', runtime) },
+      ],
+      { op: true },
+    );
+    await appendChatMessages(s.id, botMsgs, {
+      step: 'credenciales',
+      dataMerge: { username, password, loginUrl: null, portalName: username, existing: false, manualPending: false },
+    });
+    if (s.kommoLeadId) {
+      addLeadNote(tenant, s.kommoLeadId, `👤 Usuario creado A MANO por el operador (${session.slug}): ${username}`);
+    }
+    void sendPushToSession(s.id, data.pushSub, {
+      title: '¡Tu cuenta está lista!',
+      body: 'Ya te dejamos tu usuario y contraseña en el chat.',
+      url: `/chat/${session.slug}`,
+    });
+    return NextResponse.json({ ok: true, messages: botMsgs, step: 'credenciales' });
   }
 
   // ── Operaciones de SALDO REAL (Partner API / King API) ─────────────────────

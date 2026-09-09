@@ -140,6 +140,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
             : [{ id: 'want_account', label: 'Quiero mi cuenta' }];
           setButtons(welcomeBtns);
         } else if (d.step === 'credenciales') setButtons([{ id: 'want_cbu', label: 'Quiero el CBU' }]);
+        else if (d.step === 'account_pending') setButtons([]);
       } catch { /* sin resume */ }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -218,8 +219,12 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         if (d.total > pollBase.current) {
           const fresh = (d.messages ?? []).filter((m: Msg) => m.from === 'bot');
           pollBase.current = d.total;
-          await play(fresh, []);
           if (d.step) setStep(d.step);
+          // Tras confirmar creación manual (account_pending → credenciales) el
+          // cliente tiene que ver "Quiero el CBU". En el resto de steps el poll
+          // no toca botones (menú post-carga vive en step==='done').
+          const nextBtns = d.step === 'credenciales' ? [{ id: 'want_cbu', label: 'Quiero el CBU' }] : [];
+          await play(fresh, nextBtns);
           if ('Notification' in window && Notification.permission === 'granted') {
             const body = d.step === 'done' ? 'Tu carga fue acreditada con éxito' : (fresh[fresh.length - 1]?.text?.slice(0, 90) ?? 'Tenés un mensaje nuevo');
             try { new Notification(`${skin.brand}`, { body }); } catch { /* sin permiso */ }

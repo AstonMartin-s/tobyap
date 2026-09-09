@@ -143,9 +143,10 @@ export function welcomeStep(
 // ── Paso 2: PIDIO USER (crea cuenta — Pagoda o Partner API según el tenant) ─
 export async function accountStep(
   tenant: ResolvedTenant,
-  session: { phone: string; name?: string | null },
+  session: { phone: string; name?: string | null; existing?: Record<string, unknown> },
   cfg: ChatRuntimeConfig = DEFAULT_RUNTIME,
 ): Promise<{ messages: BotMsg[]; buttons: Btn[]; data: Record<string, unknown>; step: string }> {
+  if (tenant.provider === 'manual') return accountStepManual(tenant, session, cfg);
   if (tenant.provider === 'partner_api') return accountStepPartnerApi(tenant, session, cfg);
   if (tenant.provider === 'kingcash') return accountStepKingcash(tenant, session, cfg);
   // greenbet SIN Pagoda: la cuenta se crea directo por Green API.
@@ -183,6 +184,69 @@ export async function accountStep(
     buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
     data: { username: acc.username, password: acc.password, loginUrl: acc.loginUrl, portalName, existing: acc.existing, ...cajero },
     step: 'credenciales',
+  };
+}
+
+// Creación MANUAL semi-automatizada (goldenC / ElGanador): NO hay API de alta.
+// El operador crea la cuenta a mano en la plataforma del cliente. Acá solo
+// SUGERIMOS username/password y dejamos la sesión EN ESPERA ('account_pending')
+// hasta que el operador confirme desde el panel. No revelamos credenciales
+// todavía. El username sugerido = <nombre_limpio> + últimos 4 dígitos del tel.
+export function buildManualUsername(name?: string | null, phone?: string): string {
+  const clean = (name ?? '')
+    .normalize('NFD')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toLowerCase()
+    .slice(0, 12);
+  const digits = (phone ?? '').replace(/\D/g, '');
+  const last4 = digits.slice(-4);
+  const base = clean.length >= 2 ? clean : `user${digits.slice(-6)}`;
+  return `${base}${last4}`.slice(0, 18);
+}
+
+async function accountStepManual(
+  tenant: ResolvedTenant,
+  session: { phone: string; name?: string | null; existing?: Record<string, unknown> },
+  cfg: ChatRuntimeConfig,
+): Promise<{ messages: BotMsg[]; buttons: Btn[]; data: Record<string, unknown>; step: string }> {
+  const prev = session.existing ?? {};
+  const prevUser = typeof prev.username === 'string' ? prev.username.trim() : '';
+  const prevPass = typeof prev.password === 'string' ? prev.password : '';
+  // Dedup: el teléfono ya tiene usuario confirmado → devolvemos esas credenciales
+  // (no re-sugerimos ni pedimos otra confirmación al operador).
+  if (prevUser && prevPass) {
+    const creds = `\n\n👤 Usuario: *${prevUser}*\n🔑 Contraseña: *${prevPass}*\n\n🔗 Entrá acá:\n${cfg.links.portal_login}`;
+    return {
+      messages: [
+        { from: 'bot', delayMs: 600, at: now(), text: renderTemplate('account_checking', cfg) },
+        { from: 'bot', delayMs: 1500, at: now(), text: renderTemplate('account_existing', cfg, { creds_block: creds }) },
+      ],
+      buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
+      data: { username: prevUser, password: prevPass, loginUrl: null, portalName: prevUser, existing: true, manualPending: false },
+      step: 'credenciales',
+    };
+  }
+  // Ya estábamos esperando confirmación: no rotamos la sugerencia.
+  const keepUser = typeof prev.suggestedUsername === 'string' ? prev.suggestedUsername.trim() : '';
+  const keepPass = typeof prev.suggestedPassword === 'string' ? prev.suggestedPassword : '';
+  const suggestedUsername = keepUser || buildManualUsername(session.name, session.phone);
+  const suggestedPassword = keepPass || randomPlayerPassword();
+  const cajero = await assignCajeroData(tenant.id);
+  return {
+    messages: [
+      { from: 'bot', delayMs: 700, at: now(), text: renderTemplate('account_creating_manual', cfg) },
+    ],
+    // Sin botones: el cliente espera a que el operador confirme la creación.
+    buttons: [],
+    data: {
+      suggestedUsername,
+      suggestedPassword,
+      manualPending: true,
+      portalName: suggestedUsername,
+      existing: false,
+      ...cajero,
+    },
+    step: 'account_pending',
   };
 }
 
@@ -402,7 +466,7 @@ export function postActionMessages(action: string, data: Record<string, unknown>
 
 // Detecta si el cliente está pidiendo ayuda / confundido / consulta que el flujo
 // no resuelve → lo mandamos directo al soporte de WhatsApp.
-const HELP_RE = /(ayuda|no entiendo|no comprendo|no puedo|no me (anda|funciona|sale)|problema|c[oó]mo hago|como funciona|no s[eé]|duda|consulta|hablar con|una persona|un humano|asesor|operador|reclamo|estafa|no me lleg|error)/i;
+export const HELP_RE = /(ayuda|no entiendo|no comprendo|no puedo|no me (anda|funciona|sale)|problema|c[oó]mo hago|como funciona|no s[eé]|duda|consulta|hablar con|una persona|un humano|asesor|operador|reclamo|estafa|no me lleg|error)/i;
 function supportReply(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME, data: Record<string, unknown> = {}): BotMsg[] {
   return [buildSupportMsg(cfg, data, 600)];
 }
@@ -455,6 +519,7 @@ export function onFreeText(step: string, text?: string, cfg: ChatRuntimeConfig =
   // Si pide ayuda: post-carga → soporte/cajero; pre-carga → tranquilizar en el chat.
   if (text && HELP_RE.test(text)) return accredited ? supportReply(cfg, data) : reassureInChat();
   if (step === 'welcome') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Tocá el botón *Quiero mi cuenta 🎁* para empezar 👇' }];
+  if (step === 'account_pending') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Todavía estamos creando tu usuario, dame un momento 🙌' }];
   if (step === 'credenciales') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Cuando quieras cargar, tocá *Quiero el CBU 💳* 👇' }];
   if (step === 'comprobante') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Cuando tengas el comprobante de la transferencia, mandámelo por acá 📸' }];
   // Fallback: post-carga → soporte/cajero; pre-carga → tranquilizar (sin WhatsApp).

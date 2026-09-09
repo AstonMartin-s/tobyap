@@ -31,7 +31,9 @@ export interface ResolvedTenant {
   // Proveedor de creación de cuenta / fichas:
   //  'pagoda' (King) | 'king' (greenbet directa) | 'partner_api' (bblack/kplay)
   //  | 'kingcash' (panel de agente ag.kingcash7.net; login/clave en partnerApiKey
-  //    como JSON {"login","password"}, dominio en partnerApiUrl).
+  //    como JSON {"login","password"}, dominio en partnerApiUrl)
+  //  | 'manual' (goldenC / ElGanador: el operador crea la cuenta a mano; sin API
+  //    de alta ni de fichas. Activa panel "Crear usuario" + push de operador).
   provider: string;
   partnerApiUrl: string | null;
   partnerApiKey: string | null; // descifrado

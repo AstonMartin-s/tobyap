@@ -433,7 +433,7 @@ export const chatSessions = pgTable('chat_sessions', {
   token: text('token'), // código de atribución del redirect
   campaign: text('campaign'),
   ccpp: text('ccpp'),
-  step: text('step').default('form'), // form|welcome|credenciales|cbu|comprobante|done
+  step: text('step').default('form'), // form|welcome|account_pending|credenciales|cbu|comprobante|done
   kommoLeadId: bigint('kommo_lead_id', { mode: 'number' }),
   data: jsonb('data').$type<Record<string, unknown>>().default({}), // credenciales, etc.
   messages: jsonb('messages').$type<Array<{ from: 'bot' | 'user'; text?: string; image?: string; at: number }>>().default([]),
@@ -441,6 +441,30 @@ export const chatSessions = pgTable('chat_sessions', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 export type ChatSessionRow = typeof chatSessions.$inferSelect;
+
+// ---------------------------------------------------------------------------
+// operator_push_subs — suscripciones Web Push del OPERADOR (panel), separadas
+// del push del cliente (chat_sessions.data.pushSub). Solo se usan para tenants
+// provider='manual' (goldenC/ElGanador): push de fondo al celular del operador
+// cuando hay que crear un usuario, el cliente pide soporte o llega una imagen.
+// Una fila por (tenant, panel_user, endpoint). VAPID compartido con el chat.
+// ---------------------------------------------------------------------------
+export const operatorPushSubs = pgTable(
+  'operator_push_subs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+    panelUser: text('panel_user'), // panel_users.id o displayName (identifica al operador)
+    endpoint: text('endpoint').notNull(), // endpoint único de la suscripción push
+    subscription: jsonb('subscription').$type<Record<string, unknown>>().notNull(), // PushSubscription completa
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (t) => ({
+    uniqEndpoint: unique('operator_push_tenant_endpoint').on(t.tenantId, t.endpoint),
+  }),
+);
+export type OperatorPushSubRow = typeof operatorPushSubs.$inferSelect;
 
 export type TenantRow = typeof tenants.$inferSelect;
 export type NewTenant = typeof tenants.$inferInsert;

@@ -10,6 +10,7 @@ import { appendChatMessages, mergeChatData } from '@/lib/chat/mutations';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadStatus } from '@/lib/kommo';
+import { notifyOperators } from '@/lib/panel/operatorPush';
 import { saveComprobante, isDangerousUploadMime } from '@/lib/storage';
 import { signFilePath } from '@/lib/chat/fileToken';
 import { normalizeUploadImage } from '@/lib/chat/image';
@@ -160,6 +161,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       if (tenant.statusRevisarImagenId) updateLeadStatus(tenant, s.kommoLeadId, tenant.statusRevisarImagenId).catch(() => {});
     }
   }
+
+  // Provider manual: push de fondo al operador avisando que llegó una imagen
+  // (comprobante). Solo tenants manuales; best-effort.
+  void notifyOperators(tenant, 'comprobante', { sessionKey, name: s.name });
 
   return NextResponse.json({ ok: true, messages: botMsgs, step, fileUrl, total: history.length });
 }

@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
-import { onFreeText, accountStep, WANT_ACCOUNT_RE } from '@/lib/chat/flow';
+import { onFreeText, accountStep, WANT_ACCOUNT_RE, HELP_RE } from '@/lib/chat/flow';
 import { onFreeTextTienda } from '@/lib/chat/flows/tienda';
 import { loadTiendaConfig, loadChatFlow } from '@/lib/chat/loadTienda';
 import { advanceByText } from '@/lib/chat/flowGraph';
@@ -12,6 +12,7 @@ import { appendChatMessages } from '@/lib/chat/mutations';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadFields, updateLeadName } from '@/lib/kommo';
+import { notifyOperators } from '@/lib/panel/operatorPush';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,10 +68,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   // El cliente tipeó "quiero mi cuenta" en vez de tocar el botón (muy común en mobile).
   if ((s.step ?? 'welcome') === 'welcome' && WANT_ACCOUNT_RE.test(b.text)) {
-    const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name }, runtime);
+    const existing = (s.data ?? {}) as Record<string, unknown>;
+    const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name, existing }, runtime);
     const botMsgs = prepareBotBatch(r.messages);
     await appendChatMessages(s.id, [userMsg, ...botMsgs], { step: r.step, dataMerge: r.data, markUnread: true });
     const history = [...(s.messages ?? []), userMsg, ...botMsgs];
+    // Provider manual: avisar al operador que hay una creación pendiente.
+    if (r.step === 'account_pending' && !existing.manualPending) {
+      void notifyOperators(tenant, 'account_pending', { sessionKey: s.sessionKey, name: s.name });
+    }
     if (s.kommoLeadId && r.data.username) {
       const fields: Array<{ fieldId: number; value: string }> = [];
       const uF = tenant.customFields['portal_url_field'];
@@ -109,6 +115,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const history = [...(s.messages ?? []), userMsg, ...botMsgs];
 
   if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, `👤 Lead: ${b.text}`);
+
+  // Provider manual: si el cliente pide soporte post-carga (texto libre), avisamos
+  // al operador. Pre-carga se queda en el chat (reassure) — no es "soporte".
+  if ((s.step ?? '') === 'done' && HELP_RE.test(b.text)) {
+    void notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
+  }
 
   return NextResponse.json({ ok: true, messages: botMsgs, total: history.length });
 }

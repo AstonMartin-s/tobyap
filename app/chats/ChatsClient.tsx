@@ -5,6 +5,17 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Clipboa
 import { TZ_AR } from '@/lib/datetime/ar';
 import { DEFAULT_PANEL_QUICK, type PanelQuickTexts } from '@/lib/chat/templates';
 import OperationsPanel from './OperationsPanel';
+import ManualAccountPanel from './ManualAccountPanel';
+
+// VAPID base64url → Uint8Array (para suscribir push del operador). Igual que el widget.
+function urlB64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
 
 type Item = {
   sessionKey: string;
@@ -138,10 +149,10 @@ const isActivoReciente = (i: Item): boolean => isActive(i) && within30(i.updated
 // Predicado a nivel módulo (para detectar atención nueva en el poll).
 const itemNeedsAttention = (i: Item): boolean => {
   if (!isOpen(i)) return false;
-  return i.step === 'validando' || i.hasComprobante || i.unread;
+  return i.step === 'validando' || i.step === 'account_pending' || i.hasComprobante || i.unread;
 };
 
-const EXPORT_STEPS = ['welcome', 'credenciales', 'comprobante', 'app_onboarding', 'validando', 'done', 'no_cargo', 'closed'] as const;
+const EXPORT_STEPS = ['welcome', 'account_pending', 'credenciales', 'comprobante', 'app_onboarding', 'validando', 'done', 'no_cargo', 'closed'] as const;
 
 function isoDateLocal(d: Date) {
   const y = d.getFullYear();
@@ -154,7 +165,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [showKpis, setShowKpis] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [sel, setSel] = useState<string | null>(null);
-  const [detail, setDetail] = useState<{ messages: Msg[]; phone: string | null; name: string | null; username: string | null; step: string | null; kommoLeadId: number | null } | null>(null);
+  const [detail, setDetail] = useState<{ messages: Msg[]; phone: string | null; name: string | null; username: string | null; step: string | null; kommoLeadId: number | null; data: Record<string, unknown> } | null>(null);
   const [busy, setBusy] = useState(false);
   const [custom, setCustom] = useState('');
   type ChatFilter = 'inbox' | 'revisar' | 'no_leidos' | 'activos' | 'acreditados' | 'no_cargo' | 'archivadas' | 'estafa' | 'precaucion';
@@ -181,6 +192,9 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [assignedWa, setAssignedWa] = useState<string | null>(null);
   const [assignedWaName, setAssignedWaName] = useState<string | null>(null);
   const showOpsPanel = fichasEnabled && (tenantProvider === 'partner_api' || tenantProvider === 'king' || tenantProvider === 'kingcash') && !!sel && !!detail?.username;
+  // Panel de creación MANUAL (goldenC/ElGanador): solo cuando el tenant es manual
+  // y la sesión está esperando que el operador confirme el alta ('account_pending').
+  const showManualPanel = tenantProvider === 'manual' && !!sel && detail?.step === 'account_pending';
   // Ancho de la lista (barra divisora arrastrable, estilo Black Dragon).
   const [listW, setListW] = useState(380);
   const listWRef = useRef(380);
@@ -233,6 +247,87 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     if (next) { playChime(); if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {}); }
   }
   const [toast, setToast] = useState<string | null>(null);
+  // ── Push de fondo del OPERADOR (solo tenants manual: goldenC/ElGanador) ──────
+  const [opPushAvail, setOpPushAvail] = useState(false); // el server habilita push manual
+  const [opPushOn, setOpPushOn] = useState(false); // ya suscripto en este dispositivo
+  const [opPushIosGuide, setOpPushIosGuide] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<{ prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> } | null>(null);
+  const isManual = tenantProvider === 'manual';
+  const isStandalone = () => typeof window !== 'undefined' && ((window.matchMedia?.('(display-mode: standalone)').matches) || (navigator as { standalone?: boolean }).standalone === true);
+  const isIos = () => typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  // Registrar el SW del panel y ver si el push manual está habilitado en el server.
+  useEffect(() => {
+    if (!isManual) return;
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/panel-sw.js', { scope: '/chats' }).catch(() => {});
+    }
+    const onPrompt = (e: Event) => { e.preventDefault(); setDeferredPrompt(e as unknown as { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }); };
+    const onInstalled = () => setDeferredPrompt(null);
+    window.addEventListener('beforeinstallprompt', onPrompt);
+    window.addEventListener('appinstalled', onInstalled);
+    (async () => {
+      try {
+        const r = await fetch('/api/panel/push').then((x) => x.json()).catch(() => null);
+        setOpPushAvail(!!r?.ok);
+        if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
+          const reg = await navigator.serviceWorker.ready;
+          const sub = await reg.pushManager.getSubscription();
+          setOpPushOn(!!sub);
+          // Ya tenía permiso de antes: re-aseguramos la suscripción (idempotente).
+          if (sub && r?.ok && r.publicKey) void enableOperatorPush(true);
+        }
+      } catch { /* push no disponible */ }
+    })();
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onPrompt);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isManual]);
+
+  // Suscribe este dispositivo al push del operador. En iOS exige PWA instalada.
+  async function enableOperatorPush(silent = false) {
+    try {
+      if (typeof navigator === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+        if (!silent) setToast('Este navegador no soporta notificaciones de fondo');
+        return;
+      }
+      if (isIos() && !isStandalone()) { setOpPushIosGuide(true); return; }
+      if (!silent && deferredPrompt) {
+        try {
+          await deferredPrompt.prompt();
+          await deferredPrompt.userChoice.catch(() => ({ outcome: 'dismissed' }));
+          setDeferredPrompt(null);
+        } catch { /* el usuario canceló el install — igual seguimos con el push */ }
+      }
+      const kd = await fetch('/api/panel/push').then((x) => x.json()).catch(() => null);
+      if (!kd?.ok || !kd.publicKey) { if (!silent) setToast('El push no está configurado'); return; }
+      if ('Notification' in window && Notification.permission === 'default') {
+        const p = await Notification.requestPermission();
+        if (p !== 'granted') { if (!silent) setToast('Permiso de notificaciones denegado'); return; }
+      } else if ('Notification' in window && Notification.permission === 'denied') {
+        if (!silent) setToast('Notificaciones bloqueadas: habilitalas en el navegador');
+        return;
+      }
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlB64ToUint8Array(kd.publicKey) as unknown as BufferSource,
+        });
+      }
+      const res = await fetch('/api/panel/push', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: sub }),
+      }).then((x) => x.json()).catch(() => null);
+      if (res?.ok) { setOpPushOn(true); if (!silent) setToast('Notificaciones activadas ✓'); }
+      else if (!silent) setToast('No se pudo activar');
+    } catch {
+      if (!silent) setToast('No se pudo activar');
+    }
+  }
   const [panelQuick, setPanelQuick] = useState<PanelQuickTexts>({ barPresets: [] });
   const [niche, setNiche] = useState<'circo' | 'tienda'>('circo');
   const isTienda = niche === 'tienda';
@@ -318,7 +413,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     }).then((x) => x.json()).catch(() => null);
     if (r?.ok) {
       const s = r.session;
-      setDetail({ messages: (s.messages ?? []) as Msg[], phone: s.phone, name: s.name, username: (s.data?.username as string) ?? null, step: s.step, kommoLeadId: s.kommoLeadId });
+      setDetail({ messages: (s.messages ?? []) as Msg[], phone: s.phone, name: s.name, username: (s.data?.username as string) ?? null, step: s.step, kommoLeadId: s.kommoLeadId, data: (s.data ?? {}) as Record<string, unknown> });
       setAssignedWa((s.data?.assignedWa as string) ?? null);
       setAssignedWaName((s.data?.assignedWaName as string) ?? null);
     }
@@ -376,7 +471,8 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   // Si llegamos desde el Embudo con ?s=<sessionKey>, abrimos ese chat.
   useEffect(() => {
     try {
-      const s = new URL(window.location.href).searchParams.get('s');
+      const u = new URL(window.location.href);
+      const s = u.searchParams.get('s') || u.searchParams.get('c');
       if (s) setSel(s);
     } catch { /* ignore */ }
   }, []);
@@ -626,7 +722,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   // Un mensaje nuevo debe marcarse como "no leído" sin importar en qué estado estaba (ej. No Cargo)
   const noLeido = (i: Item) => i.unread;
   // "Requiere atención" = comprobante por revisar O mensaje sin leer (solo activos).
-  const needsAttention = (i: Item) => needsReview(i) || noLeido(i);
+  const needsAttention = (i: Item) => needsReview(i) || noLeido(i) || i.step === 'account_pending';
   const ql = q.trim().toLowerCase();
   // En pestañas terminales la fuente es la lista dedicada del server (no las 200
   // recientes), así que no quedan vacías aunque el estado sea viejo.
@@ -741,6 +837,16 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
             style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem', padding: '.3rem .6rem', fontSize: '.76rem', fontWeight: 700, border: '1px solid #e8883855', borderRadius: 8, background: '#e888381a', color: '#e8a050', cursor: 'pointer', transition: 'all .2s' }}
             title="Chats que requieren atención (comprobante por revisar o cliente esperando)">
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#e88838', boxShadow: '0 0 6px #e88838' }} /> Atención · {counts.atencion}
+          </button>
+        )}
+        {isManual && opPushAvail && (
+          <button onClick={() => enableOperatorPush(false)} aria-label="Activar notificaciones de fondo"
+            title={opPushOn ? 'Notificaciones de fondo activadas' : 'Activar notificaciones + instalar acceso directo'}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem', height: 30, padding: '0 .5rem', borderRadius: 8, border: `1px solid ${opPushOn ? 'var(--accent)' : 'var(--border)'}`, background: opPushOn ? 'var(--accent-soft)' : 'transparent', color: opPushOn ? 'var(--accent)' : 'var(--muted)', cursor: 'pointer', fontSize: '.68rem', fontWeight: 700 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            {opPushOn ? 'Notif ✓' : 'Activar notif + acceso'}
           </button>
         )}
         <button onClick={toggleSound} aria-label="Sonido de atención"
@@ -1075,7 +1181,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
 
             <div ref={bodyRef}
               onScroll={(e) => { const el = e.currentTarget; atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}
-              style={{ flex: 1, overflowY: 'auto', padding: '1.1rem 1.2rem', paddingRight: showOpsPanel && !opsOpen ? '3.2rem' : '1.2rem', transition: 'padding-right .2s ease', display: 'flex', flexDirection: 'column', gap: '.7rem', minHeight: 0, backgroundColor: 'var(--bg, rgba(0,0,0,.18))', backgroundImage: 'radial-gradient(circle, rgba(124, 92, 255, 0.15) 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
+              style={{ flex: 1, overflowY: 'auto', padding: '1.1rem 1.2rem', paddingRight: showManualPanel ? '356px' : (showOpsPanel && !opsOpen ? '3.2rem' : '1.2rem'), transition: 'padding-right .2s ease', display: 'flex', flexDirection: 'column', gap: '.7rem', minHeight: 0, backgroundColor: 'var(--bg, rgba(0,0,0,.18))', backgroundImage: 'radial-gradient(circle, rgba(124, 92, 255, 0.15) 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
               {detail.messages.slice(0, visibleMsgCount).map((m, idx) => {
                 // Vista de operador: el LEAD (cliente) va a la izquierda, NOSOTROS
                 // (bot/operador) a la derecha — estilo Black Dragon.
@@ -1240,7 +1346,53 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
             </div>
           </>
         )}
+
+        {/* PANEL de creación MANUAL — solo tenants manual (goldenC/ElGanador) con la
+            sesión esperando confirmación. Fijo a la derecha (no drawer). */}
+        {showManualPanel && detail && sel && (
+          <div style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0, width: 340, maxWidth: '85%',
+            zIndex: 9, background: 'var(--card, #14151b)', borderLeft: '1px solid var(--border)',
+            boxShadow: '-10px 0 30px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column', minHeight: 0,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', padding: '.7rem .9rem', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+              <span style={{ fontSize: '.8rem', fontWeight: 800, color: 'var(--accent,#7c5cff)', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+                Crear usuario
+              </span>
+            </div>
+            <div style={{ padding: '.8rem', overflowY: 'auto', minHeight: 0, flex: 1 }}>
+              <ManualAccountPanel
+                sessionKey={sel}
+                suggestedUsername={String(detail.data?.suggestedUsername ?? '')}
+                suggestedPassword={String(detail.data?.suggestedPassword ?? '')}
+                onDone={() => sel && loadDetail(sel)}
+              />
+            </div>
+          </div>
+        )}
       </div>
+
+      {opPushIosGuide && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 75, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => setOpPushIosGuide(false)}>
+          <div className="card" style={{ width: 'min(420px, 100%)', padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '.7rem' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontWeight: 800, fontSize: '1rem' }}>Instalar en iPhone</div>
+            <div style={{ fontSize: '.85rem', color: 'var(--muted)', lineHeight: 1.5 }}>
+              En iPhone las notificaciones de fondo exigen agregar el panel a la pantalla de inicio:
+              <ol style={{ margin: '.5rem 0 0', paddingLeft: '1.1rem' }}>
+                <li>Tocá <b>Compartir</b> (el ícono cuadrado con la flecha) en Safari.</li>
+                <li>Elegí <b>Agregar a inicio</b>.</li>
+                <li>Abrí el panel desde ese ícono nuevo.</li>
+                <li>Volvé a tocar <b>Activar notif</b> y aceptá el permiso.</li>
+              </ol>
+            </div>
+            <button onClick={() => setOpPushIosGuide(false)}
+              style={{ padding: '.5rem', borderRadius: 8, border: 'none', background: 'var(--accent,#7c5cff)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Entendido</button>
+          </div>
+        </div>
+      )}
 
       {deleteOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}

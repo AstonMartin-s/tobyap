@@ -1,6 +1,7 @@
 export const MESSAGE_TEMPLATE_IDS = [
   'welcome_body',
   'account_creating',
+  'account_creating_manual',
   'account_checking',
   'account_done',
   'account_agent_followup',
@@ -40,6 +41,7 @@ export const DEFAULT_PANEL_QUICK: PanelQuickTexts = {
 export const DEFAULT_TEMPLATES: Record<MessageTemplateId, string> = {
   welcome_body: 'Un gusto atenderte 🎰\nBienvenido a *{brand}*.\n\n{offer_welcome}',
   account_creating: 'Genial 🙌 Te estoy creando tu usuario, dame un segundo…',
+  account_creating_manual: 'Genial 🙌 Estamos creando tu usuario, dame un momento que lo dejo listo…',
   account_checking: 'Dejame chequear tu cuenta… 👀',
   account_done: '✅ *¡Felicitaciones!* Tu usuario ya está creado:{creds_block}',
   account_agent_followup: '👍 Tu cuenta ya está. Seguí por acá cuando quieras — si necesitás una mano, pedí *Soporte* y un agente te atiende 🙌',
@@ -69,6 +71,7 @@ export const TEMPLATE_UI_GROUPS: Array<{
     items: [
       { id: 'welcome_body', label: 'Bienvenida (tras el hola)', vars: ['{brand}', '{offer_welcome}'] },
       { id: 'account_creating', label: 'Creando usuario…', vars: [] },
+      { id: 'account_creating_manual', label: 'Creando usuario (manual)…', vars: [] },
       { id: 'account_checking', label: 'Usuario ya existía (1)', vars: [] },
       { id: 'account_done', label: 'Usuario creado', vars: ['{creds_block}'] },
       { id: 'account_agent_followup', label: 'Aviso agente (post creación)', vars: [] },

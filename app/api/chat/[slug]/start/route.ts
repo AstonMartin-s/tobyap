@@ -61,11 +61,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       return flowButtons(flow, nodeId, tiendaCfg!);
     }
     if (isTienda) return step === 'welcome' ? productButtons(tiendaCfg!) : [];
-    return step === 'welcome'
-      ? welcomeButtons(agentBtn)
-      : step === 'credenciales'
-        ? [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }]
-        : [];
+    if (step === 'welcome') return welcomeButtons(agentBtn);
+    if (step === 'credenciales') return [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }];
+    if (step === 'account_pending') return [];
+    return [];
   };
 
   // DEDUPE POR TELÉFONO

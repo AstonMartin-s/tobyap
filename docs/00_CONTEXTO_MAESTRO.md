@@ -6,6 +6,14 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-09 — provider `manual` (goldenC / ElGanador)
+
+- Provider nuevo `'manual'`: el operador crea la cuenta a mano. Chat sugiere `nombre+últimos4` + password `aaa777`, queda en `account_pending` y el panel confirma.
+- Push de fondo al operador (SW `/panel-sw.js`, tabla `operator_push_subs`, VAPID compartido): creación pendiente, soporte, comprobante. Solo si `provider==='manual'`.
+- Tenants seteados en DB: `goldenc` y `elganador` → `provider=manual`. Resto intacto (pagoda/king/partner_api/kingcash/tienda).
+- Rama `feat/tob/manual-provider`. Typecheck verde. Sin merge/deploy todavía (1 prod/día).
+- Overlap Claude: `flow.ts`, `ChatsClient.tsx`, `ChatWidget.tsx`, `panel/chats` route.
+
 ## Bitácora 2026-09-08 — candywin landing: copy Telegram (no WhatsApp)
 
 - El spinner decía "Te redirigimos a WhatsApp" aunque el hop es `t.me/candywinvip_bot`. Copy según `telegramBot`. Paradise/chat y el resto no se tocan.

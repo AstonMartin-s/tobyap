@@ -12,6 +12,7 @@ import { appendChatMessages } from '@/lib/chat/mutations';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadFields, updateLeadName, addLeadTags, updateLeadStatus } from '@/lib/kommo';
+import { notifyOperators } from '@/lib/panel/operatorPush';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,10 +88,21 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
 
   if (b.action === 'want_account') {
-    const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name }, runtime);
+    const existing = (s.data ?? {}) as Record<string, unknown>;
+    const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name, existing }, runtime);
     const botMsgs = prepareBotBatch(r.messages);
     const history = [...(s.messages ?? []), ...botMsgs];
-    await db.update(chatSessions).set({ step: r.step, data: { ...(s.data ?? {}), ...r.data }, messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+    const nextData = {
+      ...existing,
+      ...r.data,
+      ...(r.step === 'account_pending' ? { unread: true } : {}),
+    };
+    await db.update(chatSessions).set({ step: r.step, data: nextData, messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+    // Provider manual: la cuenta la crea el operador a mano → avisale por push que
+    // hay una creación pendiente de confirmar (solo tenants manuales).
+    if (r.step === 'account_pending' && !existing.manualPending) {
+      void notifyOperators(tenant, 'account_pending', { sessionKey: s.sessionKey, name: s.name });
+    }
     // Espejo Kommo — MISMA paridad que el bot de WhatsApp: campos PORTAL_* +
     // título del lead = username creado.
     if (s.kommoLeadId && r.data.username) {
@@ -112,7 +124,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   // (para que vaya probando) y además marca la sesión para atención humana → cae
   // en "Atención" del panel (markUnread) y mueve el lead a Atención manual en Kommo.
   if (b.action === 'want_agent') {
-    const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name }, runtime);
+    const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name, existing: (s.data ?? {}) as Record<string, unknown> }, runtime);
     const botMsgs = prepareBotBatch(r.messages);
     const handoff = {
       from: 'bot' as const,
@@ -184,6 +196,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     await db.update(chatSessions).set(patch).where(eq(chatSessions.id, s.id));
     // Soporte: dejar rastro + etiqueta y MOVER a Atención manual (embudo Clientes)
     // para que un asesor lo tome.
+    if (b.action === 'support') {
+      // Provider manual: push de fondo al operador (además del rastro en Kommo).
+      void notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
+    }
     if (b.action === 'support' && s.kommoLeadId) {
       addLeadNote(tenant, s.kommoLeadId, '🆘 El cliente pidió SOPORTE desde el chat web.');
       addLeadTags(tenant, s.kommoLeadId, ['Soporte']).catch(() => {});
