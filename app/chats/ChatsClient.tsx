@@ -30,7 +30,13 @@ type Item = {
   updatedAt: string | null;
 };
 
-type Msg = { from: 'bot' | 'user'; text?: string; image?: string; at: number; op?: boolean; delayMs?: number };
+type Msg = { from: 'bot' | 'user'; text?: string; image?: string; mime?: string; name?: string; at: number; op?: boolean; delayMs?: number };
+
+function isPdfMsg(m: Msg): boolean {
+  const mime = (m.mime || '').toLowerCase();
+  const name = (m.name || '').toLowerCase();
+  return mime.includes('pdf') || name.endsWith('.pdf');
+}
 
 // Nombres IGUALES al embudo de Kommo (para que el operario no traduzca).
 const STEP: Record<string, { label: string; color: string }> = {
@@ -1092,15 +1098,21 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                       borderBottomLeftRadius: mine ? 16 : 4,
                     }}>
                       {m.image ? (
-                        mine ? (
+                        isPdfMsg(m) ? (
+                          <a href={m.image} target="_blank" rel="noreferrer" title="Abrir PDF"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '.45rem', padding: '.45rem .65rem', fontSize: '.82rem', fontWeight: 700, color: '#7c5cff', border: '1px solid rgba(124,92,255,.4)', borderRadius: 10, background: 'rgba(124,92,255,.08)', textDecoration: 'none' }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            {m.name || 'Comprobante PDF'}
+                          </a>
+                        ) : mine ? (
                           // Imagen de referencia del bot/operador (ej. portal). Si el
                           // archivo falta, se oculta (igual que en el chat del cliente)
                           // para no mostrar un ícono roto que parece un comprobante.
                           <img src={m.image} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} style={{ maxWidth: 150, maxHeight: 150, borderRadius: 10, display: 'block', objectFit: 'cover' }} />
                         ) : (
                           // Comprobante del cliente. Si el navegador no puede renderizar
-                          // el formato (ej. HEIC viejo de iPhone), mostramos un enlace
-                          // visible en vez de un ícono roto → nunca "perdemos" el archivo.
+                          // el formato (ej. HEIC viejo de iPhone o PDF sin mime), mostramos
+                          // un enlace visible en vez de un ícono roto.
                           <a href={m.image} target="_blank" rel="noreferrer" title="Abrir comprobante">
                             <img
                               src={m.image}
@@ -1114,8 +1126,8 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                               style={{ maxWidth: 150, maxHeight: 150, borderRadius: 10, display: 'block', objectFit: 'cover', cursor: 'zoom-in' }}
                             />
                             <span style={{ display: 'none', alignItems: 'center', gap: '.4rem', padding: '.5rem .7rem', fontSize: '.8rem', fontWeight: 600, color: '#7c5cff', border: '1px solid rgba(124,92,255,.4)', borderRadius: 10, background: 'rgba(124,92,255,.08)' }}>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                              Abrir comprobante
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                              Abrir PDF / comprobante
                             </span>
                           </a>
                         )

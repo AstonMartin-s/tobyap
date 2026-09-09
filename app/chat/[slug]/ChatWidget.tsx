@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 
-type Msg = { from: 'bot' | 'user'; text?: string; image?: string; copy?: string; wa?: string; delayMs?: number };
+type Msg = { from: 'bot' | 'user'; text?: string; image?: string; mime?: string; name?: string; copy?: string; wa?: string; delayMs?: number };
 type Btn = { id: string; label: string };
 
 const C = { header: '#008069', bg: '#ECE5DD', botBubble: '#FFFFFF', userBubble: '#D9FDD3', send: '#008069', ink: '#111B21', sub: '#667781' };
@@ -336,7 +336,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   async function upload(file: File) {
     setButtons([]);
     const localUrl = URL.createObjectURL(file);
-    setMsgs((p) => [...p, { from: 'user', image: localUrl }]);
+    setMsgs((p) => [...p, { from: 'user', image: localUrl, mime: file.type, name: file.name }]);
     const fd = new FormData();
     fd.append('sessionKey', sessionKey);
     fd.append('image', file);
@@ -556,6 +556,11 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
           <div key={i} style={{ display: 'flex', justifyContent: m.from === 'user' ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
             <div style={{ maxWidth: '80%', background: m.from === 'user' ? C.userBubble : C.botBubble, color: '#111827', padding: '7px 10px', borderRadius: 10, borderTopLeftRadius: m.from === 'bot' ? 2 : 10, borderTopRightRadius: m.from === 'user' ? 2 : 10, boxShadow: '0 1px 1px rgba(0,0,0,.12)', fontSize: 15, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
               {m.image ? (
+                (m.mime || '').includes('pdf') || (m.name || '').toLowerCase().endsWith('.pdf') ? (
+                <a href={m.image} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 10px', fontSize: 14, fontWeight: 700, color: C.send, textDecoration: 'none' }}>
+                  📄 {m.name || 'Comprobante PDF'}
+                </a>
+                ) : (
                 <a href={m.image} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
                   <img
                     src={m.image}
@@ -572,6 +577,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
                     📄 Archivo enviado ✓
                   </span>
                 </a>
+                )
               ) : (
                 m.copy ? (
                   <div>

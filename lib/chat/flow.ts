@@ -4,6 +4,7 @@ import { clientSettings } from '@/db/schema';
 import { createPortalAccount, buildPortalName } from '@/lib/pagoda';
 import { createPlayerWithRetry, buildPlayerUsername, randomPlayerPassword } from '@/lib/partner-api';
 import { createUser as kingCreateUser, KingApiError } from '@/lib/king-api';
+import { createPlayer as kingcashCreatePlayer, KingcashApiError } from '@/lib/kingcash-api';
 import { pickCajero } from '@/lib/rotation';
 import type { ResolvedTenant } from '@/lib/types';
 import {
@@ -146,6 +147,7 @@ export async function accountStep(
   cfg: ChatRuntimeConfig = DEFAULT_RUNTIME,
 ): Promise<{ messages: BotMsg[]; buttons: Btn[]; data: Record<string, unknown>; step: string }> {
   if (tenant.provider === 'partner_api') return accountStepPartnerApi(tenant, session, cfg);
+  if (tenant.provider === 'kingcash') return accountStepKingcash(tenant, session, cfg);
   // greenbet SIN Pagoda: la cuenta se crea directo por Green API.
   if (tenant.provider === 'king' && !tenant.pagodaApiKey) return accountStepKingApi(tenant, session, cfg);
 
@@ -214,6 +216,50 @@ async function accountStepPartnerApi(
       buttons: [], data: { credsError: true }, step: 'error',
     };
   }
+}
+
+// Kingcash7 (panel de agente): igual que partner_api, ACÁ generamos
+// username/password y reintentamos con otro username si el elegido ya existe.
+// El alta crea el jugador con saldo 0; la carga de fichas la hace el operario
+// desde el panel. Sin magic-link: mostramos la página de login estable.
+async function accountStepKingcash(
+  tenant: ResolvedTenant,
+  session: { phone: string; name?: string | null },
+  cfg: ChatRuntimeConfig,
+): Promise<{ messages: BotMsg[]; buttons: Btn[]; data: Record<string, unknown>; step: string }> {
+  const password = randomPlayerPassword();
+  const maxAttempts = 4;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const username = buildPlayerUsername(session.name, session.phone, attempt);
+    try {
+      await kingcashCreatePlayer(tenant, { login: username, password, name: session.name ?? undefined });
+      const creds = `\n\n👤 Usuario: *${username}*\n🔑 Contraseña: *${password}*\n\n🔗 Entrá acá:\n${cfg.links.portal_login}`;
+      const cajero = await assignCajeroData(tenant.id);
+      return {
+        messages: [
+          { from: 'bot', delayMs: 600, at: now(), text: renderTemplate('account_creating', cfg) },
+          { from: 'bot', delayMs: 1800, at: now(), text: renderTemplate('account_done', cfg, { creds_block: creds }) },
+          { from: 'bot', delayMs: 2400, at: now(), text: renderTemplate('account_agent_followup', cfg) },
+        ],
+        buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
+        data: { username, password, loginUrl: null, portalName: username, existing: false, ...cajero },
+        step: 'credenciales',
+      };
+    } catch (e) {
+      const taken = e instanceof KingcashApiError && /exist|tomad|ya\s|duplicad|taken/i.test(e.message);
+      if (!taken || attempt === maxAttempts - 1) {
+        console.error(`[accountStep kingcash] tenant=${tenant.slug} phone=${session.phone} attempt=${attempt}: ${(e as Error).message}`);
+        return {
+          messages: [{ from: 'bot', delayMs: 1200, at: now(), text: renderTemplate('account_error', cfg) }],
+          buttons: [], data: { credsError: true }, step: 'error',
+        };
+      }
+    }
+  }
+  return {
+    messages: [{ from: 'bot', delayMs: 1200, at: now(), text: renderTemplate('account_error', cfg) }],
+    buttons: [], data: { credsError: true }, step: 'error',
+  };
 }
 
 // Green API directa (greenbet SIN Pagoda): igual que partner_api, ACÁ generamos

@@ -119,7 +119,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
 
   const newMsgs = [
-    { from: 'user' as const, image: fileUrl, at: Date.now() },
+    { from: 'user' as const, image: fileUrl, at: Date.now(), mime, name: file.name },
     ...botMsgs,
   ];
   // Entrada del comprobante en la LISTA (cada carga conserva la suya, con su cid).

@@ -58,9 +58,14 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const relPath = entry ? entry.path : (data.comprobantePath as string | undefined);
   if (relPath) {
     const buf = await readComprobante(relPath);
-    if (buf) return new NextResponse(new Uint8Array(buf), { headers: serveHeaders(mime) });
+    if (buf) {
+      const outMime = buf.subarray(0, 5).toString('ascii') === '%PDF-' ? 'application/pdf' : mime;
+      return new NextResponse(new Uint8Array(buf), { headers: serveHeaders(outMime) });
+    }
   }
   const b64 = entry ? entry.b64 : (data.comprobante as string | undefined);
   if (!b64) return NextResponse.json({ error: 'sin comprobante' }, { status: 404 });
-  return new NextResponse(Buffer.from(b64, 'base64'), { headers: serveHeaders(mime) });
+  const raw = Buffer.from(b64, 'base64');
+  const outMime = raw.subarray(0, 5).toString('ascii') === '%PDF-' ? 'application/pdf' : mime;
+  return new NextResponse(raw, { headers: serveHeaders(outMime) });
 }

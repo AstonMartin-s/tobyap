@@ -6,13 +6,16 @@ import { addLeadTags, updateLeadFields } from '@/lib/kommo';
 import type { ResolvedTenant } from '@/lib/types';
 
 // Mapa global por defecto CCPP -> bono. El tenant puede override (tenant.bonoMap).
+// Porcentuales chicos: A{n} => n×10 % (A1=10%, A2=20%, A3=30%, A5=50%).
+// Multiplicadores: A200 = Duplica (+100%), A300 = Triplica (+200%).
 export const DEFAULT_BONO_MAP: Record<string, string> = {
   A1: 'Bono10%',
   A2: 'Bono20%',
   A3: 'Bono30%',
   A5: 'Bono50%',
   F1: 'FichasGratis',
-  A200: 'Duplica',
+  A200: 'Duplica', // +100%
+  A300: 'Triplica', // +200% (ej. kingcash/PiliKing: bono automático +200%)
 };
 
 export function resolveBono(tenant: ResolvedTenant, ccpp: string | null | undefined): string | null {

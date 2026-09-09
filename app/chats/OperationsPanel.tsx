@@ -19,6 +19,7 @@ const BONO_OPTS = [
   { v: '30', label: 'Bono 30%' },
   { v: '50', label: 'Bono 50%' },
   { v: '100', label: 'Bono 100%' },
+  { v: '200', label: 'Bono 200%' },
 ];
 
 export default function OperationsPanel({ sessionKey, onDone }: { sessionKey: string; onDone?: () => void }) {

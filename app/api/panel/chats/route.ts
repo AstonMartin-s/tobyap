@@ -18,6 +18,7 @@ import { deliveredMessagesTienda } from '@/lib/chat/flows/tienda';
 import { loadTiendaConfig } from '@/lib/chat/loadTienda';
 import { depositOp, withdrawOp, consultBalance, operationsSummary } from '@/lib/partner-ops';
 import { kingDepositOp, kingWithdrawOp, kingConsultBalance } from '@/lib/king-ops';
+import { kingcashDepositOp, kingcashWithdrawOp, kingcashConsultBalance } from '@/lib/kingcash-ops';
 import {
   comprobantePendingMessages,
   comprobanteRejectedMessages,
@@ -329,7 +330,7 @@ export async function POST(req: NextRequest) {
   // hace SIEMPRE el operario (botón); nunca automático.
   if (b.op === 'pa_balance' || b.op === 'pa_deposit' || b.op === 'pa_withdraw') {
     const tenant = await getTenantBySlug(session.slug);
-    if (!tenant || (tenant.provider !== 'partner_api' && tenant.provider !== 'king')) {
+    if (!tenant || (tenant.provider !== 'partner_api' && tenant.provider !== 'king' && tenant.provider !== 'kingcash')) {
       return NextResponse.json({ ok: false, skip: true, error: 'cliente sin API de fichas' });
     }
     if (!tenant.features.fichas) {
@@ -339,9 +340,12 @@ export async function POST(req: NextRequest) {
     if (!username) return NextResponse.json({ ok: false, error: 'la sesión no tiene usuario de portal' }, { status: 400 });
 
     if (b.op === 'pa_balance') {
-      const isKing = tenant.provider === 'king';
+      const balProvider =
+        tenant.provider === 'king' ? kingConsultBalance(tenant, username)
+        : tenant.provider === 'kingcash' ? kingcashConsultBalance(tenant, username)
+        : consultBalance(tenant, username);
       const [bal, summary] = await Promise.all([
-        isKing ? kingConsultBalance(tenant, username) : consultBalance(tenant, username),
+        balProvider,
         operationsSummary(tenant, username),
       ]);
       const bonus = 'bonus' in bal ? bal.bonus : undefined;
@@ -360,6 +364,10 @@ export async function POST(req: NextRequest) {
       ? (b.op === 'pa_deposit'
           ? await kingDepositOp(tenant, opArgs)
           : await kingWithdrawOp(tenant, opArgs))
+      : tenant.provider === 'kingcash'
+      ? (b.op === 'pa_deposit'
+          ? await kingcashDepositOp(tenant, opArgs)
+          : await kingcashWithdrawOp(tenant, opArgs))
       : (b.op === 'pa_deposit'
           ? await depositOp(tenant, opArgs)
           : await withdrawOp(tenant, opArgs));

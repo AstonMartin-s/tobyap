@@ -9,7 +9,7 @@ import { applyUnreadIncrement } from '@/lib/chat/unread';
 // mensaje o un flag. Acá concatenamos/mergeamos a nivel Postgres (`||`), que
 // serializa el UPDATE sobre la fila bajo lock — mismo criterio que acreditarChat.
 
-type ChatMsg = { from: 'bot' | 'user'; text?: string; image?: string; at: number; op?: boolean; n?: boolean };
+type ChatMsg = { from: 'bot' | 'user'; text?: string; image?: string; mime?: string; name?: string; at: number; op?: boolean; n?: boolean };
 
 interface AppendOpts {
   step?: string;

@@ -6,6 +6,15 @@
 // por mime, extensión o magic bytes y lo transcodificamos a JPEG. Cualquier otro
 // formato (jpeg/png/webp/gif) pasa tal cual.
 
+export function isPdfBuffer(buf: Buffer, mime = '', name = ''): boolean {
+  if ((mime || '').toLowerCase().includes('pdf') || (name || '').toLowerCase().endsWith('.pdf')) return true;
+  return buf.length >= 5 && buf.toString('ascii', 0, 5) === '%PDF-';
+}
+
+export function isPdfMime(mime?: string | null, name?: string | null): boolean {
+  return (mime || '').toLowerCase().includes('pdf') || (name || '').toLowerCase().endsWith('.pdf');
+}
+
 function isHeic(buf: Buffer, mime: string, name: string): boolean {
   const m = (mime || '').toLowerCase();
   if (m.includes('heic') || m.includes('heif')) return true;
@@ -28,6 +37,7 @@ export async function normalizeUploadImage(
   mime: string,
   name: string,
 ): Promise<{ buf: Buffer; mime: string; converted: boolean }> {
+  if (isPdfBuffer(buf, mime, name)) return { buf, mime: 'application/pdf', converted: false };
   if (!isHeic(buf, mime, name)) return { buf, mime: mime || 'image/jpeg', converted: false };
   try {
     const { default: convert } = await import('heic-convert');

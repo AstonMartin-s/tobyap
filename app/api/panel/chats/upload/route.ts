@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     at,
     op: true, // imagen del OPERADOR (no cuenta como comprobante del cliente)
   };
-  const msg = { from: 'bot' as const, image: fileUrl, at, op: true };
+  const msg = { from: 'bot' as const, image: fileUrl, at, op: true, mime, name: file.name };
   await appendChatMessages(s.id, [msg], { dataAppend: { comprobantes: [entry] } });
 
   return NextResponse.json({ ok: true, fileUrl });

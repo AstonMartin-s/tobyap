@@ -28,7 +28,10 @@ export interface ResolvedTenant {
   pagodaUrl: string | null;
   pagodaApiKey: string | null;
 
-  // Proveedor de creación de cuenta: 'pagoda' (King) | 'partner_api' (bblack).
+  // Proveedor de creación de cuenta / fichas:
+  //  'pagoda' (King) | 'king' (greenbet directa) | 'partner_api' (bblack/kplay)
+  //  | 'kingcash' (panel de agente ag.kingcash7.net; login/clave en partnerApiKey
+  //    como JSON {"login","password"}, dominio en partnerApiUrl).
   provider: string;
   partnerApiUrl: string | null;
   partnerApiKey: string | null; // descifrado

@@ -70,6 +70,7 @@ const BONO_LINK_OPTS: Array<{ label: string; code: string }> = [
   { label: 'Bono 30%', code: 'A3' },
   { label: 'Bono 50%', code: 'A5' },
   { label: '100% (Duplica)', code: 'A200' },
+  { label: '200% (Triplica)', code: 'A300' },
   { label: 'Fichas gratis', code: 'F1' },
 ];
 
