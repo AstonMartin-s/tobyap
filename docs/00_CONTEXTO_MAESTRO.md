@@ -6,6 +6,11 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-10 — Admin Aston: reportes solo Meta (INFLU en panel cliente)
+
+- El admin sumaba chats/cargas de campañas `influ*` junto con Meta y distorsionaba CPA/conversión.
+- `/admin` ahora filtra canal `meta`. El panel del cliente (`/reportes`) sigue mostrando Meta vs Influencers y el gasto de influencers (caja aparte).
+
 ## Bitácora 2026-09-10 — Paradise: landing neutra + dominio ads aislado
 
 - Ads nuevos: `https://go.juegayahorra.online/l/paradise` (mismo host `/chat/paradise`, sin hop). `go.fichaslibres.online/l/paradise` sigue vivo. Soporte walink **no** se movió.

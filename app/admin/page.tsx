@@ -31,8 +31,8 @@ export default async function AdminPage({
   const selected = clientList.find((c) => c.slug === searchParams.tenant);
 
   const [cards, daily] = await Promise.all([
-    getDayCards(today),
-    getDailyReport({ start, end, tenantId: selected?.id }),
+    getDayCards(today, { channel: 'meta' }),
+    getDailyReport({ start, end, tenantId: selected?.id, channel: 'meta' }),
   ]);
 
   const activos = cards.filter((c) => c.chats + c.cargas > 0);
@@ -45,14 +45,14 @@ export default async function AdminPage({
         <div className="page-head">
           <div className="page-head__text">
             <h1>Panel de administración</h1>
-            <p>Estadísticas por cliente · el gasto se carga manual y queda fijo.</p>
+            <p>Estadísticas por cliente · solo Meta (campañas INFLU quedan en el panel del cliente).</p>
           </div>
         </div>
 
         {/* ---- Reporte del día (tarjetas) ---- */}
         <div className="card">
           <div className="card__title">
-            Reporte del día <span className="card__sub">{today} · {cards.length} clientes · con actividad {activos.length}</span>
+            Reporte del día <span className="card__sub">{today} · {cards.length} clientes · con actividad {activos.length} · solo Meta</span>
           </div>
           {activos.length === 0 ? (
             <div className="empty">Todavía no hay actividad hoy.</div>
@@ -96,7 +96,7 @@ export default async function AdminPage({
         {/* ---- Reportes diarios (tabla editable) ---- */}
         <div className="card">
           <div className="card__title">
-            Reportes diarios de ads <span className="card__sub">cargá el gasto en la fila — se guarda solo</span>
+            Reportes diarios de ads <span className="card__sub">gasto Meta · campañas INFLU no se suman acá</span>
           </div>
           <form method="get" className="row" style={{ alignItems: 'flex-end', marginBottom: '1.1rem', flexWrap: 'wrap' }}>
             <div className="field" style={{ margin: 0, minWidth: 200 }}>

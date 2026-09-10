@@ -205,7 +205,8 @@ function range(start?: string, end?: string) {
 }
 
 // Reporte por cliente (todos los tenants role='client'), opcional rango de fechas.
-export async function getAdminReport(start?: string, end?: string): Promise<ClientReport[]> {
+export async function getAdminReport(start?: string, end?: string, channel: Channel = 'meta'): Promise<ClientReport[]> {
+  const chCond = channelCond(channel);
   const rows = await db
     .select({
       tenantId: tenants.id,
@@ -215,7 +216,7 @@ export async function getAdminReport(start?: string, end?: string): Promise<Clie
       n: sql<number>`count(${metaEvents.id})::int`,
     })
     .from(tenants)
-    .leftJoin(metaEvents, and(eq(metaEvents.tenantId, tenants.id), notTestCampaign(), ...range(start, end)))
+    .leftJoin(metaEvents, and(eq(metaEvents.tenantId, tenants.id), notTestCampaign(), chCond, ...range(start, end)))
     .where(eq(tenants.role, 'client'))
     .groupBy(tenants.id, tenants.slug, tenants.name, metaEvents.eventType);
 
@@ -254,11 +255,12 @@ export interface DayCard {
   costPerCarga: number;
 }
 
-export async function getDayCards(day = todayAR()): Promise<DayCard[]> {
+export async function getDayCards(day = todayAR(), opts: { channel?: Channel } = { channel: 'meta' }): Promise<DayCard[]> {
+  const chCond = channelCond(opts.channel);
   const ev = await db
     .select({ tenantId: metaEvents.tenantId, type: metaEvents.eventType, n: sql<number>`count(*)::int` })
     .from(metaEvents)
-    .where(sql`${dayExpr} = ${day} AND ${notTestCampaign()}`)
+    .where(and(sql`${dayExpr} = ${day}`, notTestCampaign(), chCond))
     .groupBy(metaEvents.tenantId, metaEvents.eventType);
 
   const ts = await db.select({ id: tenants.id, slug: tenants.slug, name: tenants.name }).from(tenants).where(eq(tenants.role, 'client'));
