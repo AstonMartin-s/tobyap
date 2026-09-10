@@ -52,7 +52,9 @@ export async function sendWebPush(
   const s = sub as PushSub;
   if (!s.endpoint) return { ok: false, gone: false };
   try {
-    await webpush.sendNotification(s as webpush.PushSubscription, JSON.stringify(payload));
+    // urgency high + TTL corto: el push server (FCM/Apple) lo entrega YA y no lo
+    // agrupa/difiere, que es lo que hace que "llegue pero sin sonido/tarde".
+    await webpush.sendNotification(s as webpush.PushSubscription, JSON.stringify(payload), { urgency: 'high', TTL: 120 });
     return { ok: true, gone: false };
   } catch (e) {
     const code = (e as { statusCode?: number })?.statusCode;
@@ -75,7 +77,7 @@ export async function sendPushToSession(
   const s = sub as PushSub;
   if (!s.endpoint) return;
   try {
-    await webpush.sendNotification(s as webpush.PushSubscription, JSON.stringify(payload));
+    await webpush.sendNotification(s as webpush.PushSubscription, JSON.stringify(payload), { urgency: 'high', TTL: 120 });
   } catch (e) {
     const code = (e as { statusCode?: number })?.statusCode;
     if (code === 404 || code === 410) {
