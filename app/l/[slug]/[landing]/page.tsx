@@ -6,6 +6,7 @@ import { tenants, clientSettings, landings } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { resolveBono } from '@/lib/attribution';
 import { pickNumberByCategory } from '@/lib/rotation';
+import { applySupportDestFallback } from '@/lib/chat/runtime';
 import { LandingView, landingMetadata, fichasFromBono, type LandingConfig } from '../../_landing';
 
 export const dynamic = 'force-dynamic';
@@ -106,6 +107,17 @@ export default async function NamedLanding({
     telegramStartPrefix: c.telegramStartPrefix != null && String(c.telegramStartPrefix).trim() !== '' ? String(c.telegramStartPrefix) : null,
     noCode: c.noCode === true || lp.type === 'soporte',
   };
+
+  // Soporte sin número ni redirectUrl (KingCBA): cae a Config → walink o
+  // Ajustes → URL del botón, si es wa.me / wa.link / teléfono.
+  if (!cfg.chatSlug && !cfg.portalUrl && !cfg.telegramBot) {
+    const fb = applySupportDestFallback(
+      { redirectUrl: cfg.redirectUrl ?? null, waNumber: cfg.waNumber },
+      [s?.walink, scc.waBtnUrl],
+    );
+    cfg.redirectUrl = fb.redirectUrl;
+    cfg.waNumber = fb.waNumber;
+  }
 
   return <LandingView {...cfg} />;
 }

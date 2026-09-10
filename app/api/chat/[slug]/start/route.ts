@@ -5,7 +5,7 @@ import { db } from '@/db';
 import { chatSessions, metaEvents, attributions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { checkWhatsApp } from '@/lib/chat/wachecker';
-import { welcomeStep, welcomeButtonsFor, hasAgentButton, type Btn } from '@/lib/chat/flow';
+import { welcomeStep, welcomeButtonsFor, hasAgentButton, supportClientFlags, type Btn } from '@/lib/chat/flow';
 import { welcomeStepTienda, productButtons } from '@/lib/chat/flows/tienda';
 import { loadTiendaConfig, loadChatFlow } from '@/lib/chat/loadTienda';
 import { runFlow, flowButtons, EMPTY_FLOW } from '@/lib/chat/flowGraph';
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     // endpoints de mensaje/upload también lo rechazan).
     if ((existing.data as Record<string, unknown> | null)?.blocked) {
       const msgs = existing.messages ?? [];
-      return NextResponse.json({ ok: true, resumed: true, sessionKey: existing.sessionKey, messages: msgs, buttons: [], step: existing.step ?? 'welcome', total: msgs.length, leadId: existing.kommoLeadId ?? null });
+      return NextResponse.json({ ok: true, resumed: true, sessionKey: existing.sessionKey, messages: msgs, buttons: [], step: existing.step ?? 'welcome', total: msgs.length, leadId: existing.kommoLeadId ?? null, ...supportClientFlags(existing.data as Record<string, unknown> | null, existing.step) });
     }
     const terminal = ['closed', 'no_cargo'].includes(existing.step ?? '');
     if (terminal) {
@@ -86,14 +86,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       const welcomeMsgs = prepareBotBatch(w.messages);
       const history = [...(existing.messages ?? []), ...welcomeMsgs];
       await db.update(chatSessions).set({ step: w.step, data: { ...((existing.data as Record<string, unknown> | null) ?? {}), ...w.data }, messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, existing.id));
-      return NextResponse.json({ ok: true, resumed: true, sessionKey: existing.sessionKey, messages: history, buttons: w.buttons, step: w.step, total: history.length, leadId: existing.kommoLeadId ?? null });
+      return NextResponse.json({ ok: true, resumed: true, sessionKey: existing.sessionKey, messages: history, buttons: w.buttons, step: w.step, total: history.length, leadId: existing.kommoLeadId ?? null, ...supportClientFlags({ ...((existing.data as Record<string, unknown> | null) ?? {}), ...w.data }, w.step) });
     }
     // Sesión activa: la reanudamos tal cual (historial + estado actuales).
     if (b.name && !existing.name) await db.update(chatSessions).set({ name: b.name, updatedAt: new Date() }).where(eq(chatSessions.id, existing.id));
     const step = existing.step ?? 'welcome';
     const buttons = buttonsForStep(step, existing.data as Record<string, unknown> | null);
     const msgs = existing.messages ?? [];
-    return NextResponse.json({ ok: true, resumed: true, sessionKey: existing.sessionKey, messages: msgs, buttons, step, total: msgs.length, leadId: existing.kommoLeadId ?? null });
+    return NextResponse.json({ ok: true, resumed: true, sessionKey: existing.sessionKey, messages: msgs, buttons, step, total: msgs.length, leadId: existing.kommoLeadId ?? null, ...supportClientFlags(existing.data as Record<string, unknown> | null, step) });
   }
 
   const sessionKey = crypto.randomBytes(12).toString('hex');

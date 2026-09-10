@@ -468,7 +468,7 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
                   <span>Mostrar botón de WhatsApp en el chat</span>
                 </label>
                 <p style={{ color: 'var(--muted-2)', fontSize: '.7rem', margin: '4px 0 0', lineHeight: 1.35 }}>
-                  Antes de la acreditación muestra un aviso; después redirige a soporte.
+                  En la bienvenida muestra un aviso. Con usuario creado (o si tocó «Ya tengo usuario») abre WhatsApp.
                 </p>
               </div>
               {waBtnEnabled && (

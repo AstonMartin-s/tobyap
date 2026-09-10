@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
-import { onFreeText, accountStep, WANT_ACCOUNT_RE, HELP_RE } from '@/lib/chat/flow';
+import { onFreeText, accountStep, existingUserSupport, WANT_ACCOUNT_RE, HAVE_USER_RE, HELP_RE, sessionCanOpenSupport, supportClientFlags } from '@/lib/chat/flow';
 import { onFreeTextTienda } from '@/lib/chat/flows/tienda';
 import { loadTiendaConfig, loadChatFlow } from '@/lib/chat/loadTienda';
 import { advanceByText } from '@/lib/chat/flowGraph';
@@ -89,7 +89,18 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       updateLeadName(tenant, s.kommoLeadId, String(r.data.username)).catch(() => {});
       addLeadNote(tenant, s.kommoLeadId, `👤 Usuario Pagoda ${r.data.existing ? '(existente, recordado)' : 'creado'} (por texto): ${r.data.username}`);
     }
-    return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length });
+    return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length, ...supportClientFlags({ ...existing, ...r.data }, r.step) });
+  }
+
+  if ((s.step ?? 'welcome') === 'welcome' && HAVE_USER_RE.test(b.text)) {
+    const existing = (s.data ?? {}) as Record<string, unknown>;
+    const r = existingUserSupport(runtime, existing, s.step);
+    const botMsgs = prepareBotBatch(r.messages);
+    await appendChatMessages(s.id, [userMsg, ...botMsgs], { step: r.step, dataMerge: r.data, markUnread: true });
+    const history = [...(s.messages ?? []), userMsg, ...botMsgs];
+    void notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
+    if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, '🔁 El cliente escribió que YA TIENE usuario — derivado a WhatsApp.');
+    return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length, ...supportClientFlags(r.data, r.step) });
   }
 
   let replies = onFreeText(s.step ?? 'comprobante', b.text, runtime, (s.data ?? {}) as Record<string, unknown>);
@@ -118,7 +129,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   // Provider manual: si el cliente pide soporte post-carga (texto libre), avisamos
   // al operador. Pre-carga se queda en el chat (reassure) — no es "soporte".
-  if ((s.step ?? '') === 'done' && HELP_RE.test(b.text)) {
+  if (HELP_RE.test(b.text) && sessionCanOpenSupport((s.data ?? {}) as Record<string, unknown>, s.step)) {
     void notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
   }
 

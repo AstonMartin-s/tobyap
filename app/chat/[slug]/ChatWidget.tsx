@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { welcomeButtonsFor } from '@/lib/chat/welcomeButtons';
 
 type Msg = { from: 'bot' | 'user'; text?: string; image?: string; mime?: string; name?: string; copy?: string; wa?: string; delayMs?: number };
 type Btn = { id: string; label: string };
@@ -65,8 +66,16 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   const [waBtn, setWaBtn] = useState<{ enabled: boolean; url: string }>({ enabled: false, url: '' });
   const [niche, setNiche] = useState<'circo' | 'tienda'>('circo');
   const [assignedWa, setAssignedWa] = useState<string | null>(null); // cajero sticky
+  const [waUnlocked, setWaUnlocked] = useState(false); // usuario creado o "Ya tengo usuario"
   const [waBtnClicked, setWaBtnClicked] = useState(false);
   const [waBtnToast, setWaBtnToast] = useState(false);
+
+  function applySupportFlags(d: { assignedWa?: string | null; username?: string | null; waUnlocked?: boolean; step?: string | null }) {
+    if (d.assignedWa) setAssignedWa(String(d.assignedWa));
+    if (d.waUnlocked === true || d.step === 'done' || (typeof d.username === 'string' && d.username.trim())) {
+      setWaUnlocked(true);
+    }
+  }
 
   // La PWA puede tener HTML viejo cacheado: el nombre/color/foto se refrescan de la API.
   useEffect(() => {
@@ -131,16 +140,9 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         setMsgs(d.messages ?? []);
         pollBase.current = d.total;
         setStep(d.step ?? 'done');
-        if (d.assignedWa) setAssignedWa(String(d.assignedWa));
+        applySupportFlags(d);
         if (d.step === 'welcome') {
-          // King/Paradise muestran el 2º botón "Hablar con un agente" también al
-          // reconectar (el start ya lo devuelve; esto es el fallback del resume).
-          const welcomeBtns = slug === 'elganador'
-            ? [{ id: 'want_account', label: 'Quiero mi usuario' }, { id: 'want_agent', label: 'Hablar con un agente' }]
-            : ['king', 'paradise'].includes(slug)
-              ? [{ id: 'want_account', label: 'Quiero mi cuenta 🎁' }, { id: 'want_agent', label: 'Hablar con un agente 🧑‍💼' }]
-              : [{ id: 'want_account', label: 'Quiero mi cuenta' }];
-          setButtons(welcomeBtns);
+          setButtons(welcomeButtonsFor(slug));
         } else if (d.step === 'credenciales') setButtons([{ id: 'want_cbu', label: 'Quiero el CBU' }]);
         else if (d.step === 'account_pending') setButtons([]);
       } catch { /* sin resume */ }
@@ -216,7 +218,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         const r = await fetch(`/api/chat/${slug}/poll?sessionKey=${sessionKey}&since=${since}&kc=${kc}`);
         const d = await r.json();
         if (!d.ok) return;
-        if (d.assignedWa) setAssignedWa(String(d.assignedWa));
+        applySupportFlags(d);
         if (pollBase.current === null) {
           pollBase.current = d.total;
           if (d.step && d.step !== step) setStep(d.step);
@@ -281,6 +283,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
       } catch { /* privado */ }
       setPhase('chat');
       setStep(d.step ?? 'welcome');
+      applySupportFlags(d);
       if (d.resumed) {
         // Sesión existente (mismo teléfono): mostramos el historial tal cual, sin re-animar.
         setMsgs(d.messages ?? []);
@@ -304,6 +307,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     const d = await r.json().catch(() => ({}));
     if (typeof d.total === 'number') pollBase.current = d.total;
     if (d.step) setStep(d.step);
+    applySupportFlags(d);
     await play(d.messages ?? [], d.buttons ?? []);
   }
 
@@ -327,6 +331,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     // mostrar mientras dura la animación.
     if (typeof d.total === 'number') pollBase.current = d.total;
     if (d.step) setStep(d.step);
+    applySupportFlags(d);
     await play(d.messages ?? [], []);
   }
 
@@ -339,6 +344,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     const d = await r.json().catch(() => ({}));
     if (typeof d.total === 'number') pollBase.current = d.total;
     if (d.step) setStep(d.step);
+    applySupportFlags(d);
     await play(d.messages ?? [], d.buttons ?? buttons);
   }
 
@@ -490,7 +496,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     : waBtn.url;
 
   function handleWaBtn() {
-    if (step === 'done') {
+    if ((waUnlocked || step === 'done') && effectiveWaUrl) {
       window.open(effectiveWaUrl, '_blank');
       return;
     }
@@ -518,7 +524,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         {phase === 'chat' && waBtn.enabled && waBtn.url && (
           <button
             onClick={handleWaBtn}
-            className={step === 'done' ? 'wa-hdr wa-hdr--fast' : (waBtnClicked ? '' : 'wa-hdr')}
+            className={(waUnlocked || step === 'done') ? 'wa-hdr wa-hdr--fast' : (waBtnClicked ? '' : 'wa-hdr')}
             title="Ir a WhatsApp"
             style={{ display: 'flex', alignItems: 'center', gap: 6, border: 'none', cursor: 'pointer', background: '#25D366', color: '#fff', flexShrink: 0, borderRadius: 20, padding: '7px 14px 7px 10px', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}
           >
@@ -714,7 +720,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         </div>
       )}
 
-      {waBtnToast && step !== 'done' && (
+      {waBtnToast && !(waUnlocked || step === 'done') && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)',
           display: 'grid', placeItems: 'center', zIndex: 100,
@@ -727,7 +733,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
           }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>💬</div>
             <p style={{ fontSize: 17, lineHeight: 1.5, color: '#111827', margin: '0 0 20px', fontWeight: 500 }}>
-              Cuando tengas tu usuario y hayas recibido tu bono, te daremos acceso a soporte
+              Cuando tengas tu usuario te damos acceso a WhatsApp. Si ya lo tenés, tocá *Ya tengo usuario*.
             </p>
             <button
               onClick={() => setWaBtnToast(false)}

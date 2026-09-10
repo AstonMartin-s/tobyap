@@ -6,6 +6,13 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-10 — KingCBA (Karen866): WA solo se abría en `done`
+
+- Caso: jugadora con usuario (`Karen866`, step `validando`) tocó "Ir a WhatsApp" y no redirigió. El header exigía `step==='done'` (post-Cargo). `kingplay` no tenía landing `walink` ni números.
+- Regla: con usuario creado (o "Ya tengo usuario") el header y el hop de soporte abren WhatsApp. Welcome sin cuenta sigue el aviso.
+- Landing `/l/kingplay/walink` creada + número soporte cargado. Prefill WA: `Hola! vengo del chat y quiero atencion con un agente`. Fallback: Config → walink / Ajustes → URL del botón.
+- Overlap Claude: `flow.ts`, `ChatWidget.tsx`, `LivechatClient.tsx`.
+
 ## Bitácora 2026-09-09 — provider `manual` (goldenC / ElGanador)
 
 - Provider nuevo `'manual'`: el operador crea la cuenta a mano. Chat sugiere `nombre+últimos4` + password `aaa777`, queda en `account_pending` y el panel confirma.

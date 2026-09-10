@@ -150,6 +150,33 @@ export function walinkSupportUrl(slug: string, landingOrigin?: string): string {
   return `https://${host}/l/${slug}/walink?campaign=Soporte`;
 }
 
+/** wa.link / wa.me / teléfono crudo desde Config → walink o Ajustes. No acepta
+ *  otra landing /l/.../walink (evitar loop). */
+export function parseSupportDest(raw: unknown): { redirectUrl?: string; waNumber?: string } {
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  if (!s) return {};
+  if (/^https?:\/\//i.test(s)) {
+    if (/\/l\/[^/]+\/walink(?:\?|$)/i.test(s)) return {};
+    return { redirectUrl: s };
+  }
+  const digits = s.replace(/\D/g, '');
+  if (digits.length >= 8) return { waNumber: digits };
+  return {};
+}
+
+export function applySupportDestFallback(
+  cfg: { redirectUrl: string | null; waNumber: string },
+  extras: unknown[],
+): { redirectUrl: string | null; waNumber: string } {
+  if (cfg.redirectUrl || cfg.waNumber) return cfg;
+  for (const raw of extras) {
+    const p = parseSupportDest(raw);
+    if (p.redirectUrl) return { redirectUrl: p.redirectUrl, waNumber: cfg.waNumber };
+    if (p.waNumber) return { redirectUrl: cfg.redirectUrl ?? null, waNumber: p.waNumber };
+  }
+  return cfg;
+}
+
 function clampNum(v: unknown, min: number, max: number, fallback: number): number {
   const n = typeof v === 'number' ? v : Number(v);
   if (!Number.isFinite(n)) return fallback;

@@ -3,7 +3,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
-import { accountStep, cbuStep, postActionMessages, comprobanteReviewMessages, type BotMsg } from '@/lib/chat/flow';
+import { accountStep, cbuStep, postActionMessages, comprobanteReviewMessages, existingUserSupport, supportClientFlags, type BotMsg } from '@/lib/chat/flow';
 import { BUY_ACTION_PREFIX, productStepTienda, comprobanteReviewTienda, onFreeTextTienda } from '@/lib/chat/flows/tienda';
 import { loadTiendaConfig, loadChatFlow } from '@/lib/chat/loadTienda';
 import { advanceByButton } from '@/lib/chat/flowGraph';
@@ -152,7 +152,19 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       updateLeadName(tenant, s.kommoLeadId, String(r.data.username)).catch(() => {});
       addLeadNote(tenant, s.kommoLeadId, `👤 Usuario Pagoda ${r.data.existing ? '(existente, recordado)' : 'creado'}: ${r.data.username}`);
     }
-    return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length });
+    return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length, ...supportClientFlags(nextData, r.step) });
+  }
+
+  // Ya tiene usuario: no crea otra cuenta, abre el hop de WhatsApp (header + botón).
+  if (b.action === 'have_user') {
+    const existing = (s.data ?? {}) as Record<string, unknown>;
+    const r = existingUserSupport(runtime, existing, s.step);
+    const botMsgs = prepareBotBatch(r.messages);
+    const history = [...(s.messages ?? []), ...botMsgs];
+    await db.update(chatSessions).set({ step: r.step, data: { ...r.data, unread: true }, messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+    void notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
+    if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, '🔁 El cliente dijo que YA TIENE usuario — derivado a WhatsApp.');
+    return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length, ...supportClientFlags(r.data, r.step) });
   }
 
   // "Hablar con un agente" (King/Paradise): crea IGUAL la cuenta por emergencia
@@ -193,7 +205,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       }
     }
     const total = (s.messages?.length ?? 0) + botMsgs.length + 1;
-    return NextResponse.json({ ok: true, messages: [...botMsgs, handoff], buttons: r.buttons, step: r.step, total });
+    return NextResponse.json({ ok: true, messages: [...botMsgs, handoff], buttons: r.buttons, step: r.step, total, ...supportClientFlags({ ...r.data, requestedAgent: true }, r.step) });
   }
 
   if (b.action === 'want_cbu') {

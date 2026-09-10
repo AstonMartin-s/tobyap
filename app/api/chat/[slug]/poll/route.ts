@@ -27,6 +27,9 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       messages: chatSessions.messages,
       kommoLeadId: chatSessions.kommoLeadId,
       assignedWa: sql<string | null>`${chatSessions.data} ->> 'assignedWa'`,
+      username: sql<string | null>`${chatSessions.data} ->> 'username'`,
+      waUnlocked: sql<string | null>`${chatSessions.data} ->> 'waUnlocked'`,
+      hasExistingUser: sql<string | null>`${chatSessions.data} ->> 'hasExistingUser'`,
     })
     .from(chatSessions)
     .where(and(eq(chatSessions.tenantId, tenant.id), eq(chatSessions.sessionKey, sessionKey)));
@@ -65,5 +68,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   // Devolvemos solo lo nuevo respecto de `since` (largo de la lista del widget).
   const fresh = messages.slice(Math.max(0, since));
   const assignedWa = s.assignedWa ?? null;
-  return NextResponse.json({ ok: true, step, total: messages.length, messages: fresh, assignedWa, ...(debug ? { dbg } : {}) });
+  const username = s.username && String(s.username).trim() ? String(s.username).trim() : null;
+  const waUnlocked = s.waUnlocked === 'true' || s.hasExistingUser === 'true' || Boolean(username) || step === 'done';
+  return NextResponse.json({ ok: true, step, total: messages.length, messages: fresh, assignedWa, username, waUnlocked, ...(debug ? { dbg } : {}) });
 }

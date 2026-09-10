@@ -18,8 +18,33 @@ import {
   renderTemplate,
 } from '@/lib/chat/runtime';
 
-export interface Btn { id: string; label: string }
+import {
+  AGENT_BUTTON_SLUGS,
+  HAVE_USER_BTN,
+  WANT_ACCOUNT_BTN,
+  WANT_AGENT_BTN,
+  WANT_AGENT_PLAIN_BTN,
+  WANT_USER_BTN,
+  hasAgentButton,
+  welcomeButtons,
+  welcomeButtonsFor,
+  type WelcomeBtn,
+} from '@/lib/chat/welcomeButtons';
+
+export type Btn = WelcomeBtn;
 export interface BotMsg { from: 'bot'; text?: string; copy?: string; image?: string; wa?: string; delayMs?: number; at: number }
+
+export {
+  AGENT_BUTTON_SLUGS,
+  HAVE_USER_BTN,
+  WANT_ACCOUNT_BTN,
+  WANT_AGENT_BTN,
+  WANT_AGENT_PLAIN_BTN,
+  WANT_USER_BTN,
+  hasAgentButton,
+  welcomeButtons,
+  welcomeButtonsFor,
+};
 
 // Re-export defaults (compat con imports existentes).
 export const PORTAL_URL = DEFAULT_PORTAL_URL;
@@ -105,32 +130,47 @@ function buildCajeraMsg(cfg: ChatRuntimeConfig, data: Record<string, unknown>, d
   return { from: 'bot', delayMs, at: now(), text };
 }
 
+/** El cliente ya tiene usuario (o tocó "Ya tengo usuario") → puede ir a WhatsApp. */
+export function sessionHasAccount(data: Record<string, unknown> | null | undefined): boolean {
+  const u = typeof data?.username === 'string' ? data.username.trim() : '';
+  return u.length > 0;
+}
+
+export function sessionCanOpenSupport(
+  data: Record<string, unknown> | null | undefined,
+  step?: string | null,
+): boolean {
+  if (step === 'done') return true;
+  if (data?.waUnlocked === true || data?.hasExistingUser === true) return true;
+  return sessionHasAccount(data);
+}
+
+export function supportClientFlags(data: Record<string, unknown> | null | undefined, step?: string | null) {
+  const d = data ?? {};
+  const username = typeof d.username === 'string' && d.username.trim() ? d.username.trim() : null;
+  const assignedWa = typeof d.assignedWa === 'string' && d.assignedWa.trim() ? String(d.assignedWa) : null;
+  return {
+    username,
+    assignedWa,
+    waUnlocked: sessionCanOpenSupport(d, step),
+  };
+}
+
+export function existingUserSupport(
+  cfg: ChatRuntimeConfig,
+  data: Record<string, unknown> = {},
+  currentStep?: string | null,
+): { messages: BotMsg[]; buttons: Btn[]; data: Record<string, unknown>; step: string } {
+  const next = { ...data, waUnlocked: true, hasExistingUser: true };
+  return {
+    messages: [buildSupportMsg(cfg, next, 400)],
+    buttons: [],
+    data: next,
+    step: currentStep && currentStep !== 'form' ? currentStep : 'welcome',
+  };
+}
+
 // ── Paso 1: WELCOME ────────────────────────────────────────────────────────
-// Labels de los botones del welcome (se comparten con start/route y el resume del
-// widget para no divergir).
-export const WANT_ACCOUNT_BTN: Btn = { id: 'want_account', label: 'Quiero mi cuenta 🎁' };
-export const WANT_AGENT_BTN: Btn = { id: 'want_agent', label: 'Hablar con un agente 🧑‍💼' };
-export const WANT_USER_BTN: Btn = { id: 'want_account', label: 'Quiero mi usuario' };
-export const WANT_AGENT_PLAIN_BTN: Btn = { id: 'want_agent', label: 'Hablar con un agente' };
-
-// Tenants que muestran el 2º botón "Hablar con un agente" en el welcome (pedido de
-// King para King y Paradise, para dar más confianza). ElGanador: mismos dos
-// caminos, el agente entra al mismo paso que "Quiero mi usuario".
-export const AGENT_BUTTON_SLUGS = ['king', 'paradise', 'elganador'];
-export function hasAgentButton(slug: string): boolean {
-  return AGENT_BUTTON_SLUGS.includes(slug);
-}
-
-// Botones del welcome. `agentButton` agrega el 2º botón "Hablar con un agente"
-// (King/Paradise): crea igual la cuenta por emergencia y además avisa a un agente.
-export function welcomeButtons(agentButton = false): Btn[] {
-  return agentButton ? [WANT_ACCOUNT_BTN, WANT_AGENT_BTN] : [WANT_ACCOUNT_BTN];
-}
-
-export function welcomeButtonsFor(slug: string): Btn[] {
-  if (slug === 'elganador') return [WANT_USER_BTN, WANT_AGENT_PLAIN_BTN];
-  return welcomeButtons(hasAgentButton(slug));
-}
 
 export function welcomeStep(
   name?: string | null,
@@ -186,11 +226,14 @@ export async function accountStep(
         { from: 'bot', delayMs: 2400, at: now(), text: renderTemplate('account_agent_followup', cfg) },
       ];
 
-  const cajero = acc.existing ? {} : await assignCajeroData(tenant.id);
+  const prev = session.existing ?? {};
+  const cajero = prev.assignedWa
+    ? { assignedWa: prev.assignedWa, assignedWaName: prev.assignedWaName ?? null }
+    : await assignCajeroData(tenant.id);
   return {
     messages,
     buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
-    data: { username: acc.username, password: acc.password, loginUrl: acc.loginUrl, portalName, existing: acc.existing, ...cajero },
+    data: { username: acc.username, password: acc.password, loginUrl: acc.loginUrl, portalName, existing: acc.existing, waUnlocked: true, ...cajero },
     step: 'credenciales',
   };
 }
@@ -230,7 +273,7 @@ async function accountStepManual(
         { from: 'bot', delayMs: 1500, at: now(), text: renderTemplate('account_existing', cfg, { creds_block: creds }) },
       ],
       buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
-      data: { username: prevUser, password: prevPass, loginUrl: null, portalName: prevUser, existing: true, manualPending: false },
+      data: { username: prevUser, password: prevPass, loginUrl: null, portalName: prevUser, existing: true, manualPending: false, waUnlocked: true },
       step: 'credenciales',
     };
   }
@@ -279,7 +322,7 @@ async function accountStepPartnerApi(
         { from: 'bot', delayMs: 2400, at: now(), text: renderTemplate('account_agent_followup', cfg) },
       ],
       buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
-      data: { username, password, loginUrl: null, portalName: username, existing: false, ...cajero },
+      data: { username, password, loginUrl: null, portalName: username, existing: false, waUnlocked: true, ...cajero },
       step: 'credenciales',
     };
   } catch {
@@ -314,7 +357,7 @@ async function accountStepKingcash(
           { from: 'bot', delayMs: 2400, at: now(), text: renderTemplate('account_agent_followup', cfg) },
         ],
         buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
-        data: { username, password, loginUrl: null, portalName: username, existing: false, ...cajero },
+        data: { username, password, loginUrl: null, portalName: username, existing: false, waUnlocked: true, ...cajero },
         step: 'credenciales',
       };
     } catch (e) {
@@ -340,7 +383,7 @@ async function accountStepKingcash(
 //   agente (Green lo habilitó). Duplicado devuelve "Username already exists".
 async function accountStepKingApi(
   tenant: ResolvedTenant,
-  session: { phone: string; name?: string | null },
+  session: { phone: string; name?: string | null; existing?: Record<string, unknown> },
   cfg: ChatRuntimeConfig,
 ): Promise<{ messages: BotMsg[]; buttons: Btn[]; data: Record<string, unknown>; step: string }> {
   const password = randomPlayerPassword();
@@ -350,7 +393,10 @@ async function accountStepKingApi(
     try {
       const acc = await kingCreateUser(tenant, { username, password, phone: session.phone, name: session.name ?? undefined });
       const creds = `\n\n👤 Usuario: *${acc.username}*\n🔑 Contraseña: *${acc.password}*\n\n🔗 Entrá acá:\n${cfg.links.portal_login}`;
-      const cajero = acc.existing ? {} : await assignCajeroData(tenant.id);
+      const prev = session.existing ?? {};
+      const cajero = prev.assignedWa
+        ? { assignedWa: prev.assignedWa, assignedWaName: prev.assignedWaName ?? null }
+        : await assignCajeroData(tenant.id);
       return {
         messages: [
           { from: 'bot', delayMs: 600, at: now(), text: renderTemplate('account_creating', cfg) },
@@ -358,7 +404,7 @@ async function accountStepKingApi(
           { from: 'bot', delayMs: 2400, at: now(), text: renderTemplate('account_agent_followup', cfg) },
         ],
         buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
-        data: { username: acc.username, password: acc.password, loginUrl: null, portalName: acc.username, existing: acc.existing, ...cajero },
+        data: { username: acc.username, password: acc.password, loginUrl: null, portalName: acc.username, existing: acc.existing, waUnlocked: true, ...cajero },
         step: 'credenciales',
       };
     } catch (e) {
@@ -500,12 +546,15 @@ const APP_CONFUSION_RE = /(qu[eé] app|cu[aá]l aplicaci|qu[eé] aplicaci|c[oó]
 // (pasa seguido en mobile). Si no lo detectamos acá, el chat queda trabado en
 // 'welcome' para siempre — nunca se crea el usuario/contraseña.
 export const WANT_ACCOUNT_RE = /(quiero|dame|necesito|abr[ií]|crea|hace).*(mi )?cuenta|abrir cuenta|crear cuenta|registrar(me)?|jugar|empezar|usuario y contrase/i;
+export const HAVE_USER_RE = /ya tengo (usuario|cuenta|user)|tengo (usuario|cuenta)|soy (cliente|usuario)|ya soy cliente/i;
 
 export function onFreeText(step: string, text?: string, cfg: ChatRuntimeConfig = DEFAULT_RUNTIME, data: Record<string, unknown> = {}): BotMsg[] {
-  // Comprobante en revisión: acá manda el operario. El bot no responde nada
-  // automático para no interferir mientras se valida — el cliente puede escribir
-  // libremente y el humano interviene.
-  if (step === 'validando') return [];
+  // Comprobante en revisión: el operario manda. Si YA tiene usuario y pide
+  // ayuda/estafa, lo derivamos a WhatsApp (no lo dejamos mudo: Karen/KingCBA).
+  if (step === 'validando') {
+    if (text && HELP_RE.test(text) && sessionCanOpenSupport(data, step)) return supportReply(cfg, data);
+    return [];
+  }
 
   const asksAboutApp = !!(text && APP_CONFUSION_RE.test(text));
 
@@ -521,15 +570,14 @@ export function onFreeText(step: string, text?: string, cfg: ChatRuntimeConfig =
   if (asksAboutApp && step !== 'app_onboarding') {
     return [{ from: 'bot', delayMs: 600, at: now(), text: '✅ Tranquilo/a, no hace falta nada más con la app. Tu imagen ya quedó en proceso y en breve te acreditamos 🎉' }];
   }
-  // Derivación al cajero por WhatsApp SOLO post-carga (acreditado). Antes de
-  // cargar mantenemos al cliente en el chat: un agente lo atiende por el panel.
-  const accredited = step === 'done';
-  // Si pide ayuda: post-carga → soporte/cajero; pre-carga → tranquilizar en el chat.
-  if (text && HELP_RE.test(text)) return accredited ? supportReply(cfg, data) : reassureInChat();
+  // WhatsApp si ya tiene usuario / tocó "Ya tengo usuario" / está acreditado.
+  // Sin usuario todavía: se queda en el chat (el operador lo ve en el panel).
+  if (text && HELP_RE.test(text)) {
+    return sessionCanOpenSupport(data, step) ? supportReply(cfg, data) : reassureInChat();
+  }
   if (step === 'welcome') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Tocá un botón de abajo para seguir 👇' }];
   if (step === 'account_pending') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Todavía estamos creando tu usuario, dame un momento 🙌' }];
   if (step === 'credenciales') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Cuando quieras cargar, tocá *Quiero el CBU 💳* 👇' }];
   if (step === 'comprobante') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Cuando tengas el comprobante de la transferencia, mandámelo por acá 📸' }];
-  // Fallback: post-carga → soporte/cajero; pre-carga → tranquilizar (sin WhatsApp).
-  return accredited ? supportReply(cfg, data) : reassureInChat();
+  return sessionCanOpenSupport(data, step) ? supportReply(cfg, data) : reassureInChat();
 }
