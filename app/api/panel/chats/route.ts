@@ -352,9 +352,13 @@ export async function POST(req: NextRequest) {
       ],
       { op: true },
     );
+    // No pisar el paso si el cliente YA avanzó (ElGanador: demo → CBU → carga →
+    // recién ahí Luis entrega el usuario). Solo empujamos a 'credenciales' si
+    // todavía está en la bienvenida o esperando el alta.
+    const preCreds = ['welcome', 'account_pending', 'form', '', null, undefined].includes(s.step as string);
     await appendChatMessages(s.id, botMsgs, {
-      step: 'credenciales',
-      dataMerge: { username, password, loginUrl: null, portalName: username, existing: false, manualPending: false },
+      ...(preCreds ? { step: 'credenciales' } : {}),
+      dataMerge: { username, password, loginUrl: null, portalName: username, existing: false, manualPending: false, waUnlocked: true },
     });
     if (s.kommoLeadId) {
       addLeadNote(tenant, s.kommoLeadId, `👤 Usuario creado A MANO por el operador (${session.slug}): ${username}`);
@@ -364,7 +368,7 @@ export async function POST(req: NextRequest) {
       body: 'Ya te dejamos tu usuario y contraseña en el chat.',
       url: `/chat/${session.slug}`,
     });
-    return NextResponse.json({ ok: true, messages: botMsgs, step: 'credenciales' });
+    return NextResponse.json({ ok: true, messages: botMsgs, step: preCreds ? 'credenciales' : (s.step ?? 'credenciales') });
   }
 
   // ── Operaciones de SALDO REAL (Partner API / King API) ─────────────────────

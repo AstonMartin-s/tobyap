@@ -6,6 +6,14 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-10 — ElGanador: demo → CBU directo (sin pedir usuario)
+
+- Pedido de Luis: el cliente NO pide usuario. Arranca con el demo (welcome) y va directo al CBU. El operador entrega el usuario real desde el panel cuando confirma la carga, sin que el cliente lo pida.
+- Welcome `elganador`: un solo botón **Quiero el CBU 💳** (se sacó "Quiero mi usuario"/"Hablar con un agente"). `want_cbu` desde welcome ya funciona (→ comprobante).
+- Panel `ManualAccountPanel`: ahora disponible en cualquier paso activo (no solo `account_pending`) para tenants manuales. Auto-abre solo en `account_pending` (goldenC). Sugiere usuario `<nombre>+últimos4` y una contraseña al azar (editables).
+- `manual_account_confirm` ya no pisa el paso si el cliente avanzó (comprobante/validando/done): solo empuja a `credenciales` desde welcome/account_pending.
+- Solo `elganador`. goldenC intacto. Overlap Claude: `ChatsClient.tsx`, `ManualAccountPanel.tsx`, `panel/chats` route.
+
 ## Bitácora 2026-09-10 — KingCBA (Karen866): WA solo se abría en `done`
 
 - Caso: jugadora con usuario (`Karen866`, step `validando`) tocó "Ir a WhatsApp" y no redirigió. El header exigía `step==='done'` (post-Cargo). `kingplay` no tenía landing `walink` ni números.

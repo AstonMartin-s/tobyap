@@ -204,9 +204,24 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [assignedWa, setAssignedWa] = useState<string | null>(null);
   const [assignedWaName, setAssignedWaName] = useState<string | null>(null);
   const showOpsPanel = fichasEnabled && (tenantProvider === 'partner_api' || tenantProvider === 'king' || tenantProvider === 'kingcash') && !!sel && !!detail?.username;
-  // Panel de creación MANUAL (goldenC/ElGanador): solo cuando el tenant es manual
-  // y la sesión está esperando que el operador confirme el alta ('account_pending').
-  const showManualPanel = tenantProvider === 'manual' && !!sel && detail?.step === 'account_pending';
+  // Panel de creación MANUAL (goldenC/ElGanador): disponible en cualquier paso
+  // activo para que el operador entregue el usuario CUANDO QUIERA (ElGanador: el
+  // cliente arranca con demo → CBU, y Luis libera el usuario real al confirmar la
+  // carga, sin que el cliente lo pida). En 'account_pending' se auto-abre porque
+  // el cliente está esperando (flujo goldenC).
+  const manualWaiting = detail?.step === 'account_pending';
+  const showManualPanel =
+    tenantProvider === 'manual' && !!sel && !!detail && !['closed', 'no_cargo'].includes(detail.step ?? '');
+  // Sugerencia por defecto del usuario: <nombre limpio> + últimos 4 del teléfono.
+  const manualSuggestedUser = (() => {
+    const fromData = String(detail?.data?.suggestedUsername ?? detail?.username ?? '').trim();
+    if (fromData) return fromData;
+    const clean = (detail?.name ?? '').normalize('NFD').replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 12);
+    const digits = (detail?.phone ?? '').replace(/\D/g, '');
+    const base = clean.length >= 2 ? clean : `user${digits.slice(-6)}`;
+    return `${base}${digits.slice(-4)}`.slice(0, 18);
+  })();
+  const manualSuggestedPass = String(detail?.data?.suggestedPassword ?? '').trim();
   // Ancho de la lista (barra divisora arrastrable, estilo Black Dragon).
   const [listW, setListW] = useState(380);
   const listWRef = useRef(380);
@@ -500,7 +515,9 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     if (sel) loadDetail(sel);
   }, [sel, loadDetail]);
   useEffect(() => { setOpsOpen(false); setCargoOpen(false); setCargoAmount(''); }, [sel]); // el drawer de fichas arranca cerrado en cada chat
-  useEffect(() => { if (showManualPanel) setManualOpen(true); }, [showManualPanel, sel]);
+  // Solo auto-abrimos (mobile) cuando el cliente está ESPERANDO el alta
+  // (account_pending). En el resto de pasos el operador lo abre a demanda.
+  useEffect(() => { if (manualWaiting) setManualOpen(true); }, [manualWaiting, sel]);
   useEffect(() => {
     if (!sel) return;
     const t = setInterval(() => loadDetail(sel), 6000);
@@ -1280,7 +1297,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
               {showManualPanel && isMobile && !manualOpen && (
                 <button type="button" onClick={() => setManualOpen(true)}
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', width: '100%', padding: '.65rem .75rem', borderRadius: 10, border: '1px solid rgba(22,163,74,.45)', background: 'rgba(22,163,74,.12)', color: '#4ade80', fontWeight: 800, fontSize: '.82rem', cursor: 'pointer' }}>
-                  <span>El cliente espera — crear usuario</span>
+                  <span>{manualWaiting ? 'El cliente espera — crear usuario' : 'Entregar usuario al cliente'}</span>
                   <span style={{ fontSize: '.7rem', fontWeight: 700 }}>Abrir ›</span>
                 </button>
               )}
@@ -1402,8 +1419,8 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
             <div style={{ padding: '.8rem', overflowY: 'auto', minHeight: 0, flex: 1 }}>
               <ManualAccountPanel
                 sessionKey={sel}
-                suggestedUsername={String(detail.data?.suggestedUsername ?? '')}
-                suggestedPassword={String(detail.data?.suggestedPassword ?? '')}
+                suggestedUsername={manualSuggestedUser}
+                suggestedPassword={manualSuggestedPass}
                 onDone={() => sel && loadDetail(sel)}
               />
             </div>
@@ -1432,8 +1449,8 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
               <div style={{ padding: '.85rem .9rem 1rem', overflowY: 'auto', minHeight: 0, flex: 1 }}>
                 <ManualAccountPanel
                   sessionKey={sel}
-                  suggestedUsername={String(detail.data?.suggestedUsername ?? '')}
-                  suggestedPassword={String(detail.data?.suggestedPassword ?? '')}
+                  suggestedUsername={manualSuggestedUser}
+                  suggestedPassword={manualSuggestedPass}
                   onDone={() => sel && loadDetail(sel)}
                 />
               </div>
