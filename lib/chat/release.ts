@@ -100,7 +100,8 @@ export async function acreditarChat(
       RETURNING id
     `)) as unknown as { length?: number };
     return (res?.length ?? 0) > 0;
-  } catch {
+  } catch (e) {
+    console.error(`[acreditarChat ${tenant.slug}]`, e);
     return false;
   }
 }

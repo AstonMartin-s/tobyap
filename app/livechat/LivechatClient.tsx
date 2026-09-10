@@ -80,7 +80,7 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
   const [runtime, setRuntime] = useState<ChatRuntimeConfig>(DEFAULT_RUNTIME);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
-  const [linkBono, setLinkBono] = useState('A2');
+  const [linkBono, setLinkBono] = useState('');
   const [linkCampaign, setLinkCampaign] = useState('');
   const [landingDomain, setLandingDomain] = useState('');
   const [panelQuick, setPanelQuick] = useState<PanelQuickTexts>(DEFAULT_PANEL_QUICK);
@@ -90,7 +90,7 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
   const [waBtnUrl, setWaBtnUrl] = useState('');
   // Landings de chat del cliente (las que redirigen al chat web = tienen chatSlug).
   // El generador de link debe usar la landing REAL, no un slug hardcodeado.
-  const [chatLandings, setChatLandings] = useState<Array<{ id: string; landingSlug: string | null; name: string | null }>>([]);
+  const [chatLandings, setChatLandings] = useState<Array<{ id: string; landingSlug: string | null; name: string | null; ccpp: string; campaign: string }>>([]);
   const [selLandingId, setSelLandingId] = useState('');
   const [niche, setNiche] = useState<'circo' | 'tienda'>('circo');
   const isTienda = niche === 'tienda';
@@ -115,8 +115,10 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
     // slug fijo. Sin landing de chat no hay link válido.
     const sel = chatLandings.find((l) => l.id === selLandingId) ?? chatLandings[0];
     if (!sel?.landingSlug) return '';
-    const cid = linkCampaign.trim();
-    const qs = `ccpp=${linkBono}${cid ? `&campaign=${cid}` : ''}`;
+    const ccpp = linkBono.trim() || sel.ccpp;
+    const cid = linkCampaign.trim() || sel.campaign;
+    if (!ccpp) return '';
+    const qs = `ccpp=${ccpp}${cid ? `&campaign=${cid}` : ''}`;
     return `${origin}/l/${slug}/${sel.landingSlug}?${qs}`;
   })();
 
@@ -162,9 +164,23 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
         const all = (d.landings ?? []) as Array<{ id: string; landingSlug: string | null; name: string | null; config: Record<string, unknown> | null }>;
         const chat = all
           .filter((l) => l.config && typeof (l.config as Record<string, unknown>).chatSlug === 'string' && (l.config as Record<string, unknown>).chatSlug)
-          .map((l) => ({ id: l.id, landingSlug: l.landingSlug, name: l.name }));
+          .map((l) => {
+            const c = (l.config ?? {}) as Record<string, unknown>;
+            return {
+              id: l.id,
+              landingSlug: l.landingSlug,
+              name: l.name,
+              ccpp: typeof c.ccpp === 'string' ? c.ccpp : '',
+              campaign: typeof c.campaign === 'string' ? c.campaign : '',
+            };
+          });
         setChatLandings(chat);
-        if (chat.length) setSelLandingId((prev) => prev || chat[0].id);
+        if (chat.length) {
+          setSelLandingId((prev) => prev || chat[0].id);
+          const pick = chat.find((l) => l.id === selLandingId) ?? chat[0];
+          if (pick.ccpp) setLinkBono(pick.ccpp);
+          if (pick.campaign) setLinkCampaign(pick.campaign);
+        }
       })
       .catch(() => { /* sin landings: el generador avisa */ });
   }, []);
@@ -563,7 +579,13 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
               ) : chatLandings.length > 1 ? (
                 <div className="field" style={{ marginBottom: '.3rem' }}>
                   <label>Landing de chat</label>
-                  <select className="input" value={selLandingId} onChange={(e) => setSelLandingId(e.target.value)}>
+                  <select className="input" value={selLandingId} onChange={(e) => {
+                    const id = e.target.value;
+                    setSelLandingId(id);
+                    const pick = chatLandings.find((l) => l.id === id);
+                    if (pick?.ccpp) setLinkBono(pick.ccpp);
+                    if (pick?.campaign) setLinkCampaign(pick.campaign);
+                  }}>
                     {chatLandings.map((l) => <option key={l.id} value={l.id}>{l.landingSlug}{l.name ? ` — ${l.name}` : ''}</option>)}
                   </select>
                 </div>

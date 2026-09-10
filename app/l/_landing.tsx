@@ -74,6 +74,12 @@ export function landingSpinnerCopy(cfg: Pick<LandingConfig, 'tenantSlug' | 'head
       subtext: cfg.subtext || 'Te redirigimos a Telegram en un instante.',
     };
   }
+  if (cfg.chatSlug) {
+    return {
+      headline: cfg.headline || 'Un segundo…',
+      subtext: cfg.subtext || (cfg.brandName ? `Te estamos conectando con ${cfg.brandName}` : 'Te estamos conectando con el chat.'),
+    };
+  }
   return {
     headline: cfg.headline || 'Verificando tu acceso…',
     subtext: cfg.subtext || 'Te redirigimos a WhatsApp en un instante.',

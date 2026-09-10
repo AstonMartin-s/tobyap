@@ -135,9 +135,11 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         if (d.step === 'welcome') {
           // King/Paradise muestran el 2º botón "Hablar con un agente" también al
           // reconectar (el start ya lo devuelve; esto es el fallback del resume).
-          const welcomeBtns = ['king', 'paradise'].includes(slug)
-            ? [{ id: 'want_account', label: 'Quiero mi cuenta 🎁' }, { id: 'want_agent', label: 'Hablar con un agente 🧑‍💼' }]
-            : [{ id: 'want_account', label: 'Quiero mi cuenta' }];
+          const welcomeBtns = slug === 'elganador'
+            ? [{ id: 'want_account', label: 'Quiero mi usuario' }, { id: 'want_agent', label: 'Hablar con un agente' }]
+            : ['king', 'paradise'].includes(slug)
+              ? [{ id: 'want_account', label: 'Quiero mi cuenta 🎁' }, { id: 'want_agent', label: 'Hablar con un agente 🧑‍💼' }]
+              : [{ id: 'want_account', label: 'Quiero mi cuenta' }];
           setButtons(welcomeBtns);
         } else if (d.step === 'credenciales') setButtons([{ id: 'want_cbu', label: 'Quiero el CBU' }]);
         else if (d.step === 'account_pending') setButtons([]);
@@ -215,7 +217,11 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         const d = await r.json();
         if (!d.ok) return;
         if (d.assignedWa) setAssignedWa(String(d.assignedWa));
-        if (pollBase.current === null) { pollBase.current = d.total; if (d.step && d.step !== 'validando') setStep(d.step); return; }
+        if (pollBase.current === null) {
+          pollBase.current = d.total;
+          if (d.step && d.step !== step) setStep(d.step);
+          return;
+        }
         if (d.total > pollBase.current) {
           const fresh = (d.messages ?? []).filter((m: Msg) => m.from === 'bot');
           pollBase.current = d.total;
@@ -296,8 +302,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     // (así el panel ve la conversación completa).
     const r = await fetch(`/api/chat/${slug}/action`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionKey, action: btn.id, label: btn.label }) });
     const d = await r.json().catch(() => ({}));
-    if (typeof d.total === 'number' && d.step !== 'validando') pollBase.current = d.total;
-    else if (d.step === 'validando') pollBase.current = null;
+    if (typeof d.total === 'number') pollBase.current = d.total;
     if (d.step) setStep(d.step);
     await play(d.messages ?? [], d.buttons ?? []);
   }
@@ -320,8 +325,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     // Sincronizamos la base del poll ANTES de animar los mensajes: así el poll de
     // fondo (recordatorios / mensajes del operador) no reproduce lo que estamos por
     // mostrar mientras dura la animación.
-    if (d.step === 'validando') pollBase.current = null;
-    else if (typeof d.total === 'number') pollBase.current = d.total;
+    if (typeof d.total === 'number') pollBase.current = d.total;
     if (d.step) setStep(d.step);
     await play(d.messages ?? [], []);
   }

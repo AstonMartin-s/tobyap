@@ -97,10 +97,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const data0 = (s.data as Record<string, unknown> | null) ?? {};
   const firstComprobante = data0.comprobanteSentOnce !== true;
   const appActivated = data0.appInstall === true || data0.appNotif === true;
+  const alreadyAccredited = s.step === 'done' || !!data0.accreditedAt;
 
   let step: string;
   let botMsgs: ReturnType<typeof prepareBotBatch>;
-  if (tenant.niche === 'tienda') {
+  if (alreadyAccredited) {
+    // El operador ya pasó a Cargo: guardamos la imagen pero no volvemos a revisión.
+    step = 'done';
+    botMsgs = prepareBotBatch([{ from: 'bot', delayMs: 400, at: Date.now(), text: 'Recibimos la imagen 👍 El saldo ya estaba acreditado.' }]);
+  } else if (tenant.niche === 'tienda') {
     // Tienda: sin gate de app. El comprobante entra directo a verificación.
     step = 'validando';
     botMsgs = prepareBotBatch(comprobanteReviewTienda());

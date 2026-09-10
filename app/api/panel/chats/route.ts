@@ -671,37 +671,55 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, messages: msgs, step: 'done' });
     }
 
-    if (tenant) {
-      // Agrega el mensaje "¡Acreditado!" UNA sola vez (candado atómico). Aunque
-      // después llegue el webhook de Cargo$ o el poll, no se duplica. El panel
-      // recarga el detalle tras la acción, así que el operador lo ve igual.
-      await acreditarChat(tenant, { sessionKey: s.sessionKey });
-      // Push de acreditación (best-effort): el aviso más importante para el cliente.
+    if (!tenant) {
+      return NextResponse.json({ error: 'tenant desconocido' }, { status: 500 });
+    }
+    const amount = b.amount && b.amount > 0 ? b.amount : undefined;
+    if (amount) {
+      await mergeChatData(s.id, { accreditedAmount: amount }, undefined, { touchUpdatedAt: false });
+    }
+    // Agrega el mensaje "¡Acreditado!" UNA sola vez (candado atómico). Aunque
+    // después llegue el webhook de Cargo$ o el poll, no se duplica. El panel
+    // recarga el detalle tras la acción, así que el operador lo ve igual.
+    const released = await acreditarChat(tenant, { sessionKey: s.sessionKey });
+    const alreadyAccredited = !released && !!data.accreditedAt;
+    if (released) {
       void sendPushToSession(s.id, data.pushSub, {
         title: '¡Acreditado!',
         body: 'Tu carga fue acreditada con éxito.',
         url: `/chat/${session.slug}`,
       });
-      // Movemos el lead a Cargo$ (dispara webhook; el candado impide duplicar).
-      if (s.kommoLeadId && tenant.statusCargoId) {
-        updateLeadStatus(tenant, s.kommoLeadId, tenant.statusCargoId).catch(() => {});
-      }
-      // Fase 1: dispara CargoCRM a Meta. Kill switch EMIT_CARGO_FROM_PANEL=0.
-      if (panelApproveEmitsCargo()) {
-        await emitCargo(tenant, {
-          kommoLeadId: s.kommoLeadId,
-          sessionKey: s.sessionKey,
-          source: 'panel',
-          operator: session.slug,
-          // Si el operador aprobó indicando el monto cargado, lo mandamos en ARS.
-          value: b.amount && b.amount > 0 ? b.amount : undefined,
-          currency: 'ARS',
-          skipKommoStatus: true,
-          skipChatRelease: true,
-        }).catch((e) => console.error(`[panel/chats ${session.slug}] emitCargo:`, e));
-      }
     }
-    return NextResponse.json({ ok: true, messages: newMsgs, step: 'done' });
+    // Movemos el lead a Cargo$ (dispara webhook; el candado impide duplicar).
+    if (s.kommoLeadId && tenant.statusCargoId) {
+      updateLeadStatus(tenant, s.kommoLeadId, tenant.statusCargoId).catch(() => {});
+    }
+    // Fase 1: dispara CargoCRM a Meta. Kill switch EMIT_CARGO_FROM_PANEL=0.
+    let cargo: Awaited<ReturnType<typeof emitCargo>> | null = null;
+    if (panelApproveEmitsCargo()) {
+      cargo = await emitCargo(tenant, {
+        kommoLeadId: s.kommoLeadId,
+        sessionKey: s.sessionKey,
+        source: 'panel',
+        operator: session.slug,
+        value: amount,
+        currency: 'ARS',
+        skipKommoStatus: true,
+        skipChatRelease: true,
+      }).catch((e) => {
+        console.error(`[panel/chats ${session.slug}] emitCargo:`, e);
+        return null;
+      });
+    }
+    return NextResponse.json({
+      ok: true,
+      messages: newMsgs,
+      step: 'done',
+      accredited: released || alreadyAccredited,
+      alreadyAccredited,
+      amount: amount ?? null,
+      cargo: cargo ? { ok: cargo.ok, skipped: cargo.skipped ?? null, eventId: cargo.eventId } : null,
+    });
   }
 
   return NextResponse.json({ ok: true, messages: newMsgs, step: newStep ?? s.step });

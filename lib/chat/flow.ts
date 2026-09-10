@@ -110,10 +110,13 @@ function buildCajeraMsg(cfg: ChatRuntimeConfig, data: Record<string, unknown>, d
 // widget para no divergir).
 export const WANT_ACCOUNT_BTN: Btn = { id: 'want_account', label: 'Quiero mi cuenta 🎁' };
 export const WANT_AGENT_BTN: Btn = { id: 'want_agent', label: 'Hablar con un agente 🧑‍💼' };
+export const WANT_USER_BTN: Btn = { id: 'want_account', label: 'Quiero mi usuario' };
+export const WANT_AGENT_PLAIN_BTN: Btn = { id: 'want_agent', label: 'Hablar con un agente' };
 
 // Tenants que muestran el 2º botón "Hablar con un agente" en el welcome (pedido de
-// King para King y Paradise, para dar más confianza). Fácil de extender.
-export const AGENT_BUTTON_SLUGS = ['king', 'paradise'];
+// King para King y Paradise, para dar más confianza). ElGanador: mismos dos
+// caminos, el agente entra al mismo paso que "Quiero mi usuario".
+export const AGENT_BUTTON_SLUGS = ['king', 'paradise', 'elganador'];
 export function hasAgentButton(slug: string): boolean {
   return AGENT_BUTTON_SLUGS.includes(slug);
 }
@@ -124,10 +127,15 @@ export function welcomeButtons(agentButton = false): Btn[] {
   return agentButton ? [WANT_ACCOUNT_BTN, WANT_AGENT_BTN] : [WANT_ACCOUNT_BTN];
 }
 
+export function welcomeButtonsFor(slug: string): Btn[] {
+  if (slug === 'elganador') return [WANT_USER_BTN, WANT_AGENT_PLAIN_BTN];
+  return welcomeButtons(hasAgentButton(slug));
+}
+
 export function welcomeStep(
   name?: string | null,
   cfg: ChatRuntimeConfig = DEFAULT_RUNTIME,
-  opts: { agentButton?: boolean } = {},
+  opts: { agentButton?: boolean; slug?: string } = {},
 ): { messages: BotMsg[]; buttons: Btn[] } {
   const fn = firstName(name);
   const hi = fn ? `¡Hola ${fn}! 👋` : '¡Hola! 👋';
@@ -136,7 +144,7 @@ export function welcomeStep(
       from: 'bot', delayMs: 500, at: now(),
       text: `${hi} ${renderTemplate('welcome_body', cfg)}`,
     }],
-    buttons: welcomeButtons(opts.agentButton),
+    buttons: opts.slug ? welcomeButtonsFor(opts.slug) : welcomeButtons(opts.agentButton),
   };
 }
 
@@ -518,7 +526,7 @@ export function onFreeText(step: string, text?: string, cfg: ChatRuntimeConfig =
   const accredited = step === 'done';
   // Si pide ayuda: post-carga → soporte/cajero; pre-carga → tranquilizar en el chat.
   if (text && HELP_RE.test(text)) return accredited ? supportReply(cfg, data) : reassureInChat();
-  if (step === 'welcome') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Tocá el botón *Quiero mi cuenta 🎁* para empezar 👇' }];
+  if (step === 'welcome') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Tocá un botón de abajo para seguir 👇' }];
   if (step === 'account_pending') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Todavía estamos creando tu usuario, dame un momento 🙌' }];
   if (step === 'credenciales') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Cuando quieras cargar, tocá *Quiero el CBU 💳* 👇' }];
   if (step === 'comprobante') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Cuando tengas el comprobante de la transferencia, mandámelo por acá 📸' }];

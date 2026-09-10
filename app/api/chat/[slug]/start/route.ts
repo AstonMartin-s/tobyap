@@ -5,7 +5,7 @@ import { db } from '@/db';
 import { chatSessions, metaEvents, attributions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { checkWhatsApp } from '@/lib/chat/wachecker';
-import { welcomeStep, welcomeButtons, hasAgentButton, type Btn } from '@/lib/chat/flow';
+import { welcomeStep, welcomeButtonsFor, hasAgentButton, type Btn } from '@/lib/chat/flow';
 import { welcomeStepTienda, productButtons } from '@/lib/chat/flows/tienda';
 import { loadTiendaConfig, loadChatFlow } from '@/lib/chat/loadTienda';
 import { runFlow, flowButtons, EMPTY_FLOW } from '@/lib/chat/flowGraph';
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       return { messages: run.messages, buttons: run.buttons, step: run.step ?? 'welcome', data: { flowNodeId: run.nodeId } };
     }
     if (isTienda) { const w = welcomeStepTienda(name, tiendaCfg!); return { messages: w.messages, buttons: w.buttons, step: 'welcome', data: {} }; }
-    const w = welcomeStep(name, runtime, { agentButton: agentBtn }); return { messages: w.messages, buttons: w.buttons, step: 'welcome', data: {} };
+    const w = welcomeStep(name, runtime, { agentButton: agentBtn, slug: tenant.slug }); return { messages: w.messages, buttons: w.buttons, step: 'welcome', data: {} };
   };
   const buttonsForStep = (step: string, data?: Record<string, unknown> | null): Btn[] => {
     if (useFlow) {
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       return flowButtons(flow, nodeId, tiendaCfg!);
     }
     if (isTienda) return step === 'welcome' ? productButtons(tiendaCfg!) : [];
-    if (step === 'welcome') return welcomeButtons(agentBtn);
+    if (step === 'welcome') return welcomeButtonsFor(tenant.slug);
     if (step === 'credenciales') return [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }];
     if (step === 'account_pending') return [];
     return [];

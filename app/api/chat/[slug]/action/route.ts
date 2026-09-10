@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
-import { accountStep, cbuStep, postActionMessages, comprobanteReviewMessages } from '@/lib/chat/flow';
+import { accountStep, cbuStep, postActionMessages, comprobanteReviewMessages, type BotMsg } from '@/lib/chat/flow';
 import { BUY_ACTION_PREFIX, productStepTienda, comprobanteReviewTienda, onFreeTextTienda } from '@/lib/chat/flows/tienda';
 import { loadTiendaConfig, loadChatFlow } from '@/lib/chat/loadTienda';
 import { advanceByButton } from '@/lib/chat/flowGraph';
@@ -15,6 +15,41 @@ import { updateLeadFields, updateLeadName, addLeadTags, updateLeadStatus } from 
 import { notifyOperators } from '@/lib/panel/operatorPush';
 
 export const dynamic = 'force-dynamic';
+
+/** Cierra el gate de app → revisión. No pisa un Cargo ya acreditado (carrera con Aprobar). */
+async function applyFinishUpload(
+  sessionId: string,
+  dbCountBefore: number,
+  label: string | undefined,
+  reviewMsgs: BotMsg[],
+): Promise<{ moved: boolean; body: Record<string, unknown> }> {
+  const userTap = label?.trim()
+    ? [{ from: 'user' as const, text: label.trim(), at: Date.now() }]
+    : [];
+  const botMsgs = prepareBotBatch(reviewMsgs);
+  const toAdd = [...userTap, ...botMsgs];
+  const res = (await db.execute(sql`
+    UPDATE chat_sessions
+    SET messages = coalesce(messages, '[]'::jsonb) || ${JSON.stringify(toAdd)}::jsonb,
+        step = 'validando',
+        updated_at = now()
+    WHERE id = ${sessionId}
+      AND coalesce(data->>'accreditedAt', '') = ''
+      AND coalesce(step, '') <> 'done'
+    RETURNING id
+  `)) as unknown as { length?: number };
+  if ((res?.length ?? 0) === 0) {
+    if (userTap.length) await appendChatMessages(sessionId, userTap);
+    return {
+      moved: false,
+      body: { ok: true, messages: [], buttons: [], step: 'done', alreadyDone: true, total: dbCountBefore + userTap.length },
+    };
+  }
+  return {
+    moved: true,
+    body: { ok: true, messages: botMsgs, buttons: [], step: 'validando', total: dbCountBefore + toAdd.length },
+  };
+}
 
 // POST /api/chat/[slug]/action  { sessionKey, action }  — avanza el flujo por botón.
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
@@ -68,10 +103,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     }
 
     if (b.action === 'finish_upload') {
-      const botMsgs = prepareBotBatch(comprobanteReviewTienda());
-      const history = [...(s.messages ?? []), ...botMsgs];
-      await db.update(chatSessions).set({ step: 'validando', messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
-      return NextResponse.json({ ok: true, messages: botMsgs, buttons: [], step: 'validando', total: history.length });
+      const dbCountBefore = (s.messages ?? []).length - (label ? 1 : 0);
+      const r = await applyFinishUpload(s.id, dbCountBefore, b.label, comprobanteReviewTienda());
+      return NextResponse.json(r.body);
     }
 
     if (b.action === 'support') {
@@ -87,7 +121,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ ok: true, messages: [], buttons: [], step: s.step, total: persisted.length });
   }
 
-  if (b.action === 'want_account') {
+  if (b.action === 'want_account' || (b.action === 'want_agent' && tenant.provider === 'manual')) {
     const existing = (s.data ?? {}) as Record<string, unknown>;
     const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name, existing }, runtime);
     const botMsgs = prepareBotBatch(r.messages);
@@ -96,6 +130,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       ...existing,
       ...r.data,
       ...(r.step === 'account_pending' ? { unread: true } : {}),
+      ...(b.action === 'want_agent' ? { requestedAgent: true } : {}),
     };
     await db.update(chatSessions).set({ step: r.step, data: nextData, messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
     // Provider manual: la cuenta la crea el operador a mano → avisale por push que
@@ -173,16 +208,15 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   // FINALIZAR envío del comprobante: recién ahora (tras instalar app + notifs) el
   // comprobante entra en revisión y el lead se mueve a "Revisar imagen" en Kommo.
+  // Si el operador ya acreditó (Cargo), no volvemos a "validando" ni pisamos el hilo.
   if (b.action === 'finish_upload') {
-    const msgs = comprobanteReviewMessages(runtime);
-    const botMsgs = prepareBotBatch(msgs);
-    const history = [...(s.messages ?? []), ...botMsgs];
-    await db.update(chatSessions).set({ step: 'validando', messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
-    if (s.kommoLeadId && tenant.statusRevisarImagenId) {
+    const dbCountBefore = (s.messages ?? []).length - (label ? 1 : 0);
+    const r = await applyFinishUpload(s.id, dbCountBefore, b.label, comprobanteReviewMessages(runtime));
+    if (r.moved && s.kommoLeadId && tenant.statusRevisarImagenId) {
       updateLeadStatus(tenant, s.kommoLeadId, tenant.statusRevisarImagenId).catch(() => {});
       addLeadNote(tenant, s.kommoLeadId, '🔎 Comprobante en revisión (app instalada). ➡️ Chequealo y mové a Cargo$ para acreditar.');
     }
-    return NextResponse.json({ ok: true, messages: botMsgs, buttons: [], step: 'validando', total: history.length });
+    return NextResponse.json(r.body);
   }
 
   // Opciones POST-acreditación (depositar / retirar / soporte / olvidé usuario / cancelar).

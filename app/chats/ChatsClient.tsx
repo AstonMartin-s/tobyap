@@ -154,6 +154,15 @@ const itemNeedsAttention = (i: Item): boolean => {
 
 const EXPORT_STEPS = ['welcome', 'account_pending', 'credenciales', 'comprobante', 'app_onboarding', 'validando', 'done', 'no_cargo', 'closed'] as const;
 
+const CARGO_QUICKS = [3000, 5000, 10000, 20000];
+
+function approveToast(r: { alreadyAccredited?: boolean; cargo?: { ok?: boolean; skipped?: string | null } | null }, amount?: number): string {
+  const amt = amount && amount > 0 ? `$${amount.toLocaleString('es-AR')}` : '';
+  const meta = r.cargo?.ok ? (r.cargo.skipped === 'already_sent' ? 'Meta ya lo tenía' : 'Meta ✓') : 'Meta pendiente';
+  if (r.alreadyAccredited) return `Ya estaba en Cargo$ ${amt} · ${meta}`.replace(/\s+/g, ' ').trim();
+  return `Acreditado ${amt} · enviado al chat · ${meta}`.replace(/\s+/g, ' ').trim();
+}
+
 function isoDateLocal(d: Date) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -178,6 +187,8 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [exportSteps, setExportSteps] = useState<string[]>([]);
   const [exportBusy, setExportBusy] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [cargoOpen, setCargoOpen] = useState(false);
+  const [cargoAmount, setCargoAmount] = useState('');
   const [delChat, setDelChat] = useState(false);
   const [delLead, setDelLead] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -488,7 +499,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     setDetail(null);
     if (sel) loadDetail(sel);
   }, [sel, loadDetail]);
-  useEffect(() => { setOpsOpen(false); }, [sel]); // el drawer de fichas arranca cerrado en cada chat
+  useEffect(() => { setOpsOpen(false); setCargoOpen(false); setCargoAmount(''); }, [sel]); // el drawer de fichas arranca cerrado en cada chat
   useEffect(() => { if (showManualPanel) setManualOpen(true); }, [showManualPanel, sel]);
   useEffect(() => {
     if (!sel) return;
@@ -619,7 +630,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     setNameDraft('');
   }, [sel]);
 
-  async function act(op: string, text?: string, step?: string, extra?: { deleteChat?: boolean; deleteLead?: boolean }) {
+  async function act(op: string, text?: string, step?: string, extra?: { deleteChat?: boolean; deleteLead?: boolean; amount?: number }) {
     if (!sel || busy) return false;
     setBusy(true);
     const r = await fetch('/api/panel/chats', {
@@ -645,7 +656,8 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                 : op === 'mark_precaucion' ? 'Marcado como precaución ✓'
                   : op === 'unmark_precaucion' ? 'Sacado de Precaución ✓'
                     : op === 'mark_revisar' ? 'Movido a Revisar ✓'
-                      : 'Enviado al chat ✓',
+                      : op === 'approve' ? approveToast(r, extra?.amount)
+                        : 'Enviado al chat ✓',
         );
         forceScrollRef.current = op === 'custom';
         if (op === 'mark_estafa') setFilter('estafa');
@@ -667,6 +679,20 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     if (busy || !detail) return;
     setNameDraft(detail.name ?? '');
     setEditingName(true);
+  }
+
+  async function confirmCargo() {
+    const n = Number(String(cargoAmount).replace(/\D/g, ''));
+    if (!Number.isFinite(n) || n <= 0) {
+      setToast('Ingresá el monto que acreditaste');
+      setTimeout(() => setToast(null), 2200);
+      return;
+    }
+    const ok = await act('approve', undefined, undefined, { amount: n });
+    if (ok) {
+      setCargoOpen(false);
+      setCargoAmount('');
+    }
   }
 
   async function saveName() {
@@ -1288,7 +1314,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                         }}>
                         Editar
                       </Link>
-                      <button className="tt tt--down" data-tt={isTienda ? 'Pago válido → entrega el producto y dispara la conversión (Purchase) a Meta' : 'Comprobante válido → acredita y pasa a Cargo$ (dispara la conversión a Meta)'} disabled={busy} onClick={() => act('approve')} style={opStyle('#16a34a', true)}>{ICONS.approve} {isTienda ? 'Liberar producto' : 'Aprobar'}</button>
+                      <button className="tt tt--down" data-tt={isTienda ? 'Pago válido → entrega el producto y dispara la conversión (Purchase) a Meta' : 'Comprobante válido → pide el monto, acredita, manda el mensaje y dispara Cargo a Meta'} disabled={busy} onClick={() => isTienda ? act('approve') : (setCargoAmount(''), setCargoOpen(true))} style={opStyle('#16a34a', true)}>{ICONS.approve} {isTienda ? 'Liberar producto' : 'Cargo'}</button>
                       <button className="tt tt--down" data-tt="En revisión — le avisa que estamos validando" disabled={busy} onClick={() => act('pending')} style={opStyle()}>{ICONS.pending} Pendiente</button>
                       <button className="tt tt--down" data-tt="Comprobante ilegible/incompleto — le pide reenviarlo" disabled={busy} onClick={() => act('reject')} style={opStyle('#f59e0b')}>{ICONS.reject} Erróneo</button>
                       <button className="tt tt--down" data-tt={isTienda ? 'No compró — lo saca de atención' : 'No depositó — lo pasa a No Cargo (sale de atención)'} disabled={busy} onClick={() => act('set_step', undefined, 'no_cargo')} style={opStyle('#ef4444')}>{ICONS.noCargo} {isTienda ? 'No compró' : 'No cargó'}</button>
@@ -1433,6 +1459,40 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
             </div>
             <button onClick={() => setOpPushIosGuide(false)}
               style={{ padding: '.5rem', borderRadius: 8, border: 'none', background: 'var(--accent,#7c5cff)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Entendido</button>
+          </div>
+        </div>
+      )}
+
+      {cargoOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => !busy && setCargoOpen(false)}>
+          <div className="card" style={{ width: 'min(400px, 100%)', padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '.7rem' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontWeight: 800, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '.45rem' }}>{ICONS.approve} Acreditar Cargo</div>
+            <p style={{ fontSize: '.8rem', color: 'var(--muted)', margin: 0, lineHeight: 1.45 }}>
+              Ingresá el saldo que acreditaste. Se manda el mensaje al cliente, pasa a Cargo$ y se completa la conversión a Meta.
+            </p>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
+              <span style={{ fontSize: '.65rem', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--muted-2,#5d6478)' }}>Monto acreditado (ARS)</span>
+              <input className="input" inputMode="numeric" autoFocus placeholder="Ej. 5000" value={cargoAmount}
+                onChange={(e) => setCargoAmount(e.target.value.replace(/[^\d]/g, ''))}
+                onKeyDown={(e) => { if (e.key === 'Enter') void confirmCargo(); }}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '.6rem .7rem', fontSize: 16 }} />
+            </label>
+            <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>
+              {CARGO_QUICKS.map((q) => (
+                <button key={q} type="button" disabled={busy} onClick={() => setCargoAmount(String(q))}
+                  style={{ fontSize: '.72rem', padding: '.3rem .55rem', border: '1px solid var(--border)', borderRadius: 6, background: cargoAmount === String(q) ? 'rgba(22,163,74,.18)' : 'transparent', color: 'var(--text)', cursor: 'pointer' }}>
+                  ${q.toLocaleString('es-AR')}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end', marginTop: '.15rem' }}>
+              <button className="btn btn--ghost" disabled={busy} onClick={() => setCargoOpen(false)}>Cancelar</button>
+              <button disabled={busy || !cargoAmount} onClick={() => void confirmCargo()} style={opStyle('#16a34a', true)}>
+                {busy ? 'Acreditando…' : 'Acreditar y enviar'}
+              </button>
+            </div>
           </div>
         </div>
       )}
