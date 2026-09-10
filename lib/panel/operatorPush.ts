@@ -10,8 +10,9 @@ import type { ResolvedTenant } from '@/lib/types';
 //
 // GATING: todos los disparos se hacen SOLO cuando tenant.provider === 'manual'.
 // En cualquier otro caso es no-op (nadie tiene suscripciones y el guard corta).
+// Disparos: mensaje nuevo, pidió usuario, pidió CBU, soporte, comprobante.
 
-export type OperatorPushEvent = 'account_pending' | 'support' | 'comprobante';
+export type OperatorPushEvent = 'account_pending' | 'cbu' | 'support' | 'comprobante' | 'message';
 
 /** Guarda/actualiza la suscripción push del operador (idempotente por endpoint). */
 export async function saveOperatorSub(
@@ -31,9 +32,11 @@ export async function saveOperatorSub(
 }
 
 const EVENT_COPY: Record<OperatorPushEvent, { title: string; body: string }> = {
-  account_pending: { title: 'Crear usuario 🧑‍💻', body: 'Un cliente pidió su cuenta. Confirmá la creación en el panel.' },
-  support: { title: 'Soporte solicitado 🆘', body: 'Un cliente pidió hablar con un agente.' },
-  comprobante: { title: 'Comprobante recibido 📸', body: 'Llegó una imagen de un cliente. Revisala en el panel.' },
+  account_pending: { title: 'Pidió usuario', body: 'Un cliente pidió su cuenta. Creala en el panel.' },
+  cbu: { title: 'Pidió CBU', body: 'Un cliente pidió el CBU.' },
+  support: { title: 'Soporte solicitado', body: 'Un cliente pidió hablar con un agente.' },
+  comprobante: { title: 'Comprobante recibido', body: 'Llegó una imagen. Revisala en el panel.' },
+  message: { title: 'Mensaje nuevo', body: 'Un cliente escribió en el chat.' },
 };
 
 /**
@@ -44,7 +47,7 @@ const EVENT_COPY: Record<OperatorPushEvent, { title: string; body: string }> = {
 export async function notifyOperators(
   tenant: ResolvedTenant,
   event: OperatorPushEvent,
-  opts: { sessionKey?: string; name?: string | null } = {},
+  opts: { sessionKey?: string; name?: string | null; text?: string | null } = {},
 ): Promise<void> {
   if (tenant.provider !== 'manual') return;
   if (!pushEnabled()) return;
@@ -58,7 +61,13 @@ export async function notifyOperators(
 
   const copy = EVENT_COPY[event];
   const who = (opts.name ?? '').trim();
-  const body = who ? `${copy.body.replace(/\.$/, '')} (${who}).` : copy.body;
+  const snippet = (opts.text ?? '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  const body =
+    event === 'message' && snippet
+      ? (who ? `${who}: ${snippet}` : snippet)
+      : who
+        ? `${copy.body.replace(/\.$/, '')} (${who}).`
+        : copy.body;
   const url = opts.sessionKey ? `/chats?s=${encodeURIComponent(opts.sessionKey)}` : '/chats';
   const tag = `tobyap-panel-${event}-${Date.now()}`;
 

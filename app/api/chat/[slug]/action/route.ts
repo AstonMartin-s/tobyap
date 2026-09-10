@@ -212,8 +212,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     const r = await cbuStep(tenant, runtime);
     const botMsgs = prepareBotBatch(r.messages);
     const history = [...(s.messages ?? []), ...botMsgs];
-    // Persistimos cbu/titular en la sesión para poder re-enviarlos en los recordatorios.
-    await db.update(chatSessions).set({ step: r.step, data: { ...(s.data ?? {}), ...r.data }, messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+    // Persistimos cbu/titular y marcamos atención: ElGanador entra por este botón.
+    await db.update(chatSessions).set({
+      step: r.step,
+      data: { ...(s.data ?? {}), ...r.data, unread: true },
+      messages: history,
+      updatedAt: new Date(),
+    }).where(eq(chatSessions.id, s.id));
+    void notifyOperators(tenant, 'cbu', { sessionKey: s.sessionKey, name: s.name });
     if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, '💳 Pidió CBU — datos entregados.');
     return NextResponse.json({ ok: true, messages: botMsgs, buttons: [], step: r.step, total: history.length });
   }
@@ -228,6 +234,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       updateLeadStatus(tenant, s.kommoLeadId, tenant.statusRevisarImagenId).catch(() => {});
       addLeadNote(tenant, s.kommoLeadId, '🔎 Comprobante en revisión (app instalada). ➡️ Chequealo y mové a Cargo$ para acreditar.');
     }
+    if (r.moved) void notifyOperators(tenant, 'comprobante', { sessionKey: s.sessionKey, name: s.name });
     return NextResponse.json(r.body);
   }
 

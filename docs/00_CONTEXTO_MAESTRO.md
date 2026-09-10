@@ -6,6 +6,11 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-10 — push operador = atención (mensaje / usuario / CBU)
+
+- Luis quería que suene cuando alguien requiere atención, no un ping suelto. El push solo salía en usuario/soporte/comprobante: **pedir CBU no avisaba** (el botón de ElGanador) y un mensaje libre tampoco.
+- Ahora: mensaje nuevo (con snippet), pidió usuario, pidió CBU (y queda unread), soporte, comprobante. Solo tenants `provider=manual`.
+
 ## Bitácora 2026-09-10 — Safari: sonido sin texto (Luis)
 
 - Luis: “me llegan sonidos pero no llegan nada de mensajes”. Apple aceptaba el push (ok=true). En iOS, con la PWA abierta el sistema suena y **oculta el banner**; `new Notification()` de la página no pinta nada. El poll del panel hacía `playChime()` + Notification de página → sonido, cero texto.

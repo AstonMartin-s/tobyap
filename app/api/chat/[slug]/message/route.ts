@@ -51,6 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       if (run) await db.update(chatSessions).set(upd).where(eq(chatSessions.id, s.id));
       const history = [...(s.messages ?? []), userMsg, ...botMsgs];
       if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, `👤 Lead: ${b.text}`);
+      void notifyOperators(tenant, 'message', { sessionKey: s.sessionKey, name: s.name, text: b.text });
       return NextResponse.json({ ok: true, messages: botMsgs, total: history.length });
     }
 
@@ -63,6 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     await appendChatMessages(s.id, [userMsg, ...botMsgs], { markUnread: true });
     const history = [...(s.messages ?? []), userMsg, ...botMsgs];
     if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, `👤 Lead: ${b.text}`);
+    void notifyOperators(tenant, 'message', { sessionKey: s.sessionKey, name: s.name, text: b.text });
     return NextResponse.json({ ok: true, messages: botMsgs, total: history.length });
   }
 
@@ -127,10 +129,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, `👤 Lead: ${b.text}`);
 
-  // Provider manual: si el cliente pide soporte post-carga (texto libre), avisamos
-  // al operador. Pre-carga se queda en el chat (reassure) — no es "soporte".
+  // Manual: cada inbound avisa al operador. Soporte post-carga usa copy propio.
   if (HELP_RE.test(b.text) && sessionCanOpenSupport((s.data ?? {}) as Record<string, unknown>, s.step)) {
     void notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
+  } else {
+    void notifyOperators(tenant, 'message', { sessionKey: s.sessionKey, name: s.name, text: b.text });
   }
 
   return NextResponse.json({ ok: true, messages: botMsgs, total: history.length });
