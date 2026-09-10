@@ -69,6 +69,8 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   const [waUnlocked, setWaUnlocked] = useState(false); // usuario creado o "Ya tengo usuario"
   const [waBtnClicked, setWaBtnClicked] = useState(false);
   const [waBtnToast, setWaBtnToast] = useState(false);
+  const [pushBanner, setPushBanner] = useState<{ title: string; body: string } | null>(null);
+  const pushBannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function applySupportFlags(d: { assignedWa?: string | null; username?: string | null; waUnlocked?: boolean; step?: string | null }) {
     if (d.assignedWa) setAssignedWa(String(d.assignedWa));
@@ -109,6 +111,19 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    const onMsg = (e: MessageEvent) => {
+      const d = e.data;
+      if (!d || d.type !== 'tobyap-chat-push') return;
+      setPushBanner({ title: String(d.title || skin.brand), body: String(d.body || '') });
+      if (pushBannerTimer.current) clearTimeout(pushBannerTimer.current);
+      pushBannerTimer.current = setTimeout(() => setPushBanner(null), 8000);
+    };
+    navigator.serviceWorker.addEventListener('message', onMsg);
+    return () => navigator.serviceWorker.removeEventListener('message', onMsg);
+  }, [skin.brand]);
+
   useEffect(() => { scrollRef.current?.scrollTo({ top: 999999, behavior: 'smooth' }); }, [msgs, typing, buttons]);
 
   // Recordatorio háptico: mientras falte activar notificaciones o instalar la app,
@@ -145,6 +160,9 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
           setButtons(welcomeButtonsFor(slug));
         } else if (d.step === 'credenciales') setButtons([{ id: 'want_cbu', label: 'Quiero el CBU' }]);
         else if (d.step === 'account_pending') setButtons([]);
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          void subscribeWebPush(saved);
+        }
       } catch { /* sin resume */ }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -233,9 +251,11 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
           // no toca botones (menú post-carga vive en step==='done').
           const nextBtns = d.step === 'credenciales' ? [{ id: 'want_cbu', label: 'Quiero el CBU' }] : [];
           await play(fresh, nextBtns);
-          if ('Notification' in window && Notification.permission === 'granted') {
-            const body = d.step === 'done' ? 'Tu carga fue acreditada con éxito' : (fresh[fresh.length - 1]?.text?.slice(0, 90) ?? 'Tenés un mensaje nuevo');
-            try { new Notification(`${skin.brand}`, { body }); } catch { /* sin permiso */ }
+          const body = d.step === 'done' ? 'Tu carga fue acreditada con éxito' : (fresh[fresh.length - 1]?.text?.slice(0, 90) ?? 'Tenés un mensaje nuevo');
+          if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            navigator.serviceWorker.ready
+              .then((reg) => reg.showNotification(skin.brand, { body, tag: `tobyap-chat-poll-${Date.now()}`, data: { url: `/chat/${slug}` } }))
+              .catch(() => {});
           }
         }
       } catch { /* siguiente intento */ }
@@ -269,6 +289,9 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     if (!accept) return setFormErr('Necesitás confirmar que es tu número.');
     setStarting(true);
     try {
+      if (!(isIos() && !isStandalone()) && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        await Notification.requestPermission().catch(() => 'denied');
+      }
       const r = await fetch(`/api/chat/${slug}/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, name, token, campaign, ccpp }) });
       const d = await r.json();
       if (!r.ok || !d.ok) { setStarting(false); return setFormErr(d.error || 'No pudimos iniciar. Probá de nuevo.'); }
@@ -291,6 +314,10 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         pollBase.current = typeof d.total === 'number' ? d.total : (d.messages?.length ?? 0);
       } else {
         play(d.messages ?? [], d.buttons ?? []);
+      }
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        setAppNotif(true);
+        void subscribeWebPush(d.sessionKey);
       }
     } catch {
       setStarting(false);
@@ -393,10 +420,10 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   // una habilitación PROLONGADA (dura hasta que el cliente revoque el permiso; no
   // hay que reactivar por sesión). Best-effort: si el push no está configurado
   // (sin VAPID) o algo falla, seguimos con las notificaciones in-page de siempre.
-  async function subscribeWebPush() {
+  async function subscribeWebPush(key = sessionKey) {
     try {
       if (typeof navigator === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
-      if (!sessionKey) return;
+      if (!key) return;
       const keyRes = await fetch(`/api/chat/${slug}/push`);
       const kd = await keyRes.json();
       if (!kd?.ok || !kd.publicKey) return; // push no configurado → fallback in-page
@@ -411,7 +438,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
       await fetch(`/api/chat/${slug}/push`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionKey, subscription: sub }),
+        body: JSON.stringify({ sessionKey: key, subscription: sub }),
       });
     } catch {
       /* fallback: notificaciones in-page mientras el chat esté abierto */
@@ -565,6 +592,16 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
           </div>
         )}
       </div>
+
+      {pushBanner && (
+        <div
+          role="status"
+          onClick={() => setPushBanner(null)}
+          style={{ position: 'absolute', top: 62, left: 10, right: 10, zIndex: 40, background: '#111827', color: '#fff', padding: '10px 12px', borderRadius: 12, boxShadow: '0 8px 24px #0005', cursor: 'pointer' }}>
+          <div style={{ fontWeight: 700, fontSize: 14 }}>{pushBanner.title}</div>
+          {pushBanner.body ? <div style={{ fontSize: 13, opacity: 0.92, marginTop: 4, lineHeight: 1.35 }}>{pushBanner.body}</div> : null}
+        </div>
+      )}
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 10px', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22%3E%3Ccircle cx=%223%22 cy=%223%22 r=%221%22 fill=%22%23d8cfc4%22/%3E%3C/svg%3E")' }}>
         {msgs.map((m, i) => (

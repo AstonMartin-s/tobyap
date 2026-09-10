@@ -13,6 +13,7 @@ import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadFields, updateLeadName, addLeadTags, updateLeadStatus } from '@/lib/kommo';
 import { notifyOperators } from '@/lib/panel/operatorPush';
+import { sendPushToSession } from '@/lib/chat/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -151,6 +152,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       if (fields.length) updateLeadFields(tenant, s.kommoLeadId, fields).catch(() => {});
       updateLeadName(tenant, s.kommoLeadId, String(r.data.username)).catch(() => {});
       addLeadNote(tenant, s.kommoLeadId, `👤 Usuario Pagoda ${r.data.existing ? '(existente, recordado)' : 'creado'}: ${r.data.username}`);
+    }
+    if (r.data.username) {
+      void sendPushToSession(s.id, (s.data as Record<string, unknown> | null)?.pushSub, {
+        title: '¡Tu cuenta está lista!',
+        body: 'Ya te dejamos tu usuario y contraseña en el chat.',
+        url: `/chat/${params.slug}`,
+      });
     }
     return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length, ...supportClientFlags(nextData, r.step) });
   }

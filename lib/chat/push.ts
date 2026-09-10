@@ -71,18 +71,13 @@ export async function sendWebPush(
 export async function sendPushToSession(
   sessionId: string,
   sub: unknown,
-  payload: { title: string; body: string; url?: string },
+  payload: { title: string; body: string; url?: string; tag?: string },
 ): Promise<void> {
-  if (!ensureVapid()) return;
-  if (!sub || typeof sub !== 'object') return;
-  const s = sub as PushSub;
-  if (!s.endpoint) return;
-  try {
-    await webpush.sendNotification(s as webpush.PushSubscription, JSON.stringify(payload), { urgency: 'high', TTL: 86400 });
-  } catch (e) {
-    const code = (e as { statusCode?: number })?.statusCode;
-    if (code === 404 || code === 410) {
-      await mergeChatData(sessionId, {}, ['pushSub']).catch(() => {});
-    }
+  const res = await sendWebPush(sub, {
+    ...payload,
+    tag: payload.tag || `tobyap-chat-${Date.now()}`,
+  });
+  if (res.gone) {
+    await mergeChatData(sessionId, {}, ['pushSub']).catch(() => {});
   }
 }

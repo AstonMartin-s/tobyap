@@ -7,14 +7,11 @@ import { saveOperatorSub } from '@/lib/panel/operatorPush';
 export const dynamic = 'force-dynamic';
 
 // GET /api/panel/push → clave pública VAPID para suscribir al operador.
-// Solo habilitado para tenants provider='manual' (goldenC/ElGanador). Reusa el
-// VAPID compartido con el chat del cliente.
+// Habilitado para cualquier tenant con sesión de panel. Reusa el VAPID del chat.
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false }, { status: 401 });
-  const tenant = await getTenantBySlug(session.slug);
-  const manual = tenant?.provider === 'manual';
-  return NextResponse.json({ ok: pushEnabled() && manual, manual, publicKey: manual ? vapidPublicKey() : null });
+  return NextResponse.json({ ok: pushEnabled(), publicKey: pushEnabled() ? vapidPublicKey() : null });
 }
 
 // POST /api/panel/push  { subscription } → guarda la suscripción push del operador.
@@ -23,9 +20,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ ok: false }, { status: 401 });
   if (!pushEnabled()) return NextResponse.json({ ok: false, disabled: true });
   const tenant = await getTenantBySlug(session.slug);
-  if (!tenant || tenant.provider !== 'manual') {
-    return NextResponse.json({ ok: false, skip: true });
-  }
+  if (!tenant) return NextResponse.json({ ok: false }, { status: 404 });
   const body = (await req.json().catch(() => null)) as {
     subscription?: ({ endpoint?: string } & Record<string, unknown>);
   } | null;

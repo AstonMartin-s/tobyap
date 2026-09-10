@@ -293,9 +293,8 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const isStandalone = () => typeof window !== 'undefined' && ((window.matchMedia?.('(display-mode: standalone)').matches) || (navigator as { standalone?: boolean }).standalone === true);
   const isIos = () => typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-  // Registrar el SW del panel y ver si el push manual está habilitado en el server.
+  // Registrar el SW del panel y ver si el push está habilitado en el server.
   useEffect(() => {
-    if (!isManual) return;
     if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/panel-sw.js', { scope: '/chats' }).catch(() => {});
     }
@@ -321,12 +320,12 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
       window.removeEventListener('appinstalled', onInstalled);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isManual]);
+  }, []);
 
   // Safari/iOS: con la PWA abierta el sistema suena y no muestra el banner.
   // El SW nos manda el título/cuerpo para pintarlo acá.
   useEffect(() => {
-    if (!isManual || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
     const onMsg = (e: MessageEvent) => {
       const d = e.data;
       if (!d || d.type !== 'tobyap-op-push') return;
@@ -336,7 +335,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     };
     navigator.serviceWorker.addEventListener('message', onMsg);
     return () => navigator.serviceWorker.removeEventListener('message', onMsg);
-  }, [isManual, showOpPushBanner]);
+  }, [showOpPushBanner]);
 
   // Suscribe este dispositivo al push del operador. En iOS exige PWA instalada.
   async function enableOperatorPush(silent = false) {
@@ -915,7 +914,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#e88838', boxShadow: '0 0 6px #e88838' }} /> Atención · {counts.atencion}
           </button>
         )}
-        {isManual && opPushAvail && (
+        {opPushAvail && (
           <button onClick={() => enableOperatorPush(false)} aria-label="Activar notificaciones de fondo"
             title={opPushOn ? 'Notificaciones de fondo activadas' : 'Activar notificaciones + instalar acceso directo'}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem', height: 30, padding: '0 .5rem', borderRadius: 8, border: `1px solid ${opPushOn ? 'var(--accent)' : 'var(--border)'}`, background: opPushOn ? 'var(--accent-soft)' : 'transparent', color: opPushOn ? 'var(--accent)' : 'var(--muted)', cursor: 'pointer', fontSize: '.68rem', fontWeight: 700 }}>

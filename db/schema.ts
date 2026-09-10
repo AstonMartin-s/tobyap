@@ -444,10 +444,8 @@ export type ChatSessionRow = typeof chatSessions.$inferSelect;
 
 // ---------------------------------------------------------------------------
 // operator_push_subs — suscripciones Web Push del OPERADOR (panel), separadas
-// del push del cliente (chat_sessions.data.pushSub). Solo se usan para tenants
-// provider='manual' (goldenC/ElGanador): push de fondo al celular del operador
-// cuando hay que crear un usuario, el cliente pide soporte o llega una imagen.
-// Una fila por (tenant, panel_user, endpoint). VAPID compartido con el chat.
+// del push del cliente (chat_sessions.data.pushSub). Una fila por
+// (tenant, endpoint). VAPID compartido con el chat del cliente.
 // ---------------------------------------------------------------------------
 export const operatorPushSubs = pgTable(
   'operator_push_subs',

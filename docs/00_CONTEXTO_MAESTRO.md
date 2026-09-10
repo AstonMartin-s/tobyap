@@ -6,6 +6,11 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-10 — push operador todos los tenants + mismo aviso al cliente
+
+- El push de atención (mensaje / usuario / CBU / soporte / foto) deja de estar limitado a `provider=manual`. Cualquier panel con “Activar notif” recibe fondo.
+- Cliente: se suscribe al tocar Comenzar (si acepta el permiso), no recién en el gate del comprobante. `chat-sw.js` v4 igual que el panel (Safari: título/cuerpo + postMessage). Si el operador manda mensaje / cuenta lista / acredita, el aviso llega con el chat cerrado.
+
 ## Bitácora 2026-09-10 — push operador = atención (mensaje / usuario / CBU)
 
 - Luis quería que suene cuando alguien requiere atención, no un ping suelto. El push solo salía en usuario/soporte/comprobante: **pedir CBU no avisaba** (el botón de ElGanador) y un mensaje libre tampoco.

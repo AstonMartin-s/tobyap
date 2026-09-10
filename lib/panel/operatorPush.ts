@@ -4,12 +4,10 @@ import { operatorPushSubs } from '@/db/schema';
 import { sendWebPush, pushEnabled } from '@/lib/chat/push';
 import type { ResolvedTenant } from '@/lib/types';
 
-// Push de FONDO al operador (panel). Solo tiene sentido para tenants manuales
-// (goldenC/ElGanador): avisa al celular del operador aunque tenga el navegador
-// minimizado. Reusa el VAPID del chat del cliente, con tabla e infra separadas.
+// Push de FONDO al operador (panel). Avisa al celular aunque tenga el
+// navegador minimizado. Reusa el VAPID del chat del cliente.
 //
-// GATING: todos los disparos se hacen SOLO cuando tenant.provider === 'manual'.
-// En cualquier otro caso es no-op (nadie tiene suscripciones y el guard corta).
+// GATING: VAPID + suscripciones. Todos los tenants del panel (no solo manual).
 // Disparos: mensaje nuevo, pidió usuario, pidió CBU, soporte, comprobante.
 
 export type OperatorPushEvent = 'account_pending' | 'cbu' | 'support' | 'comprobante' | 'message';
@@ -41,15 +39,14 @@ const EVENT_COPY: Record<OperatorPushEvent, { title: string; body: string }> = {
 
 /**
  * Notifica a TODOS los operadores suscriptos del tenant. Best-effort: nunca
- * lanza, limpia suscripciones muertas (404/410). No-op si el tenant no es
- * manual, si no hay VAPID, o si no hay suscripciones.
+ * lanza, limpia suscripciones muertas (404/410). No-op si no hay VAPID o
+ * no hay suscripciones.
  */
 export async function notifyOperators(
   tenant: ResolvedTenant,
   event: OperatorPushEvent,
   opts: { sessionKey?: string; name?: string | null; text?: string | null } = {},
 ): Promise<void> {
-  if (tenant.provider !== 'manual') return;
   if (!pushEnabled()) return;
   let subs: Awaited<ReturnType<typeof loadSubs>>;
   try {

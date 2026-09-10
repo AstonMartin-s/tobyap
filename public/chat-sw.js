@@ -3,7 +3,8 @@
 // referencia chunks de JS con hash; tras un deploy los viejos dan 404 y la app
 // no hidrata (se ve el form pero los botones no responden). Por eso navegación =
 // network-first y cache solo como fallback offline.
-const CACHE = 'king-chat-v3';
+// v4 — Safari/iOS: aviso visual (sin icon/badge) + postMessage si el chat está abierto.
+const CACHE = 'king-chat-v4';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => {
@@ -48,23 +49,49 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Web Push (Claude): título/cuerpo + url de destino en data.
+function parsePush(event) {
+  const fallback = { title: 'Tenés un mensaje', body: 'Tenés una novedad', url: '/', tag: '' };
+  try {
+    if (!event.data) return fallback;
+    const raw = event.data.json();
+    const n = (raw && (raw.notification || raw.aps && raw.aps.alert)) || raw || {};
+    const title = String(n.title || raw.title || fallback.title);
+    const body = String(n.body || n.message || raw.body || fallback.body);
+    const url = n.url || (raw.data && raw.data.url) || raw.url || fallback.url;
+    const tag = String(n.tag || raw.tag || '') || `tobyap-chat-${Date.now()}`;
+    return { title: title || fallback.title, body: body || fallback.body, url, tag };
+  } catch (_) {
+    return { ...fallback, tag: `tobyap-chat-${Date.now()}` };
+  }
+}
+
 self.addEventListener('push', (event) => {
-  let data = { title: 'King 🎰', body: 'Tenés una novedad' };
-  try { data = event.data ? event.data.json() : data; } catch (_) {}
-  event.waitUntil(self.registration.showNotification(data.title, {
-    body: data.body,
-    icon: '/chat-icon-192.png',
-    badge: '/chat-icon-192.png',
-    data: { url: data.url || '/' },
-  }));
+  const data = parsePush(event);
+  event.waitUntil((async () => {
+    const clientsList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of clientsList) {
+      try {
+        c.postMessage({ type: 'tobyap-chat-push', title: data.title, body: data.body, url: data.url });
+      } catch (_) {}
+    }
+    return self.registration.showNotification(data.title, {
+      body: data.body,
+      tag: data.tag,
+      data: { url: data.url || '/' },
+    });
+  })());
 });
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const target = (event.notification.data && event.notification.data.url) || '/';
   event.waitUntil(self.clients.matchAll({ type: 'window' }).then((cs) => {
-    const c = cs.find((w) => 'focus' in w);
-    if (c) return c.focus();
+    for (const c of cs) {
+      if ('focus' in c) {
+        if ('navigate' in c) { try { c.navigate(target); } catch (_) {} }
+        return c.focus();
+      }
+    }
     return self.clients.openWindow(target);
   }));
 });
