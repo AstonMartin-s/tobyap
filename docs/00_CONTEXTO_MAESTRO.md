@@ -6,6 +6,16 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-10 — Safari: sonido sin texto (Luis)
+
+- Luis: “me llegan sonidos pero no llegan nada de mensajes”. Apple aceptaba el push (ok=true). En iOS, con la PWA abierta el sistema suena y **oculta el banner**; `new Notification()` de la página no pinta nada. El poll del panel hacía `playChime()` + Notification de página → sonido, cero texto.
+- Fix: `panel-sw.js` v4 muestra solo title/body/tag (sin icon/badge, que en iOS dejan el aviso en blanco) y `postMessage` al panel. `ChatsClient` pinta un banner con el título y el cuerpo.
+
+## Bitácora 2026-09-10 — push operador Safari (Luis)
+
+- ElGanador tiene 3 subs **Safari/APNs** (`web.push.apple.com`) + 1 FCM viva + 1 FCM muerta. El `vibrate` de Chrome no aplica.
+- Ping de prueba: Apple aceptó las 3 (ok=true). TTL 120s de d0f4df7 era corto para iPhone dormido → ahora 24h. Tag único por aviso (Safari ignora `renotify`).
+
 ## Bitácora 2026-09-10 — revert vibrate del panel-sw (sonido operador)
 
 - `d0f4df7` agregó `vibrate`/`requireInteraction`/`silent:false` y Chrome/Android recreó el canal en modo vibración **sin sonido**. Anoche `4a6c74b` sonaba.

@@ -281,6 +281,13 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [opPushAvail, setOpPushAvail] = useState(false); // el server habilita push manual
   const [opPushOn, setOpPushOn] = useState(false); // ya suscripto en este dispositivo
   const [opPushIosGuide, setOpPushIosGuide] = useState(false);
+  const [opPushBanner, setOpPushBanner] = useState<{ title: string; body: string } | null>(null);
+  const opPushBannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showOpPushBanner = useCallback((title: string, body: string) => {
+    setOpPushBanner({ title, body });
+    if (opPushBannerTimer.current) clearTimeout(opPushBannerTimer.current);
+    opPushBannerTimer.current = setTimeout(() => setOpPushBanner(null), 8000);
+  }, []);
   const [deferredPrompt, setDeferredPrompt] = useState<{ prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> } | null>(null);
   const isManual = tenantProvider === 'manual';
   const isStandalone = () => typeof window !== 'undefined' && ((window.matchMedia?.('(display-mode: standalone)').matches) || (navigator as { standalone?: boolean }).standalone === true);
@@ -315,6 +322,21 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isManual]);
+
+  // Safari/iOS: con la PWA abierta el sistema suena y no muestra el banner.
+  // El SW nos manda el título/cuerpo para pintarlo acá.
+  useEffect(() => {
+    if (!isManual || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    const onMsg = (e: MessageEvent) => {
+      const d = e.data;
+      if (!d || d.type !== 'tobyap-op-push') return;
+      const title = String(d.title || 'TrackerIO · Panel');
+      const body = String(d.body || '');
+      showOpPushBanner(title, body);
+    };
+    navigator.serviceWorker.addEventListener('message', onMsg);
+    return () => navigator.serviceWorker.removeEventListener('message', onMsg);
+  }, [isManual, showOpPushBanner]);
 
   // Suscribe este dispositivo al push del operador. En iOS exige PWA instalada.
   async function enableOperatorPush(silent = false) {
@@ -401,8 +423,14 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
       attnNow.forEach((k) => { if (!prevAttn.current!.has(k)) nuevo++; });
       if (nuevo > 0) {
         playChime();
-        if ('Notification' in window && Notification.permission === 'granted') {
-          try { new Notification('TrackerIO · Chats', { body: `${nuevo} chat${nuevo > 1 ? 's' : ''} requiere${nuevo > 1 ? 'n' : ''} atención` }); } catch { /* sin permiso */ }
+        const title = 'TrackerIO · Chats';
+        const body = `${nuevo} chat${nuevo > 1 ? 's' : ''} requiere${nuevo > 1 ? 'n' : ''} atención`;
+        showOpPushBanner(title, body);
+        // iOS ignora `new Notification()` de la página; el aviso visible va por el SW.
+        if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+          navigator.serviceWorker.ready
+            .then((reg) => reg.showNotification(title, { body, tag: `tobyap-panel-attn-${Date.now()}`, data: { url: '/chats' } }))
+            .catch(() => {});
         }
       }
     }
@@ -416,7 +444,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     })));
     if (r.tenantProvider) setTenantProvider(r.tenantProvider);
     if (typeof r.fichasEnabled === 'boolean') setFichasEnabled(r.fichasEnabled);
-  }, []);
+  }, [showOpPushBanner]);
 
   // Pestañas terminales (Acreditados / No cargó / Archivadas): son estados viejos
   // que quedan fuera de las 200 recientes, así que se piden aparte al server.
@@ -1586,6 +1614,17 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
         </div>
       )}
 
+      {opPushBanner && (
+        <div
+          role="status"
+          onClick={() => setOpPushBanner(null)}
+          style={{ position: 'fixed', top: 12, left: 12, right: 12, zIndex: 80, background: '#111827', color: '#fff', padding: '12px 14px', borderRadius: 12, boxShadow: '0 8px 28px #0007', cursor: 'pointer' }}>
+          <div style={{ fontWeight: 800, fontSize: '.9rem' }}>{opPushBanner.title}</div>
+          {opPushBanner.body ? (
+            <div style={{ fontSize: '.82rem', opacity: 0.92, marginTop: 4, lineHeight: 1.35 }}>{opPushBanner.body}</div>
+          ) : null}
+        </div>
+      )}
       {toast && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#111827', color: '#fff', padding: '.6rem 1rem', borderRadius: 10, fontSize: '.85rem', zIndex: 50 }}>{toast}</div>
       )}
