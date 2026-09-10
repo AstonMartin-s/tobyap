@@ -6,6 +6,11 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-10 — revert vibrate del panel-sw (sonido operador)
+
+- `d0f4df7` agregó `vibrate`/`requireInteraction`/`silent:false` y Chrome/Android recreó el canal en modo vibración **sin sonido**. Anoche `4a6c74b` sonaba.
+- Revertido el `showNotification` a tag+renotify. Se mantiene `urgency:high` en `push.ts`. Post-deploy: Luis reinstala la PWA una vez y re-activa notificaciones.
+
 ## Bitácora 2026-09-10 — ClienteA3 (bblack) + Marceneitor (king) en juegayahorra
 
 - Misma pauta que Paradise: landing+chat same-origin en `go.juegayahorra.online`. Soporte y URLs viejas de fichaslibres intactos.
