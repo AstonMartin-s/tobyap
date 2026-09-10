@@ -19,7 +19,20 @@ export function landingMetadata(o: {
   fichas?: string | null;
   logoAbs?: string | null;
   url: string;
+  /** Preview neutro (sin marca/fichas/foto) para crawlers de ads. */
+  neutral?: boolean;
 }): Metadata {
+  if (o.neutral) {
+    const title = 'Hola! Vas a recibir atención';
+    const description = 'Completá el siguiente formulario.';
+    return {
+      title,
+      description,
+      openGraph: { title, description, url: o.url, type: 'website' },
+      twitter: { card: 'summary', title, description },
+      robots: { index: false, follow: false },
+    };
+  }
   const title = o.fichas ? `🎁 ${o.fichas} fichas libres` : o.brand;
   const description = o.fichas
     ? `Reclamá tus ${o.fichas} fichas gratis en ${o.brand} 🎰`
@@ -64,8 +77,8 @@ export function landingSpinnerCopy(cfg: Pick<LandingConfig, 'tenantSlug' | 'head
 } {
   if (cfg.tenantSlug === 'paradise' && cfg.chatSlug) {
     return {
-      headline: cfg.headline || (cfg.brandName ? `Bienvenido a ${cfg.brandName}` : 'Bienvenido'),
-      subtext: cfg.subtext || 'Ingresá para reclamar tu beneficio.',
+      headline: cfg.headline || 'Hola! Vas a recibir atención, completá el siguiente formulario.',
+      subtext: cfg.subtext || '',
     };
   }
   if (cfg.telegramBot) {
@@ -88,8 +101,9 @@ export function landingSpinnerCopy(cfg: Pick<LandingConfig, 'tenantSlug' | 'head
 
 export function LandingView(cfg: LandingConfig) {
   const paradiseChat = cfg.tenantSlug === 'paradise' && !!cfg.chatSlug;
-  const accent = cfg.primaryColor || (paradiseChat ? '#F5C400' : '#25d366');
+  const accent = cfg.primaryColor || '#25d366';
   const brand = cfg.brandName || 'Acceso';
+  const showBrand = !paradiseChat && (!!cfg.logoUrl || !!cfg.brandName);
   const { headline, subtext } = landingSpinnerCopy(cfg);
   const delay = cfg.redirectDelayMs ?? 1500;
 
@@ -239,31 +253,9 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
   })();
 })();`;
 
-  const chatHref = paradiseChat
-    ? `${cfg.chatOrigin || ''}/chat/${encodeURIComponent(cfg.chatSlug as string)}`
-    : '';
-  const paradiseAvatar = cfg.logoUrl || '/logos/paradise-queens.jpg';
-
   return (
     <main style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', textAlign: 'center', padding: '1rem', background: '#0a0d12', color: '#e6edf3' }}>
-      {paradiseChat ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.85rem' }}>
-          <img
-            src={paradiseAvatar}
-            alt={brand}
-            style={{
-              width: 132,
-              height: 132,
-              borderRadius: '50%',
-              objectFit: 'cover',
-              objectPosition: '50% 16%',
-              border: `3px solid ${accent}`,
-              boxShadow: `0 0 22px ${accent}66`,
-            }}
-          />
-          <div style={{ fontWeight: 800, fontSize: '1.3rem', letterSpacing: '-0.02em', color: accent }}>{brand}</div>
-        </div>
-      ) : (
+      {showBrand ? (
       <div
         dangerouslySetInnerHTML={{
           __html: cfg.logoUrl
@@ -271,30 +263,10 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
             : `<div style="font-weight:800;font-size:1.3rem;letter-spacing:-0.02em;color:${accent}">${brand}</div>`,
         }}
       />
-      )}
-      {!paradiseChat && (
-        <div id="ll-spin" style={{ width: 42, height: 42, border: '4px solid #2a2f36', borderTopColor: accent, borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-      )}
-      <p id="ll-headline" style={{ margin: 0, color: accent, fontWeight: 700, fontSize: paradiseChat ? '1.25rem' : undefined }}>{headline}</p>
-      <p id="ll-subtext" style={{ color: '#8a93a0', fontSize: '.9rem', margin: 0, maxWidth: paradiseChat ? 360 : undefined }}>{subtext}</p>
-      {chatHref ? (
-        <a
-          id="ll-cta"
-          href={chatHref}
-          style={{
-            display: 'inline-block',
-            marginTop: 4,
-            padding: '12px 28px',
-            borderRadius: 10,
-            background: accent,
-            color: '#0a0d12',
-            fontWeight: 700,
-            textDecoration: 'none',
-          }}
-        >
-          Continuar
-        </a>
       ) : null}
+      <div id="ll-spin" style={{ width: 42, height: 42, border: '4px solid #2a2f36', borderTopColor: accent, borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+      <p id="ll-headline" style={{ margin: 0, color: accent, fontWeight: 700 }}>{headline}</p>
+      <p id="ll-subtext" style={{ color: '#8a93a0', fontSize: '.9rem', margin: 0, maxWidth: 360 }}>{subtext}</p>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       {pixelScript ? <script dangerouslySetInnerHTML={{ __html: pixelScript }} /> : null}
       <script dangerouslySetInnerHTML={{ __html: logic }} />

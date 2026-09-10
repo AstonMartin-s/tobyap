@@ -6,6 +6,12 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-10 — Paradise: landing neutra + dominio ads aislado
+
+- Ads nuevos: `https://go.juegayahorra.online/l/paradise` (mismo host `/chat/paradise`, sin hop). `go.fichaslibres.online/l/paradise` sigue vivo. Soporte walink **no** se movió.
+- Landing de chat sin foto/marca Paradise. Copy: "Hola! Vas a recibir atención, completá el siguiente formulario." OG neutro (sin fichas/foto). Pixel + `/api/track/redirect` + token PB iguales.
+- Panel: selector de landing siempre visible (aunque haya una sola). Config → Landings genera el link con `landingDomain` y deja editar título/subtítulo.
+
 ## Bitácora 2026-09-10 — ElGanador: demo → CBU directo (sin pedir usuario)
 
 - Pedido de Luis: el cliente NO pide usuario. Arranca con el demo (welcome) y va directo al CBU. El operador entrega el usuario real desde el panel cuando confirma la carga, sin que el cliente lo pida.

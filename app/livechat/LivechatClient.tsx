@@ -576,7 +576,7 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
                 <div style={{ padding: '.6rem .7rem', borderRadius: 8, background: 'var(--blue-soft)', border: '1px solid var(--border)', fontSize: '.78rem', color: 'var(--muted)', marginBottom: '.5rem' }}>
                   No hay ninguna landing de <b>Chat</b> creada. Andá a <b>Configuración → Landings → + Nueva landing</b> y elegí destino <b>Chat</b>. Después volvé acá para generar el link.
                 </div>
-              ) : chatLandings.length > 1 ? (
+              ) : (
                 <div className="field" style={{ marginBottom: '.3rem' }}>
                   <label>Landing de chat</label>
                   <select className="input" value={selLandingId} onChange={(e) => {
@@ -589,7 +589,7 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
                     {chatLandings.map((l) => <option key={l.id} value={l.id}>{l.landingSlug}{l.name ? ` — ${l.name}` : ''}</option>)}
                   </select>
                 </div>
-              ) : null}
+              )}
               <div className="field" style={{ marginBottom: '.3rem' }}>
                 <label>Dominio del cliente <span style={{ color: 'var(--muted)', fontSize: '.72rem' }}>(subdominio propio; vacío = dominio compartido)</span></label>
                 <input className="input" value={landingDomain.replace(/^https?:\/\//, '')}

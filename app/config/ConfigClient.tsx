@@ -421,7 +421,7 @@ function NumbersSection() {
 interface Landing { id: string; landingSlug: string | null; name: string | null; type: string | null; active: boolean | null; config: Record<string, string | number | null> | null }
 const LANDING_TYPES = ['publi', 'regular', 'spam', 'remarketing', 'soporte'];
 
-const emptyForm = { landingSlug: '', name: '', type: 'publi', brandName: '', logoUrl: '', primaryColor: '#25d366', waNumber: '', message: '', ccpp: '', campaign: '', destination: 'whatsapp', telegramBot: '', telegramStartPrefix: '' };
+const emptyForm = { landingSlug: '', name: '', type: 'publi', brandName: '', logoUrl: '', primaryColor: '#25d366', waNumber: '', message: '', headline: '', subtext: '', ccpp: '', campaign: '', destination: 'whatsapp', telegramBot: '', telegramStartPrefix: '' };
 const cfgStr = (c: Landing['config'], k: string) => (c && c[k] != null ? String(c[k]) : '');
 
 function LandingsSection() {
@@ -435,14 +435,19 @@ function LandingsSection() {
   const [n, setN] = useState({ ...emptyForm });
   // Generador de link
   const [gen, setGen] = useState({ landingId: '', ccpp: '', campaign: '' });
-  // Dominio público de las landings (no el del panel). Configurable por env.
-  const origin = process.env.NEXT_PUBLIC_LANDING_ORIGIN || 'https://go.fichaslibres.online';
+  // Dominio público de las landings (no el del panel). Configurable por tenant o env.
+  const defaultOrigin = process.env.NEXT_PUBLIC_LANDING_ORIGIN || 'https://go.fichaslibres.online';
+  const [landingDomain, setLandingDomain] = useState('');
+  const origin = landingDomain
+    ? `https://${landingDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '')}`
+    : defaultOrigin;
 
   const load = () =>
     j('/api/landings').then((d) => {
       setRows(d.landings ?? []);
       setSlug(d.slug ?? '');
       setBonos(d.bonos ?? {});
+      if (typeof d.landingDomain === 'string') setLandingDomain(d.landingDomain.replace(/^https?:\/\//, ''));
       if (d.landings?.length && !gen.landingId) setGen((g) => ({ ...g, landingId: d.landings[0].id }));
     }).catch(() => {});
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
@@ -474,7 +479,9 @@ function LandingsSection() {
     setN({
       landingSlug: l.landingSlug ?? '', name: l.name ?? '', type: l.type ?? 'publi',
       brandName: cfgStr(l.config, 'brandName'), logoUrl: cfgStr(l.config, 'logoUrl'), primaryColor: cfgStr(l.config, 'primaryColor') || '#25d366',
-      waNumber: cfgStr(l.config, 'waNumber'), message: cfgStr(l.config, 'message'), ccpp: cfgStr(l.config, 'ccpp'), campaign: cfgStr(l.config, 'campaign'),
+      waNumber: cfgStr(l.config, 'waNumber'), message: cfgStr(l.config, 'message'),
+      headline: cfgStr(l.config, 'headline'), subtext: cfgStr(l.config, 'subtext'),
+      ccpp: cfgStr(l.config, 'ccpp'), campaign: cfgStr(l.config, 'campaign'),
       destination: cfgStr(l.config, 'chatSlug') ? 'livechat' : cfgStr(l.config, 'telegramBot') ? 'telegram' : 'whatsapp',
       telegramBot: cfgStr(l.config, 'telegramBot'),
       telegramStartPrefix: cfgStr(l.config, 'telegramStartPrefix'),
@@ -483,9 +490,12 @@ function LandingsSection() {
   }
   async function save() {
     setErr('');
+    const prev = editId ? (rows.find((r) => r.id === editId)?.config ?? {}) : {};
     const config = {
+      ...prev,
       brandName: n.brandName, logoUrl: n.logoUrl, primaryColor: n.primaryColor,
-      waNumber: n.waNumber, message: n.message, ccpp: n.ccpp, campaign: n.campaign,
+      waNumber: n.waNumber, message: n.message, headline: n.headline, subtext: n.subtext,
+      ccpp: n.ccpp, campaign: n.campaign,
       // Destino livechat → redirige a /chat/<slug>; telegram → t.me/<bot>?start=;
       // whatsapp → rotación de números. Solo uno queda seteado a la vez.
       chatSlug: n.destination === 'livechat' ? slug : '',
@@ -544,6 +554,8 @@ function LandingsSection() {
             )}
             <div className="field"><label>CCPP por defecto</label><input className="input" value={n.ccpp} onChange={(e) => setN({ ...n, ccpp: e.target.value })} placeholder="A5" /></div>
             <div className="field"><label>Campaña por defecto</label><input className="input" value={n.campaign} onChange={(e) => setN({ ...n, campaign: e.target.value })} placeholder="C1" /></div>
+            <div className="field" style={{ gridColumn: '1 / -1' }}><label>Título de la página</label><input className="input" value={n.headline} onChange={(e) => setN({ ...n, headline: e.target.value })} placeholder="Hola! Vas a recibir atención, completá el siguiente formulario." /></div>
+            <div className="field" style={{ gridColumn: '1 / -1' }}><label>Subtítulo</label><input className="input" value={n.subtext} onChange={(e) => setN({ ...n, subtext: e.target.value })} placeholder="(opcional)" /></div>
             <div className="field" style={{ gridColumn: '1 / -1' }}><label>Mensaje de WhatsApp</label><input className="input" value={n.message} onChange={(e) => setN({ ...n, message: e.target.value })} placeholder="Hola, vi el anuncio y quiero mi beneficio" /></div>
           </div>
           {err && <p style={{ color: 'var(--danger)', fontSize: '.85rem' }}>{err}</p>}

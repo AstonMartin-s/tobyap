@@ -55,11 +55,13 @@ export async function generateMetadata({
   const fichas = fichasFromBono(resolveBono(tenant, searchParams.ccpp ?? (c.ccpp as string | undefined)));
   const h = headers();
   const base = `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('host')}`;
+  const paradiseChat = tenant.slug === 'paradise' && !!c.chatSlug;
   return landingMetadata({
     brand: c.brandName ? String(c.brandName) : tenant.name,
     fichas,
-    logoAbs: c.logoUrl ? base + String(c.logoUrl) : null,
+    logoAbs: paradiseChat ? null : (c.logoUrl ? base + String(c.logoUrl) : null),
     url: `${base}/l/${params.slug}`,
+    neutral: paradiseChat,
   });
 }
 
@@ -94,8 +96,8 @@ export default async function Landing({
     pixelId: String(c.pixelId ?? t.metaPixelId ?? ''),
     waNumber: String(rotated ?? searchParams.wa ?? fixedWa ?? '').replace(/\D/g, ''),
     message: String(c.message ?? s?.message ?? 'Hola, vi el anuncio y quiero mi beneficio'),
-    brandName: c.brandName ? String(c.brandName) : t.name,
-    logoUrl: c.logoUrl ? String(c.logoUrl) : undefined,
+    brandName: t.slug === 'paradise' && c.chatSlug ? (c.brandName ? String(c.brandName) : '') : (c.brandName ? String(c.brandName) : t.name),
+    logoUrl: t.slug === 'paradise' && c.chatSlug ? undefined : (c.logoUrl ? String(c.logoUrl) : undefined),
     primaryColor: c.primaryColor ? String(c.primaryColor) : undefined,
     headline: c.headline ? String(c.headline) : undefined,
     subtext: c.subtext ? String(c.subtext) : undefined,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { and, desc, eq } from 'drizzle-orm';
 import { db } from '@/db';
-import { landings, tenants } from '@/db/schema';
+import { landings, tenants, clientSettings } from '@/db/schema';
 import { getSession } from '@/lib/session';
 import { DEFAULT_BONO_MAP } from '@/lib/attribution';
 
@@ -21,9 +21,17 @@ export async function GET() {
     .from(tenants)
     .where(eq(tenants.id, session.tenantId));
 
+  const [cs] = await db
+    .select({ chatConfig: clientSettings.chatConfig })
+    .from(clientSettings)
+    .where(eq(clientSettings.tenantId, session.tenantId))
+    .limit(1);
+  const cc = (cs?.chatConfig ?? {}) as Record<string, unknown>;
+  const landingDomain = typeof cc.landingDomain === 'string' ? cc.landingDomain.replace(/^https?:\/\//, '').replace(/\/.*$/, '') : '';
+
   // CCPP disponibles = mapa global por defecto + override del cliente.
   const bonos = { ...DEFAULT_BONO_MAP, ...((t?.bonoMap ?? {}) as Record<string, string>) };
-  return NextResponse.json({ slug: t?.slug ?? session.slug, bonos, landings: rows });
+  return NextResponse.json({ slug: t?.slug ?? session.slug, bonos, landings: rows, landingDomain });
 }
 
 // POST /api/landings — crea una landing del cliente.
