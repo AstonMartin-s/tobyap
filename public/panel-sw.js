@@ -7,15 +7,9 @@ self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
 // Push de fondo: título/cuerpo + url de destino en data. El SONIDO es el del
-// sistema (un push de fondo no permite audio custom). Para que Android lo trate
-// como alerta (heads-up + sonido/vibración) y no lo entregue en silencio:
-//   - vibrate: patrón → dispara la vibración y el alerta del canal.
-//   - renotify + tag: cada evento nuevo VUELVE a sonar (si no, reemplaza mudo).
-//   - requireInteraction: queda fija hasta que el operador la toca.
-//   - silent:false: nunca silenciosa.
-// Si igual no suena, es el canal de notificaciones del navegador/PWA en el
-// celular (Ajustes → Apps → Chrome/PWA → Notificaciones → sonido): eso es
-// del sistema y no se puede forzar por código.
+// sistema (un push de fondo no permite audio custom). NO poner `vibrate`:
+// Chrome/Android crea el canal en modo vibración y queda MUDO. d0f4df7 lo
+// agregó y silenció a Luis; volvemos al SW de 4a6c74b (tag + renotify).
 self.addEventListener('push', (event) => {
   let data = { title: 'TrackerIO · Panel', body: 'Tenés una novedad' };
   try { data = event.data ? event.data.json() : data; } catch (_) {}
@@ -25,10 +19,6 @@ self.addEventListener('push', (event) => {
     badge: '/chat-icon-192.png',
     tag: data.tag || 'tobyap-panel',
     renotify: true,
-    requireInteraction: true,
-    silent: false,
-    vibrate: [300, 120, 300, 120, 300],
-    timestamp: Date.now(),
     data: { url: data.url || '/chats' },
   }));
 });
