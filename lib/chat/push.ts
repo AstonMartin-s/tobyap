@@ -45,20 +45,21 @@ export function vapidPublicKey(): string | null {
  */
 export async function sendWebPush(
   sub: unknown,
-  payload: { title: string; body: string; url?: string },
-): Promise<{ ok: boolean; gone: boolean }> {
-  if (!ensureVapid()) return { ok: false, gone: false };
-  if (!sub || typeof sub !== 'object') return { ok: false, gone: false };
+  payload: { title: string; body: string; url?: string; tag?: string },
+): Promise<{ ok: boolean; gone: boolean; status?: number; error?: string }> {
+  if (!ensureVapid()) return { ok: false, gone: false, error: 'vapid' };
+  if (!sub || typeof sub !== 'object') return { ok: false, gone: false, error: 'no-sub' };
   const s = sub as PushSub;
-  if (!s.endpoint) return { ok: false, gone: false };
+  if (!s.endpoint) return { ok: false, gone: false, error: 'no-endpoint' };
   try {
-    // urgency high + TTL corto: el push server (FCM/Apple) lo entrega YA y no lo
-    // agrupa/difiere, que es lo que hace que "llegue pero sin sonido/tarde".
-    await webpush.sendNotification(s as webpush.PushSubscription, JSON.stringify(payload), { urgency: 'high', TTL: 120 });
+    // urgency high: entrega inmediata. TTL 24h: Safari/APNs descarta si el
+    // iPhone está un rato offline (TTL 120s de d0f4df7 mataba pings en Safari).
+    await webpush.sendNotification(s as webpush.PushSubscription, JSON.stringify(payload), { urgency: 'high', TTL: 86400 });
     return { ok: true, gone: false };
   } catch (e) {
-    const code = (e as { statusCode?: number })?.statusCode;
-    return { ok: false, gone: code === 404 || code === 410 };
+    const err = e as { statusCode?: number; message?: string; body?: string };
+    const code = err?.statusCode;
+    return { ok: false, gone: code === 404 || code === 410, status: code, error: err?.body || err?.message };
   }
 }
 
@@ -77,7 +78,7 @@ export async function sendPushToSession(
   const s = sub as PushSub;
   if (!s.endpoint) return;
   try {
-    await webpush.sendNotification(s as webpush.PushSubscription, JSON.stringify(payload), { urgency: 'high', TTL: 120 });
+    await webpush.sendNotification(s as webpush.PushSubscription, JSON.stringify(payload), { urgency: 'high', TTL: 86400 });
   } catch (e) {
     const code = (e as { statusCode?: number })?.statusCode;
     if (code === 404 || code === 410) {

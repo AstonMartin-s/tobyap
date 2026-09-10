@@ -59,13 +59,13 @@ export async function notifyOperators(
   const copy = EVENT_COPY[event];
   const who = (opts.name ?? '').trim();
   const body = who ? `${copy.body.replace(/\.$/, '')} (${who}).` : copy.body;
-  // Al tocar la notificación abrimos el panel de chats, preseleccionando la sesión.
   const url = opts.sessionKey ? `/chats?s=${encodeURIComponent(opts.sessionKey)}` : '/chats';
+  const tag = `tobyap-panel-${event}-${Date.now()}`;
 
   const dead: string[] = [];
   await Promise.all(
     subs.map(async (row) => {
-      const res = await sendWebPush(row.subscription, { title: copy.title, body, url });
+      const res = await sendWebPush(row.subscription, { title: copy.title, body, url, tag });
       if (res.gone) dead.push(row.endpoint);
     }),
   );

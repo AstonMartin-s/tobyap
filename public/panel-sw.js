@@ -6,10 +6,8 @@
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
-// Push de fondo: título/cuerpo + url de destino en data. El SONIDO es el del
-// sistema (un push de fondo no permite audio custom). NO poner `vibrate`:
-// Chrome/Android crea el canal en modo vibración y queda MUDO. d0f4df7 lo
-// agregó y silenció a Luis; volvemos al SW de 4a6c74b (tag + renotify).
+// Push de fondo. Safari/iOS: no `vibrate` (Chrome lo mutea) y NO reusar el
+// mismo `tag` (Safari ignora renotify → reemplaza mudo). Tag único por evento.
 self.addEventListener('push', (event) => {
   let data = { title: 'TrackerIO · Panel', body: 'Tenés una novedad' };
   try { data = event.data ? event.data.json() : data; } catch (_) {}
@@ -17,8 +15,7 @@ self.addEventListener('push', (event) => {
     body: data.body,
     icon: '/chat-icon-192.png',
     badge: '/chat-icon-192.png',
-    tag: data.tag || 'tobyap-panel',
-    renotify: true,
+    tag: data.tag || `tobyap-panel-${Date.now()}`,
     data: { url: data.url || '/chats' },
   }));
 });
