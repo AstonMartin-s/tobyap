@@ -62,6 +62,16 @@ const I = {
       <circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
     </svg>
   ),
+  menu: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" />
+    </svg>
+  ),
+  close: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  ),
 };
 
 type Features = { reportes: boolean; embudo: boolean; livechat: boolean; fichas: boolean };
@@ -117,17 +127,26 @@ export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?:
   }
 
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   useEffect(() => {
     const c = (() => { try { return localStorage.getItem('sidebar') === 'collapsed'; } catch { return false; } })();
     setCollapsed(c);
     if (c) document.documentElement.dataset.sidebar = 'collapsed';
   }, []);
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
   function toggleCollapse() {
     const next = !collapsed;
     setCollapsed(next);
     if (next) document.documentElement.dataset.sidebar = 'collapsed';
     else delete document.documentElement.dataset.sidebar;
     try { localStorage.setItem('sidebar', next ? 'collapsed' : 'expanded'); } catch { /* ignore */ }
+  }
+  function onLogoClick() {
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches) {
+      setMobileOpen(false);
+      return;
+    }
+    toggleCollapse();
   }
 
   const NavLink = (href: string, label: string, icon: ReactNode) => (
@@ -138,9 +157,9 @@ export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?:
   );
 
   return (
-    <nav className="sidebar">
+    <nav className={`sidebar${mobileOpen ? ' is-open' : ''}`}>
       <div className="sidebar__brand">
-        <button className="sidebar__burger sidebar__burger--logo" onClick={toggleCollapse} aria-label="Contraer menú" title="Contraer / expandir menú">
+        <button className="sidebar__burger sidebar__burger--logo" onClick={onLogoClick} aria-label="Contraer menú" title="Contraer / expandir menú">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="TrackerIO" />
         </button>
@@ -150,7 +169,16 @@ export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?:
         </span>
       </div>
 
-      <div className="sidebar__nav">
+      <button
+        type="button"
+        className="sidebar__menu"
+        aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'}
+        aria-expanded={mobileOpen}
+        onClick={() => setMobileOpen((o) => !o)}>
+        {mobileOpen ? I.close : I.menu}
+      </button>
+
+      <div className="sidebar__nav" onClick={() => setMobileOpen(false)}>
         {isAdmin ? (
           <>
             {NavLink('/admin', 'Reportes', I.report)}
@@ -193,6 +221,9 @@ export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?:
         {I.logout}
         <span>Cerrar sesión</span>
       </button>
+      {mobileOpen && (
+        <button type="button" className="sidebar__backdrop" aria-label="Cerrar menú" onClick={() => setMobileOpen(false)} />
+      )}
     </nav>
   );
 }

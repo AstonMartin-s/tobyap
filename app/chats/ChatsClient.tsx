@@ -982,7 +982,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
       </div>
     )}
 
-    <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : `${listW}px 10px minmax(0,1fr)`, alignItems: 'stretch', height: isMobile ? `calc(100dvh - ${showKpis ? '15.5rem' : '11rem'} - env(safe-area-inset-bottom, 0px))` : `calc(100vh - ${showKpis ? '150px' : '90px'})`, minHeight: isMobile ? 280 : 560 }}>
+    <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : `${listW}px 10px minmax(0,1fr)`, alignItems: 'stretch', height: isMobile ? `calc(100dvh - ${showKpis ? '12.75rem' : '7.15rem'} - env(safe-area-inset-bottom, 0px))` : `calc(100vh - ${showKpis ? '150px' : '90px'})`, minHeight: isMobile ? 280 : 560 }}>
       {/* LISTA — en mobile se oculta cuando hay un chat abierto */}
       <div className="card" style={{ padding: 0, overflow: 'hidden', display: isMobile && sel ? 'none' : 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ padding: '.6rem .6rem .35rem', flexShrink: 0 }}>

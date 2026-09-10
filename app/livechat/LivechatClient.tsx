@@ -283,7 +283,7 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
         <button className="btn" disabled={busy} onClick={save} style={{ flexShrink: 0 }}>Guardar todo</button>
       </div>
 
-      <div style={{
+      <div className="panel-split" style={{
         display: 'grid',
         gridTemplateColumns: tab === 'preview'
           ? 'minmax(220px, 280px) minmax(0, 1fr)'

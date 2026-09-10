@@ -18,6 +18,7 @@ export function DailyAdsTable({
   }
 
   return (
+    <div className="table-wrap">
     <table className="table">
       <thead>
         <tr>
@@ -63,5 +64,6 @@ export function DailyAdsTable({
         </tr>
       </tfoot>
     </table>
+    </div>
   );
 }

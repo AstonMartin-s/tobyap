@@ -88,6 +88,7 @@ export function InfluencerSpend({ start, end }: { start?: string; end?: string }
         <span style={{ fontSize: '.82rem', color: 'var(--muted)' }}>Total en el período: <b style={{ color: 'var(--text)' }}>${fmt(total)}</b></span>
       </div>
 
+      <div className="table-wrap">
       <table className="table">
         <thead>
           <tr><th>Fecha</th><th>Campaña</th><th className="num">Monto</th><th>Nota</th><th></th></tr>
@@ -105,6 +106,7 @@ export function InfluencerSpend({ start, end }: { start?: string; end?: string }
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

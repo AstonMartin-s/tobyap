@@ -198,6 +198,7 @@ export default async function ReportesPage({
               conversión = {L.cargas} / conversaciones{!isTienda && channel ? ` · filtrando: ${channel === 'meta' ? 'Meta' : 'Influencers'}` : ''}
             </span>
           </div>
+          <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
@@ -227,6 +228,7 @@ export default async function ReportesPage({
               ))}
             </tbody>
           </table>
+          </div>
         </div>
 
       </main>

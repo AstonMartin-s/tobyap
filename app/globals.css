@@ -236,6 +236,12 @@ a { color: inherit; }
 }
 .sidebar__theme svg { width: 17px; height: 17px; }
 .sidebar__theme:hover { color: var(--accent); border-color: var(--accent); }
+.sidebar__menu { display: none; }
+
+@media (hover: none) {
+  .card:hover { transform: none; box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.15); }
+}
+.table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 /* ---------- Cards ---------- */
 .card {
@@ -420,32 +426,60 @@ input[type='date']:hover::-webkit-calendar-picker-indicator { opacity: 0.9; }
 .spinner { width: 18px; height: 18px; border: 2px solid var(--border-2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
 
 @media (max-width: 860px) {
-  :root { --sidebar-w: 0px; }
-  .shell { margin-left: 0; padding: 1.25rem 1rem 4rem; }
-  /* Chats a pantalla completa: el padding de 4rem del .shell dejaba un hueco tosco. */
-  .shell--wide { padding: .55rem .55rem calc(.45rem + env(safe-area-inset-bottom, 0px)); }
-  /* Mobile: la barra ENVUELVE a varias líneas y MUESTRA las etiquetas. Antes era
-     una fila de solo íconos con scroll horizontal poco visible → no se podía
-     encontrar/tocar "Chats" en el celular. Con wrap + labels todo queda a la vista. */
+  :root,
+  :root[data-sidebar="collapsed"] { --sidebar-w: 0px; }
+  .shell { margin-left: 0; padding: 1rem .85rem 3.5rem; }
+  .shell--wide { padding: .45rem .55rem calc(.45rem + env(safe-area-inset-bottom, 0px)); }
+  /* En el celular el menú es una barra de arriba. El hamburguesa abre HACIA ABAJO
+     (overlay), no una columna a la izquierda que coma el chat. */
   .sidebar {
-    position: sticky; width: auto; inset: auto; flex-direction: row; align-items: center;
-    flex-wrap: wrap; gap: 0.3rem 0.4rem; padding: 0.6rem 0.8rem; border-right: none;
-    border-bottom: 1px solid var(--border); overflow: visible;
+    position: sticky; top: 0; left: auto; right: auto; bottom: auto;
+    width: 100%; height: auto;
+    flex-direction: row; flex-wrap: nowrap; align-items: center;
+    gap: .35rem; padding: .45rem .7rem;
+    border-right: none; border-bottom: 1px solid var(--border);
+    overflow: visible; z-index: 80;
   }
-  /* Línea 1: logo (crece) + tema + salir. Línea 2: las pestañas del nav. */
-  .sidebar__brand { padding: 0 0.6rem 0 0.2rem; flex: 1 1 auto; order: 0; }
-  .sidebar__mark { width: 30px; height: 30px; border-radius: 9px; }
+  :root[data-sidebar="collapsed"] .sidebar { padding-left: .7rem; padding-right: .7rem; }
+  :root[data-sidebar="collapsed"] .sidebar__burger { margin-left: 0; margin-right: 0; }
+  .sidebar__brand { padding: 0; flex: 1 1 auto; min-width: 0; order: 0; }
+  :root[data-sidebar="collapsed"] .sidebar__brand { justify-content: flex-start; gap: .55rem; }
+  :root[data-sidebar="collapsed"] .sidebar__name,
+  :root[data-sidebar="collapsed"] .sidebar__brand > span:last-child { display: block; }
   .sidebar__tag { display: none; }
-  /* Nav = tabs con etiqueta, envuelven a la línea siguiente si no entran. */
-  .sidebar__nav { flex-direction: row; flex-wrap: wrap; flex: 1 1 100%; gap: 0.3rem 0.4rem; order: 3; }
-  .sidebar__link { padding: 0.5rem 0.8rem; white-space: nowrap; font-size: 0.9rem; }
-  .sidebar__link span { display: inline; }
+  .sidebar__menu {
+    display: flex; align-items: center; justify-content: center; order: 4;
+    width: 36px; height: 36px; border-radius: 9px; flex: 0 0 auto;
+    background: var(--hover); color: var(--text); border: 1px solid var(--border); cursor: pointer;
+  }
+  .sidebar__menu svg { width: 18px; height: 18px; }
+  .sidebar__nav {
+    display: none; flex-direction: column; flex-wrap: nowrap;
+    position: absolute; top: 100%; left: 0; right: 0;
+    background: var(--bg-2); border-bottom: 1px solid var(--border);
+    padding: .45rem .6rem .65rem; gap: .15rem;
+    box-shadow: 0 12px 28px rgba(0,0,0,.28); z-index: 82;
+  }
+  .sidebar.is-open .sidebar__nav { display: flex; }
+  :root[data-sidebar="collapsed"] .sidebar__nav { align-items: stretch; }
+  .sidebar__link { padding: .7rem .75rem; white-space: nowrap; font-size: .92rem; width: 100%; }
+  :root[data-sidebar="collapsed"] .sidebar__link { justify-content: flex-start; padding-left: .75rem; padding-right: .75rem; }
+  .sidebar__link span,
+  :root[data-sidebar="collapsed"] .sidebar__link span { display: inline; }
+  .sidebar__link.active::before { display: none; }
   .sidebar__spacer { display: none; }
   .sidebar__status { display: none; }
-  .sidebar__logout { width: auto; padding: 0.5rem 0.6rem; order: 2; }
-  .sidebar__logout span { display: none; }
-  .sidebar__theme { width: auto; padding: 0.5rem 0.6rem; margin: 0 0.3rem 0 0; order: 1; }
-  .sidebar__theme span { display: none; }
+  .sidebar__logout { width: auto; padding: .45rem .5rem; order: 3; margin: 0; }
+  .sidebar__logout span,
+  :root[data-sidebar="collapsed"] .sidebar__logout span { display: none; }
+  .sidebar__theme { width: auto; padding: .45rem .5rem; margin: 0; order: 2; }
+  .sidebar__theme span,
+  :root[data-sidebar="collapsed"] .sidebar__theme span { display: none; }
+  .sidebar__backdrop {
+    position: fixed; inset: 0; top: 52px; border: none; padding: 0;
+    background: rgba(0,0,0,.4); z-index: 70; cursor: pointer;
+  }
   .kpis { grid-template-columns: repeat(2, 1fr); }
   .grid-2 { grid-template-columns: 1fr; }
+  .panel-split { grid-template-columns: 1fr !important; }
 }

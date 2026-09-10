@@ -6,6 +6,10 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-10 — panel mobile: menú hacia abajo, chat a pantalla
+
+- En el celular el sidebar de escritorio (incluso colapsado) se abría a la derecha y comía el chat. Barra compacta arriba + hamburguesa que despliega el menú hacia abajo. Tablas con scroll horizontal; ajustes de chat en una columna.
+
 ## Bitácora 2026-09-10 — push operador todos los tenants + mismo aviso al cliente
 
 - El push de atención (mensaje / usuario / CBU / soporte / foto) deja de estar limitado a `provider=manual`. Cualquier panel con “Activar notif” recibe fondo.
