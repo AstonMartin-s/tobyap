@@ -175,7 +175,7 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
     if (C.messageTpl) {
       return C.messageTpl.replace('{fichas}', fichas||'').replace('{bono}', bono||'');
     }
-    if (fichas) return 'Hola, quiero mis ' + fichas + ' fichas libres 🎁';
+    ${cfg.chatSlug ? '' : "if (fichas) return 'Hola, quiero mis ' + fichas + ' fichas libres 🎁';"}
     return C.defaultMessage;
   }
   function go(d){
