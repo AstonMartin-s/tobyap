@@ -6,6 +6,12 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-10 — ClienteA3 (bblack) + Marceneitor (king) en juegayahorra
+
+- Misma pauta que Paradise: landing+chat same-origin en `go.juegayahorra.online`. Soporte y URLs viejas de fichaslibres intactos.
+- Ads: `https://go.juegayahorra.online/l/bblack` y `https://go.juegayahorra.online/l/king` (landings `go`, copy neutro de formulario).
+- Aislamiento ya no es slug=paradise: si hay `landingDomain` y no `chatDomain`, el chat es same-origin.
+
 ## Bitácora 2026-09-10 — Admin Aston: reportes solo Meta (INFLU en panel cliente)
 
 - El admin sumaba chats/cargas de campañas `influ*` junto con Meta y distorsionaba CPA/conversión.

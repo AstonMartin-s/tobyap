@@ -6,6 +6,7 @@ import { tenants, clientSettings, landings } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { resolveBono } from '@/lib/attribution';
 import { pickNumberByCategory } from '@/lib/rotation';
+import { usesAdsSameOrigin, isChatLandingConfig } from '@/lib/chat/adsIsolation';
 import { LandingView, landingMetadata, fichasFromBono, type LandingConfig } from '../_landing';
 
 export const dynamic = 'force-dynamic';
@@ -20,14 +21,12 @@ async function resolveBySlugOrAlias(slug: string) {
       .select()
       .from(landings)
       .where(and(eq(landings.tenantId, direct.id), eq(landings.active, true)));
-    // paradise: /l/paradise debe ser la landing de chat (no walink, no /bestwin).
-    // El resto sigue tomando la primera activa (pauta en vivo).
+    // Pauta aislada (landingDomain, sin chatDomain): /l/<slug> debe ser la
+    // landing de chat (no walink). El resto sigue tomando la primera activa.
     let lp = rows[0] ?? null;
-    if (direct.slug === 'paradise') {
-      const chatLp = rows.find((l) => {
-        const cfg = (l.config ?? {}) as Record<string, unknown>;
-        return typeof cfg.chatSlug === 'string' && String(cfg.chatSlug).trim() !== '';
-      });
+    const [s] = await db.select({ chatConfig: clientSettings.chatConfig }).from(clientSettings).where(eq(clientSettings.tenantId, direct.id)).limit(1);
+    if (usesAdsSameOrigin(s?.chatConfig)) {
+      const chatLp = rows.find((l) => isChatLandingConfig((l.config ?? {}) as Record<string, unknown>));
       if (chatLp) lp = chatLp;
     }
     return { tenant: direct, landing: lp };
@@ -55,13 +54,14 @@ export async function generateMetadata({
   const fichas = fichasFromBono(resolveBono(tenant, searchParams.ccpp ?? (c.ccpp as string | undefined)));
   const h = headers();
   const base = `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('host')}`;
-  const paradiseChat = tenant.slug === 'paradise' && !!c.chatSlug;
+  const [sMeta] = await db.select({ chatConfig: clientSettings.chatConfig }).from(clientSettings).where(eq(clientSettings.tenantId, tenant.id)).limit(1);
+  const isolated = usesAdsSameOrigin(sMeta?.chatConfig) && !!c.chatSlug;
   return landingMetadata({
     brand: c.brandName ? String(c.brandName) : tenant.name,
     fichas,
-    logoAbs: paradiseChat ? null : (c.logoUrl ? base + String(c.logoUrl) : null),
+    logoAbs: isolated ? null : (c.logoUrl ? base + String(c.logoUrl) : null),
     url: `${base}/l/${params.slug}`,
-    neutral: paradiseChat,
+    neutral: isolated,
   });
 }
 
@@ -85,6 +85,7 @@ export default async function Landing({
   const [s] = await db.select().from(clientSettings).where(eq(clientSettings.tenantId, t.id));
   const lp = found.landing;
   const c = (lp?.config ?? {}) as Record<string, string | number | boolean | null>;
+  const isolated = usesAdsSameOrigin(s?.chatConfig) && !!c.chatSlug;
   const fixedWa =
     c.waNumber != null && String(c.waNumber).replace(/\D/g, '') !== ''
       ? String(c.waNumber).replace(/\D/g, '')
@@ -96,8 +97,8 @@ export default async function Landing({
     pixelId: String(c.pixelId ?? t.metaPixelId ?? ''),
     waNumber: String(rotated ?? searchParams.wa ?? fixedWa ?? '').replace(/\D/g, ''),
     message: String(c.message ?? s?.message ?? 'Hola, vi el anuncio y quiero mi beneficio'),
-    brandName: t.slug === 'paradise' && c.chatSlug ? (c.brandName ? String(c.brandName) : '') : (c.brandName ? String(c.brandName) : t.name),
-    logoUrl: t.slug === 'paradise' && c.chatSlug ? undefined : (c.logoUrl ? String(c.logoUrl) : undefined),
+    brandName: isolated ? (c.brandName ? String(c.brandName) : '') : (c.brandName ? String(c.brandName) : t.name),
+    logoUrl: isolated ? undefined : (c.logoUrl ? String(c.logoUrl) : undefined),
     primaryColor: c.primaryColor ? String(c.primaryColor) : undefined,
     headline: c.headline ? String(c.headline) : undefined,
     subtext: c.subtext ? String(c.subtext) : undefined,
@@ -106,12 +107,12 @@ export default async function Landing({
     redirectDelayMs: c.redirectDelayMs != null ? Number(c.redirectDelayMs) : undefined,
     portalUrl: c.portalUrl != null && String(c.portalUrl).trim() !== '' ? String(c.portalUrl) : null,
     redirectUrl: c.redirectUrl != null && String(c.redirectUrl).trim() !== '' ? String(c.redirectUrl) : null,
-    // Solo paradise: honrar chatSlug + same-origin. Los demás /l/<slug> no cambian.
-    chatSlug: t.slug === 'paradise' && c.chatSlug ? String(c.chatSlug) : null,
-    chatOrigin: t.slug === 'paradise' && c.chatSlug ? '' : undefined,
+    chatSlug: isolated && c.chatSlug ? String(c.chatSlug) : null,
+    chatOrigin: isolated ? '' : undefined,
     telegramBot: t.slug === 'candywin' && c.telegramBot ? String(c.telegramBot) : null,
     telegramStartPrefix: t.slug === 'candywin' && c.telegramStartPrefix ? String(c.telegramStartPrefix) : null,
     noCode: c.noCode === true,
+    neutralAds: isolated,
   };
 
   return <LandingView {...cfg} />;

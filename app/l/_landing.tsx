@@ -67,15 +67,17 @@ export interface LandingConfig {
   telegramBot?: string | null; // si está, redirige a t.me/<bot>?start=<prefix><code> (afiliados Telegram).
   telegramStartPrefix?: string | null; // prefijo del start (ej. candywin: ref_CW211_). Solo [A-Za-z0-9_].
   noCode?: boolean; // no incluir "Codigo Promocion:" en el mensaje (CRM sin webhook, no matchea)
+  /** Pauta aislada (juegayahorra): copy/OG neutros, sin marca/foto. */
+  neutralAds?: boolean;
 }
 
 // Piloto Meta solo paradise (chat): copy de página, no de redirect.
 // El resto de tenants conserva el default histórico (pauta en vivo).
-export function landingSpinnerCopy(cfg: Pick<LandingConfig, 'tenantSlug' | 'headline' | 'subtext' | 'chatSlug' | 'brandName' | 'telegramBot'>): {
+export function landingSpinnerCopy(cfg: Pick<LandingConfig, 'tenantSlug' | 'headline' | 'subtext' | 'chatSlug' | 'brandName' | 'telegramBot' | 'neutralAds'>): {
   headline: string;
   subtext: string;
 } {
-  if (cfg.tenantSlug === 'paradise' && cfg.chatSlug) {
+  if (cfg.neutralAds && cfg.chatSlug) {
     return {
       headline: cfg.headline || 'Hola! Vas a recibir atención, completá el siguiente formulario.',
       subtext: cfg.subtext || '',
@@ -100,10 +102,9 @@ export function landingSpinnerCopy(cfg: Pick<LandingConfig, 'tenantSlug' | 'head
 }
 
 export function LandingView(cfg: LandingConfig) {
-  const paradiseChat = cfg.tenantSlug === 'paradise' && !!cfg.chatSlug;
   const accent = cfg.primaryColor || '#25d366';
   const brand = cfg.brandName || 'Acceso';
-  const showBrand = !paradiseChat && (!!cfg.logoUrl || !!cfg.brandName);
+  const showBrand = !cfg.neutralAds && (!!cfg.logoUrl || !!cfg.brandName);
   const { headline, subtext } = landingSpinnerCopy(cfg);
   const delay = cfg.redirectDelayMs ?? 1500;
 

@@ -7,6 +7,7 @@ import { getTenantBySlug } from '@/lib/tenants';
 import { resolveBono } from '@/lib/attribution';
 import { pickNumberByCategory } from '@/lib/rotation';
 import { applySupportDestFallback } from '@/lib/chat/runtime';
+import { usesAdsSameOrigin } from '@/lib/chat/adsIsolation';
 import { LandingView, landingMetadata, fichasFromBono, type LandingConfig } from '../../_landing';
 
 export const dynamic = 'force-dynamic';
@@ -34,13 +35,14 @@ export async function generateMetadata({
   const ccpp = searchParams.ccpp ?? (c.ccpp as string | undefined);
   const fichas = fichasFromBono(resolveBono(tenant, ccpp));
   const base = baseUrl();
-  const paradiseChat = tenant.slug === 'paradise' && !!c.chatSlug;
+  const [sMeta] = await db.select({ chatConfig: clientSettings.chatConfig }).from(clientSettings).where(eq(clientSettings.tenantId, tenant.id)).limit(1);
+  const isolated = usesAdsSameOrigin(sMeta?.chatConfig) && !!c.chatSlug;
   return landingMetadata({
     brand: c.brandName ? String(c.brandName) : tenant.name,
     fichas,
-    logoAbs: paradiseChat ? null : (c.logoUrl ? base + String(c.logoUrl) : null),
+    logoAbs: isolated ? null : (c.logoUrl ? base + String(c.logoUrl) : null),
     url: `${base}/l/${params.slug}/${params.landing}`,
-    neutral: paradiseChat,
+    neutral: isolated,
   });
 }
 
@@ -68,13 +70,14 @@ export default async function NamedLanding({
   const c = (lp.config ?? {}) as Record<string, string | number | boolean | null>;
   // Override de origen del chat por-tenant (ej chat.trackerapp.site).
   // Default = CHAT_ORIGIN (chat.fichaslibres.online) — pauta en vivo depende de ese hop.
-  // Solo paradise: same-origin en el host de la landing (piloto Meta, sin tocar al resto).
+  // Si hay landingDomain y no chatDomain → same-origin (piloto Meta / juegayahorra).
   const scc = (s?.chatConfig ?? {}) as Record<string, unknown>;
   const chatDomainOverride =
     typeof scc.chatDomain === 'string' && scc.chatDomain.trim()
       ? `https://${scc.chatDomain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '')}`
       : '';
-  const sameOriginChat = t.slug === 'paradise' && !chatDomainOverride;
+  const isolated = usesAdsSameOrigin(scc) && !!c.chatSlug;
+  const sameOriginChat = isolated && !chatDomainOverride;
   const fixedWa =
     c.waNumber != null && String(c.waNumber).replace(/\D/g, '') !== ''
       ? String(c.waNumber).replace(/\D/g, '')
@@ -89,8 +92,8 @@ export default async function NamedLanding({
     pixelId: String(c.pixelId ?? t.metaPixelId ?? ''),
     waNumber: String(rotated ?? fixedWa ?? '').replace(/\D/g, ''),
     message: String(c.message ?? s?.message ?? 'Hola, vi el anuncio y quiero mi beneficio'),
-    brandName: t.slug === 'paradise' && c.chatSlug ? (c.brandName ? String(c.brandName) : '') : (c.brandName ? String(c.brandName) : t.name),
-    logoUrl: t.slug === 'paradise' && c.chatSlug ? undefined : (c.logoUrl ? String(c.logoUrl) : undefined),
+    brandName: isolated ? (c.brandName ? String(c.brandName) : '') : (c.brandName ? String(c.brandName) : t.name),
+    logoUrl: isolated ? undefined : (c.logoUrl ? String(c.logoUrl) : undefined),
     primaryColor: c.primaryColor ? String(c.primaryColor) : undefined,
     headline: c.headline ? String(c.headline) : undefined,
     subtext: c.subtext ? String(c.subtext) : undefined,
@@ -108,6 +111,7 @@ export default async function NamedLanding({
     telegramBot: c.telegramBot != null && String(c.telegramBot).trim() !== '' ? String(c.telegramBot) : null,
     telegramStartPrefix: c.telegramStartPrefix != null && String(c.telegramStartPrefix).trim() !== '' ? String(c.telegramStartPrefix) : null,
     noCode: c.noCode === true || lp.type === 'soporte',
+    neutralAds: isolated,
   };
 
   // Soporte sin número ni redirectUrl (KingCBA): cae a Config → walink o
