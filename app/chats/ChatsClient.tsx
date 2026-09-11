@@ -873,6 +873,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     background: filled ? (color || 'var(--accent)') : 'transparent',
     color: filled ? '#fff' : (color || 'var(--text)'),
     whiteSpace: 'nowrap',
+    flexShrink: 0
   });
 
   const opStyle = (color?: string, filled?: boolean): React.CSSProperties => ({
@@ -893,7 +894,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
 
   return (
     <>
-    <div style={{ display: 'flex', gap: '.5rem', marginBottom: '.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+    <div style={{ display: isMobile && sel ? 'none' : 'flex', gap: '.5rem', marginBottom: '.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
       <button 
         onClick={() => setShowKpis(!showKpis)}
         className="btn"
@@ -940,7 +941,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
       </div>
     </div>
 
-    {showKpis && (
+    {showKpis && (!isMobile || !sel) && (
       <div style={{ display: 'flex', gap: '1.25rem', marginBottom: '1rem', alignItems: 'center', flexWrap: 'wrap', background: 'var(--bg-2)', padding: '.65rem .85rem', borderRadius: 10, border: '1px solid var(--border)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }}>
         {/* 1. Selector de fechas (Segmented Control) */}
         <div style={{ display: 'flex', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: 2, gap: 2 }}>
@@ -982,7 +983,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
       </div>
     )}
 
-    <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : `${listW}px 10px minmax(0,1fr)`, alignItems: 'stretch', height: isMobile ? `calc(100dvh - ${showKpis ? '12.75rem' : '7.15rem'} - env(safe-area-inset-bottom, 0px))` : `calc(100vh - ${showKpis ? '150px' : '90px'})`, minHeight: isMobile ? 280 : 560 }}>
+    <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : `${listW}px 10px minmax(0,1fr)`, alignItems: 'stretch', height: isMobile ? (sel ? `calc(100dvh - 3.8rem - env(safe-area-inset-bottom, 0px))` : `calc(100dvh - ${showKpis ? '12.75rem' : '7.15rem'} - env(safe-area-inset-bottom, 0px))`) : `calc(100vh - ${showKpis ? '150px' : '90px'})`, minHeight: isMobile ? 280 : 560 }}>
       {/* LISTA — en mobile se oculta cuando hay un chat abierto */}
       <div className="card" style={{ padding: 0, overflow: 'hidden', display: isMobile && sel ? 'none' : 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ padding: '.6rem .6rem .35rem', flexShrink: 0 }}>
@@ -1080,11 +1081,11 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
           <>
             {isMobile && (
               <button onClick={() => { setSel(null); setDetail(null); }}
-                style={{ display: 'flex', alignItems: 'center', gap: '.35rem', width: '100%', textAlign: 'left', padding: '.6rem 1rem', border: 'none', borderBottom: '1px solid var(--border)', background: 'var(--card-3, rgba(255,255,255,.03))', color: 'var(--accent)', fontWeight: 700, fontSize: '.85rem', cursor: 'pointer' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: '.35rem', width: '100%', textAlign: 'left', padding: '.4rem .6rem', border: 'none', borderBottom: '1px solid var(--border)', background: 'var(--card-3, rgba(255,255,255,.03))', color: 'var(--accent)', fontWeight: 700, fontSize: '.85rem', cursor: 'pointer' }}>
                 ‹ Volver a la lista
               </button>
             )}
-            <div style={{ padding: '.8rem 1rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap', overflow: 'visible', position: 'relative', zIndex: 5 }}>
+            <div style={{ padding: isMobile ? '.5rem .6rem' : '.8rem 1rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: isMobile ? '.4rem' : '.75rem', flexWrap: 'wrap', overflow: 'visible', position: 'relative', zIndex: 5 }}>
               {/* IZQUIERDA: icono, nombre + selector de estado, y campaña */}
               <div style={{ display: 'flex', gap: '.7rem', minWidth: 0 }}>
                 <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--card-3)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', flexShrink: 0 }}>
@@ -1320,22 +1321,23 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
             </div>
 
             {/* ACCIONES */}
-            <div style={{ borderTop: '1px solid var(--border)', padding: isMobile ? '.55rem .7rem calc(.55rem + env(safe-area-inset-bottom, 0px))' : '.7rem .9rem', display: 'flex', flexDirection: 'column', gap: '.5rem', background: 'var(--bg-2, rgba(255,255,255,.012))', flexShrink: 0, overflow: 'visible', position: 'relative', zIndex: 4 }}>
+            <div style={{ borderTop: '1px solid var(--border)', padding: isMobile ? '.4rem .5rem calc(.4rem + env(safe-area-inset-bottom, 0px))' : '.7rem .9rem', display: 'flex', flexDirection: 'column', gap: isMobile ? '.35rem' : '.5rem', background: 'var(--bg-2, rgba(255,255,255,.012))', flexShrink: 0, overflow: 'visible', position: 'relative', zIndex: 4 }}>
               {showManualPanel && isMobile && !manualOpen && (
                 <button type="button" onClick={() => setManualOpen(true)}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', width: '100%', padding: '.65rem .75rem', borderRadius: 10, border: '1px solid rgba(22,163,74,.45)', background: 'rgba(22,163,74,.12)', color: '#4ade80', fontWeight: 800, fontSize: '.82rem', cursor: 'pointer' }}>
-                  <span>{manualWaiting ? 'El cliente espera — crear usuario' : 'Entregar usuario al cliente'}</span>
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', width: '100%', padding: '.4rem .6rem', borderRadius: 8, border: '1px solid rgba(22,163,74,.45)', background: 'rgba(22,163,74,.12)', color: '#4ade80', fontWeight: 800, fontSize: '.75rem', cursor: 'pointer' }}>
+                  <span>{manualWaiting ? 'Crear usuario' : 'Entregar usuario'}</span>
                   <span style={{ fontSize: '.7rem', fontWeight: 700 }}>Abrir ›</span>
                 </button>
               )}
               {(panelQuick.barPresets ?? []).length > 0 && (
-                <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div className="hide-scroll" style={{ display: 'flex', gap: '.35rem', flexWrap: isMobile ? 'nowrap' : 'wrap', alignItems: 'center', overflowX: isMobile ? 'auto' : 'visible', paddingBottom: isMobile ? 4 : 0 }}>
                   {(panelQuick.barPresets ?? []).map((p) => (
                     <button key={p} type="button" disabled={busy} onClick={() => setCustom(p)}
                       style={{
                         fontSize: '.72rem', padding: '.28rem .55rem', borderRadius: 8,
                         border: '1px solid rgba(124,92,255,.35)', background: 'rgba(124,92,255,.08)',
                         color: 'var(--accent,#7c5cff)', cursor: 'pointer', maxWidth: '100%', textAlign: 'left', fontWeight: 600,
+                        whiteSpace: isMobile ? 'nowrap' : 'normal', flexShrink: 0
                       }}>
                       {p.length > 48 ? `${p.slice(0, 48)}…` : p}
                     </button>
@@ -1349,7 +1351,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                 const isEstafa = cur?.estafa;
                 return (
                   <>
-                    <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div className="hide-scroll" style={{ display: 'flex', gap: '.4rem', flexWrap: isMobile ? 'nowrap' : 'wrap', alignItems: 'center', overflowX: isMobile ? 'auto' : 'visible', paddingBottom: isMobile ? 4 : 0 }}>
                       <Link href={isTienda ? '/producto' : '/livechat?tab=guion'} className="tt tt--down tt--down-left" data-tt={isTienda ? 'Producto → matriz de venta' : 'Ajustes de chat → Guion'}
                         style={{
                           fontSize: '.6rem', fontWeight: 700, color: 'var(--accent,#7c5cff)', textTransform: 'uppercase',

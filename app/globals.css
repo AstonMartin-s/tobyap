@@ -483,3 +483,12 @@ input[type='date']:hover::-webkit-calendar-picker-indicator { opacity: 0.9; }
   .grid-2 { grid-template-columns: 1fr; }
   .panel-split { grid-template-columns: 1fr !important; }
 }
+
+/* Utility para ocultar scrollbars pero mantener scroll */
+.hide-scroll::-webkit-scrollbar {
+  display: none;
+}
+.hide-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
