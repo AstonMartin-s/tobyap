@@ -1,11 +1,22 @@
 // Service worker del PANEL del operador (separado del chat-sw.js del cliente).
 // Su único trabajo es recibir Web Push de fondo (con el navegador minimizado) y
 // abrir el panel de chats al tocar la notificación. Scope: /chats.
-// Solo se registra para tenants manuales (goldenC/ElGanador) desde ChatsClient.
-// v4 — Safari/iOS: aviso visual (sin icon/badge) + postMessage si el panel está abierto.
+// Habilitado para todos los tenants del panel desde ChatsClient.
+// v5 — Safari/iOS: aviso visual (sin icon/badge) + postMessage si el panel está
+//      abierto + AUTO-RE-SUSCRIPCIÓN (pushsubscriptionchange) para que la sub
+//      caducada por iOS se regenere sola y no haya que reactivar a mano.
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+
+function urlB64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
 
 function parsePush(event) {
   const fallback = { title: 'TrackerIO · Panel', body: 'Tenés una novedad', url: '/chats', tag: '' };
@@ -58,4 +69,37 @@ self.addEventListener('notificationclick', (event) => {
     }
     return self.clients.openWindow(target);
   }));
+});
+
+// AUTO-RE-SUSCRIPCIÓN: iOS/APNs (y a veces Chrome) rotan/caducan la suscripción
+// sin aviso. El navegador dispara `pushsubscriptionchange`; acá regeneramos la
+// sub con la MISMA VAPID y la re-guardamos en el server. El fetch same-origin
+// lleva la cookie de sesión del operador, así que /api/panel/push nos identifica.
+// Sin esto, la sub muerta nunca se regenera y hay que tocar "Activar notif" a mano.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil((async () => {
+    try {
+      // 1) Intentar reusar la applicationServerKey de la sub vieja (si vino).
+      let appServerKey = event.oldSubscription && event.oldSubscription.options
+        ? event.oldSubscription.options.applicationServerKey
+        : null;
+      // 2) Si no, pedir la VAPID pública al server (con cookie de sesión).
+      if (!appServerKey) {
+        const r = await fetch('/api/panel/push', { credentials: 'include' })
+          .then((x) => x.json()).catch(() => null);
+        if (!r || !r.ok || !r.publicKey) return;
+        appServerKey = urlB64ToUint8Array(r.publicKey);
+      }
+      const sub = await self.registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: appServerKey,
+      });
+      await fetch('/api/panel/push', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: sub }),
+      }).catch(() => {});
+    } catch (_) { /* best-effort */ }
+  })());
 });

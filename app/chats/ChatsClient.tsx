@@ -310,14 +310,27 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
           const reg = await navigator.serviceWorker.ready;
           const sub = await reg.pushManager.getSubscription();
           setOpPushOn(!!sub);
-          // Ya tenía permiso de antes: re-aseguramos la suscripción (idempotente).
-          if (sub && r?.ok && r.publicKey) void enableOperatorPush(true);
+          // AUTO-REPARACIÓN: si el permiso ya está concedido, re-aseguramos la
+          // suscripción SIEMPRE (aunque getSubscription() sea null porque iOS la
+          // caducó). enableOperatorPush(true) la regenera y la re-guarda. Sin
+          // esto, una sub caducada quedaba muerta hasta reactivar a mano.
+          const granted = typeof Notification !== 'undefined' && Notification.permission === 'granted';
+          if (r?.ok && r.publicKey && granted) void enableOperatorPush(true);
         }
       } catch { /* push no disponible */ }
     })();
+    // Al volver a la app (PWA reabierta / pestaña visible), re-validar la sub:
+    // es cuando iOS más suele haberla rotado. Auto-repara sin intervención.
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+      const granted = typeof Notification !== 'undefined' && Notification.permission === 'granted';
+      if (granted) void enableOperatorPush(true);
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       window.removeEventListener('beforeinstallprompt', onPrompt);
       window.removeEventListener('appinstalled', onInstalled);
+      document.removeEventListener('visibilitychange', onVisible);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -344,7 +357,9 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
         if (!silent) setToast('Este navegador no soporta notificaciones de fondo');
         return;
       }
-      if (isIos() && !isStandalone()) { setOpPushIosGuide(true); return; }
+      // En iOS el push exige PWA instalada. En modo silencioso (auto-reparación)
+      // no interrumpimos con la guía: solo salimos.
+      if (isIos() && !isStandalone()) { if (!silent) setOpPushIosGuide(true); return; }
       if (!silent && deferredPrompt) {
         try {
           await deferredPrompt.prompt();
@@ -362,12 +377,18 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
         return;
       }
       const reg = await navigator.serviceWorker.ready;
+      const appKey = urlB64ToUint8Array(kd.publicKey) as unknown as BufferSource;
       let sub = await reg.pushManager.getSubscription();
       if (!sub) {
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlB64ToUint8Array(kd.publicKey) as unknown as BufferSource,
-        });
+        try {
+          sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: appKey });
+        } catch {
+          // La sub previa quedó en un estado inválido (VAPID cambiada / sub
+          // fantasma tras rotación de iOS): desuscribir y reintentar una vez.
+          const stale = await reg.pushManager.getSubscription();
+          if (stale) await stale.unsubscribe().catch(() => {});
+          sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: appKey });
+        }
       }
       const res = await fetch('/api/panel/push', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
