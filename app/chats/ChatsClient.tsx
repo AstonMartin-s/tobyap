@@ -265,7 +265,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const sheetManual = showManualPanel && isMobile && manualOpen;
   const [soundOn, setSoundOn] = useState(true);
   const soundRef = useRef(true);
-  const prevAttn = useRef<Set<string> | null>(null);
+  const prevInbound = useRef<Map<string, { msgCount: number; unreadCount: number; lastAt: string | null; lastFrom: Item['lastFrom'] }> | null>(null);
   useEffect(() => {
     const v = (() => { try { return localStorage.getItem('chatSoundOn') !== '0'; } catch { return true; } })();
     setSoundOn(v); soundRef.current = v;
@@ -436,25 +436,41 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     const r = await fetch('/api/panel/chats').then((x) => x.json()).catch(() => null);
     if (!r?.ok) return;
     const its: Item[] = r.items;
-    // Notificar SOLO cuando aparece una atención NUEVA (no en cada refresh).
-    const attnNow = new Set(its.filter(itemNeedsAttention).map((i) => i.sessionKey));
-    if (prevAttn.current && soundRef.current) {
-      let nuevo = 0;
-      attnNow.forEach((k) => { if (!prevAttn.current!.has(k)) nuevo++; });
-      if (nuevo > 0) {
+    // Cada inbound del cliente (mensaje/imagen) suena. No solo la 1ª atención:
+    // si el chat ya estaba en "no leído" y escribe de nuevo, también pita.
+    const inboundNow = new Map(its.map((i) => [i.sessionKey, {
+      msgCount: i.msgCount,
+      unreadCount: i.unreadCount ?? (i.unread ? 1 : 0),
+      lastAt: i.lastAt,
+      lastFrom: i.lastFrom,
+    }]));
+    if (prevInbound.current && soundRef.current) {
+      const hits: Item[] = [];
+      for (const i of its) {
+        if (i.blocked || i.lastFrom !== 'user') continue;
+        const prev = prevInbound.current.get(i.sessionKey);
+        const unreadNow = i.unreadCount ?? (i.unread ? 1 : 0);
+        if (!prev) { hits.push(i); continue; }
+        if (i.msgCount > prev.msgCount || unreadNow > prev.unreadCount || (!!i.lastAt && i.lastAt !== prev.lastAt)) {
+          hits.push(i);
+        }
+      }
+      if (hits.length > 0) {
         playChime();
-        const title = 'TrackerIO · Chats';
-        const body = `${nuevo} chat${nuevo > 1 ? 's' : ''} requiere${nuevo > 1 ? 'n' : ''} atención`;
+        const first = hits[0];
+        const title = first.name || first.phone || 'TrackerIO · Chats';
+        const body = hits.length === 1
+          ? (first.lastText || 'Mensaje nuevo')
+          : `${hits.length} mensajes nuevos`;
         showOpPushBanner(title, body);
-        // iOS ignora `new Notification()` de la página; el aviso visible va por el SW.
         if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
           navigator.serviceWorker.ready
-            .then((reg) => reg.showNotification(title, { body, tag: `tobyap-panel-attn-${Date.now()}`, data: { url: '/chats' } }))
+            .then((reg) => reg.showNotification(title, { body, tag: `tobyap-panel-msg-${Date.now()}`, data: { url: first.sessionKey ? `/chats?s=${encodeURIComponent(first.sessionKey)}` : '/chats' } }))
             .catch(() => {});
         }
       }
     }
-    prevAttn.current = attnNow;
+    prevInbound.current = inboundNow;
     setItems(its);
     setStats((r.stats ?? []).map((s: { step: string | null; createdAt: string | null; estafa?: unknown; precaucion?: unknown }) => ({
       step: s.step,

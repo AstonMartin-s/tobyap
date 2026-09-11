@@ -76,9 +76,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     const botMsgs = prepareBotBatch(r.messages);
     await appendChatMessages(s.id, [userMsg, ...botMsgs], { step: r.step, dataMerge: r.data, markUnread: true });
     const history = [...(s.messages ?? []), userMsg, ...botMsgs];
-    // Provider manual: avisar al operador que hay una creación pendiente.
     if (r.step === 'account_pending' && !existing.manualPending) {
       await notifyOperators(tenant, 'account_pending', { sessionKey: s.sessionKey, name: s.name });
+    } else {
+      await notifyOperators(tenant, 'message', { sessionKey: s.sessionKey, name: s.name, text: b.text });
     }
     if (s.kommoLeadId && r.data.username) {
       const fields: Array<{ fieldId: number; value: string }> = [];
