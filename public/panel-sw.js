@@ -52,6 +52,7 @@ self.addEventListener('push', (event) => {
     return self.registration.showNotification(data.title, {
       body: data.body,
       tag: data.tag,
+      renotify: true,
       data: { url: data.url || '/chats' },
     });
   })());

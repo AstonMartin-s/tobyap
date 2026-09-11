@@ -10,7 +10,7 @@ import type { ResolvedTenant } from '@/lib/types';
 // GATING: VAPID + suscripciones. Todos los tenants del panel (no solo manual).
 // Disparos: mensaje nuevo, pidió usuario, pidió CBU, soporte, comprobante.
 
-export type OperatorPushEvent = 'account_pending' | 'cbu' | 'support' | 'comprobante' | 'message';
+export type OperatorPushEvent = 'account_pending' | 'cbu' | 'support' | 'comprobante' | 'message' | 'new_chat';
 
 /** Guarda/actualiza la suscripción push del operador (idempotente por endpoint). */
 export async function saveOperatorSub(
@@ -35,6 +35,7 @@ const EVENT_COPY: Record<OperatorPushEvent, { title: string; body: string }> = {
   support: { title: 'Soporte solicitado', body: 'Un cliente pidió hablar con un agente.' },
   comprobante: { title: 'Comprobante recibido', body: 'Llegó una imagen. Revisala en el panel.' },
   message: { title: 'Mensaje nuevo', body: 'Un cliente escribió en el chat.' },
+  new_chat: { title: 'Chat nuevo', body: 'Un cliente acaba de entrar al chat.' },
 };
 
 /**
@@ -69,12 +70,16 @@ export async function notifyOperators(
   const tag = `tobyap-panel-${event}-${Date.now()}`;
 
   const dead: string[] = [];
+  let okCount = 0;
   await Promise.all(
     subs.map(async (row) => {
       const res = await sendWebPush(row.subscription, { title: copy.title, body, url, tag });
+      if (res.ok) okCount += 1;
       if (res.gone) dead.push(row.endpoint);
+      else if (!res.ok) console.warn('[op-push] send fail', { slug: tenant.slug, event, status: res.status, error: res.error });
     }),
   );
+  console.log('[op-push]', { slug: tenant.slug, event, subs: subs.length, ok: okCount, dead: dead.length });
   if (dead.length) {
     for (const endpoint of dead) {
       await db

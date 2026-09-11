@@ -113,6 +113,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       const botMsgs = prepareBotBatch(onFreeTextTienda('support', cfg));
       const history = [...(s.messages ?? []), ...botMsgs];
       await db.update(chatSessions).set({ messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+      await notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
       return NextResponse.json({ ok: true, messages: botMsgs, buttons: [], step: s.step, total: history.length });
     }
 
@@ -137,7 +138,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     // Provider manual: la cuenta la crea el operador a mano → avisale por push que
     // hay una creación pendiente de confirmar (solo tenants manuales).
     if (r.step === 'account_pending' && !existing.manualPending) {
-      void notifyOperators(tenant, 'account_pending', { sessionKey: s.sessionKey, name: s.name });
+      await notifyOperators(tenant, 'account_pending', { sessionKey: s.sessionKey, name: s.name });
     }
     // Espejo Kommo — MISMA paridad que el bot de WhatsApp: campos PORTAL_* +
     // título del lead = username creado.
@@ -170,7 +171,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     const botMsgs = prepareBotBatch(r.messages);
     const history = [...(s.messages ?? []), ...botMsgs];
     await db.update(chatSessions).set({ step: r.step, data: { ...r.data, unread: true }, messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
-    void notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
+    await notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
     if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, '🔁 El cliente dijo que YA TIENE usuario — derivado a WhatsApp.');
     return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length, ...supportClientFlags(r.data, r.step) });
   }
@@ -213,6 +214,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       }
     }
     const total = (s.messages?.length ?? 0) + botMsgs.length + 1;
+    await notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
     return NextResponse.json({ ok: true, messages: [...botMsgs, handoff], buttons: r.buttons, step: r.step, total, ...supportClientFlags({ ...r.data, requestedAgent: true }, r.step) });
   }
 
@@ -227,7 +229,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       messages: history,
       updatedAt: new Date(),
     }).where(eq(chatSessions.id, s.id));
-    void notifyOperators(tenant, 'cbu', { sessionKey: s.sessionKey, name: s.name });
+    await notifyOperators(tenant, 'cbu', { sessionKey: s.sessionKey, name: s.name });
     if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, '💳 Pidió CBU — datos entregados.');
     return NextResponse.json({ ok: true, messages: botMsgs, buttons: [], step: r.step, total: history.length });
   }
@@ -242,7 +244,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       updateLeadStatus(tenant, s.kommoLeadId, tenant.statusRevisarImagenId).catch(() => {});
       addLeadNote(tenant, s.kommoLeadId, '🔎 Comprobante en revisión (app instalada). ➡️ Chequealo y mové a Cargo$ para acreditar.');
     }
-    if (r.moved) void notifyOperators(tenant, 'comprobante', { sessionKey: s.sessionKey, name: s.name });
+    if (r.moved) await notifyOperators(tenant, 'comprobante', { sessionKey: s.sessionKey, name: s.name });
     return NextResponse.json(r.body);
   }
 
@@ -258,8 +260,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     // Soporte: dejar rastro + etiqueta y MOVER a Atención manual (embudo Clientes)
     // para que un asesor lo tome.
     if (b.action === 'support') {
-      // Provider manual: push de fondo al operador (además del rastro en Kommo).
-      void notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
+      await notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
+    } else if (b.action === 'deposit' || b.action === 'withdraw' || b.action === 'forgot_user') {
+      await notifyOperators(tenant, 'message', {
+        sessionKey: s.sessionKey,
+        name: s.name,
+        text: b.action === 'deposit' ? 'Pidió cómo cargar' : b.action === 'withdraw' ? 'Pidió cómo retirar' : 'Pidió sus datos',
+      });
     }
     if (b.action === 'support' && s.kommoLeadId) {
       addLeadNote(tenant, s.kommoLeadId, '🆘 El cliente pidió SOPORTE desde el chat web.');

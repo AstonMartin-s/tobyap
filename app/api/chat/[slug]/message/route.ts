@@ -52,7 +52,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       if (run) await db.update(chatSessions).set(upd).where(eq(chatSessions.id, s.id));
       const history = [...(s.messages ?? []), userMsg, ...botMsgs];
       if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, `👤 Lead: ${b.text}`);
-      void notifyOperators(tenant, 'message', { sessionKey: s.sessionKey, name: s.name, text: b.text });
+      await notifyOperators(tenant, 'message', { sessionKey: s.sessionKey, name: s.name, text: b.text });
       return NextResponse.json({ ok: true, messages: botMsgs, total: history.length });
     }
 
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     await appendChatMessages(s.id, [userMsg, ...botMsgs], { markUnread: true });
     const history = [...(s.messages ?? []), userMsg, ...botMsgs];
     if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, `👤 Lead: ${b.text}`);
-    void notifyOperators(tenant, 'message', { sessionKey: s.sessionKey, name: s.name, text: b.text });
+    await notifyOperators(tenant, 'message', { sessionKey: s.sessionKey, name: s.name, text: b.text });
     return NextResponse.json({ ok: true, messages: botMsgs, total: history.length });
   }
 
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     const history = [...(s.messages ?? []), userMsg, ...botMsgs];
     // Provider manual: avisar al operador que hay una creación pendiente.
     if (r.step === 'account_pending' && !existing.manualPending) {
-      void notifyOperators(tenant, 'account_pending', { sessionKey: s.sessionKey, name: s.name });
+      await notifyOperators(tenant, 'account_pending', { sessionKey: s.sessionKey, name: s.name });
     }
     if (s.kommoLeadId && r.data.username) {
       const fields: Array<{ fieldId: number; value: string }> = [];
@@ -108,7 +108,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     const botMsgs = prepareBotBatch(r.messages);
     await appendChatMessages(s.id, [userMsg, ...botMsgs], { step: r.step, dataMerge: r.data, markUnread: true });
     const history = [...(s.messages ?? []), userMsg, ...botMsgs];
-    void notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
+    await notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
     if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, '🔁 El cliente escribió que YA TIENE usuario — derivado a WhatsApp.');
     return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length, ...supportClientFlags(r.data, r.step) });
   }
@@ -139,9 +139,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   // Manual: cada inbound avisa al operador. Soporte post-carga usa copy propio.
   if (HELP_RE.test(b.text) && sessionCanOpenSupport((s.data ?? {}) as Record<string, unknown>, s.step)) {
-    void notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
+    await notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
   } else {
-    void notifyOperators(tenant, 'message', { sessionKey: s.sessionKey, name: s.name, text: b.text });
+    await notifyOperators(tenant, 'message', { sessionKey: s.sessionKey, name: s.name, text: b.text });
   }
 
   return NextResponse.json({ ok: true, messages: botMsgs, total: history.length });

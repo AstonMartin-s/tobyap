@@ -169,7 +169,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   // Provider manual: push de fondo al operador avisando que llegó una imagen
   // (comprobante). Solo tenants manuales; best-effort.
-  void notifyOperators(tenant, 'comprobante', { sessionKey, name: s.name });
+  await notifyOperators(tenant, 'comprobante', { sessionKey, name: s.name });
 
   return NextResponse.json({ ok: true, messages: botMsgs, step, fileUrl, total: history.length });
 }
