@@ -358,7 +358,7 @@ export async function POST(req: NextRequest) {
     const preCreds = ['welcome', 'account_pending', 'form', '', null, undefined].includes(s.step as string);
     await appendChatMessages(s.id, botMsgs, {
       ...(preCreds ? { step: 'credenciales' } : {}),
-      dataMerge: { username, password, loginUrl: null, portalName: username, existing: false, manualPending: false, waUnlocked: true },
+      dataMerge: { username, password, loginUrl: null, portalName: username, existing: false, manualPending: false },
     });
     if (s.kommoLeadId) {
       addLeadNote(tenant, s.kommoLeadId, `👤 Usuario creado A MANO por el operador (${session.slug}): ${username}`);

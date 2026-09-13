@@ -66,7 +66,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   const [waBtn, setWaBtn] = useState<{ enabled: boolean; url: string }>({ enabled: false, url: '' });
   const [niche, setNiche] = useState<'circo' | 'tienda'>('circo');
   const [assignedWa, setAssignedWa] = useState<string | null>(null); // cajero sticky
-  const [waUnlocked, setWaUnlocked] = useState(false); // usuario creado o "Ya tengo usuario"
+  const [waUnlocked, setWaUnlocked] = useState(false); // cargo hecho o "Ya tengo usuario"
   const [waBtnClicked, setWaBtnClicked] = useState(false);
   const [waBtnToast, setWaBtnToast] = useState(false);
   const [pushBanner, setPushBanner] = useState<{ title: string; body: string } | null>(null);
@@ -74,9 +74,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
 
   function applySupportFlags(d: { assignedWa?: string | null; username?: string | null; waUnlocked?: boolean; step?: string | null }) {
     if (d.assignedWa) setAssignedWa(String(d.assignedWa));
-    if (d.waUnlocked === true || d.step === 'done' || (typeof d.username === 'string' && d.username.trim())) {
-      setWaUnlocked(true);
-    }
+    setWaUnlocked(d.waUnlocked === true || d.step === 'done');
   }
 
   // La PWA puede tener HTML viejo cacheado: el nombre/color/foto se refrescan de la API.

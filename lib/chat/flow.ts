@@ -136,13 +136,16 @@ export function sessionHasAccount(data: Record<string, unknown> | null | undefin
   return u.length > 0;
 }
 
+/** WhatsApp/cajero SOLO post-carga, o si el cliente dijo "ya tengo usuario".
+ *  Tener username no alcanza: en bblack/partner el user se crea ANTES del
+ *  comprobante y derivar ahí les llega gente sin convertir. */
 export function sessionCanOpenSupport(
   data: Record<string, unknown> | null | undefined,
   step?: string | null,
 ): boolean {
   if (step === 'done') return true;
-  if (data?.waUnlocked === true || data?.hasExistingUser === true) return true;
-  return sessionHasAccount(data);
+  if (data?.hasExistingUser === true) return true;
+  return false;
 }
 
 export function supportClientFlags(data: Record<string, unknown> | null | undefined, step?: string | null) {
@@ -233,7 +236,7 @@ export async function accountStep(
   return {
     messages,
     buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
-    data: { username: acc.username, password: acc.password, loginUrl: acc.loginUrl, portalName, existing: acc.existing, waUnlocked: true, ...cajero },
+    data: { username: acc.username, password: acc.password, loginUrl: acc.loginUrl, portalName, existing: acc.existing, ...cajero },
     step: 'credenciales',
   };
 }
@@ -273,7 +276,7 @@ async function accountStepManual(
         { from: 'bot', delayMs: 1500, at: now(), text: renderTemplate('account_existing', cfg, { creds_block: creds }) },
       ],
       buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
-      data: { username: prevUser, password: prevPass, loginUrl: null, portalName: prevUser, existing: true, manualPending: false, waUnlocked: true },
+      data: { username: prevUser, password: prevPass, loginUrl: null, portalName: prevUser, existing: true, manualPending: false },
       step: 'credenciales',
     };
   }
@@ -322,7 +325,7 @@ async function accountStepPartnerApi(
         { from: 'bot', delayMs: 2400, at: now(), text: renderTemplate('account_agent_followup', cfg) },
       ],
       buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
-      data: { username, password, loginUrl: null, portalName: username, existing: false, waUnlocked: true, ...cajero },
+      data: { username, password, loginUrl: null, portalName: username, existing: false, ...cajero },
       step: 'credenciales',
     };
   } catch {
@@ -357,7 +360,7 @@ async function accountStepKingcash(
           { from: 'bot', delayMs: 2400, at: now(), text: renderTemplate('account_agent_followup', cfg) },
         ],
         buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
-        data: { username, password, loginUrl: null, portalName: username, existing: false, waUnlocked: true, ...cajero },
+        data: { username, password, loginUrl: null, portalName: username, existing: false, ...cajero },
         step: 'credenciales',
       };
     } catch (e) {
@@ -404,7 +407,7 @@ async function accountStepKingApi(
           { from: 'bot', delayMs: 2400, at: now(), text: renderTemplate('account_agent_followup', cfg) },
         ],
         buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
-        data: { username: acc.username, password: acc.password, loginUrl: null, portalName: acc.username, existing: acc.existing, waUnlocked: true, ...cajero },
+        data: { username: acc.username, password: acc.password, loginUrl: null, portalName: acc.username, existing: acc.existing, ...cajero },
         step: 'credenciales',
       };
     } catch (e) {
@@ -570,8 +573,15 @@ export function onFreeText(step: string, text?: string, cfg: ChatRuntimeConfig =
   if (asksAboutApp && step !== 'app_onboarding') {
     return [{ from: 'bot', delayMs: 600, at: now(), text: '✅ Tranquilo/a, no hace falta nada más con la app. Tu imagen ya quedó en proceso y en breve te acreditamos 🎉' }];
   }
-  // WhatsApp si ya tiene usuario / tocó "Ya tengo usuario" / está acreditado.
-  // Sin usuario todavía: se queda en el chat (el operador lo ve en el panel).
+  // "¿cómo vuelvo a entrar?" con usuario ya creado: le reenviamos el login,
+  // no lo mandamos a WhatsApp (Amandi/bblack: derivaban sin comprobante).
+  if (text && sessionHasAccount(data) && /(volver a entrar|c[oó]mo (entro|ingreso)|olvid[eé]|no me acuerdo)/i.test(text)) {
+    return [{ from: 'bot', delayMs: 600, at: now(), text: renderTemplate('post_forgot', cfg, {
+      username: String(data.username ?? ''),
+      password: typeof data.password === 'string' ? data.password : '',
+    }) }];
+  }
+  // WhatsApp SOLO post-carga o "Ya tengo usuario". Antes: se queda en el chat.
   if (text && HELP_RE.test(text)) {
     return sessionCanOpenSupport(data, step) ? supportReply(cfg, data) : reassureInChat();
   }

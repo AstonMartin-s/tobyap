@@ -69,6 +69,6 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const fresh = messages.slice(Math.max(0, since));
   const assignedWa = s.assignedWa ?? null;
   const username = s.username && String(s.username).trim() ? String(s.username).trim() : null;
-  const waUnlocked = s.waUnlocked === 'true' || s.hasExistingUser === 'true' || Boolean(username) || step === 'done';
+  const waUnlocked = s.hasExistingUser === 'true' || step === 'done';
   return NextResponse.json({ ok: true, step, total: messages.length, messages: fresh, assignedWa, username, waUnlocked, ...(debug ? { dbg } : {}) });
 }
