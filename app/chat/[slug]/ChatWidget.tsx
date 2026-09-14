@@ -534,7 +534,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   const initial = (skin.brand || brand || 'K').charAt(0).toUpperCase();
 
   return (
-    <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif', background: C.bg }}>
+    <div style={{ position: 'fixed', inset: 0, height: '100dvh', display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif', background: C.bg, paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)', boxSizing: 'border-box' }}>
       <div style={{ background: header, color: '#fff', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 1px 3px rgba(0,0,0,.2)' }}>
         {(skin.avatarUrl || avatarUrl) ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -603,7 +603,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 10px', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22%3E%3Ccircle cx=%223%22 cy=%223%22 r=%221%22 fill=%22%23d8cfc4%22/%3E%3C/svg%3E")' }}>
         {msgs.map((m, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: m.from === 'user' ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
+          <div key={i} data-chat-row="" style={{ display: 'flex', justifyContent: m.from === 'user' ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
             <div style={{ maxWidth: '80%', background: m.from === 'user' ? C.userBubble : C.botBubble, color: '#111827', padding: '7px 10px', borderRadius: 10, borderTopLeftRadius: m.from === 'bot' ? 2 : 10, borderTopRightRadius: m.from === 'user' ? 2 : 10, boxShadow: '0 1px 1px rgba(0,0,0,.12)', fontSize: 15, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
               {m.image ? (
                 (m.mime || '').includes('pdf') || (m.name || '').toLowerCase().endsWith('.pdf') ? (
@@ -617,6 +617,14 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
                     alt=""
                     onError={(e) => {
                       const img = e.currentTarget as HTMLImageElement;
+                      // Recorte de portal / imagen rota del bot: se oculta. No
+                      // mostramos "Archivo enviado" (parece un comprobante).
+                      if (m.from === 'bot') {
+                        const row = img.closest('[data-chat-row]') as HTMLElement | null;
+                        if (row) row.style.display = 'none';
+                        else img.style.display = 'none';
+                        return;
+                      }
                       img.style.display = 'none';
                       const span = img.nextElementSibling as HTMLElement | null;
                       if (span) span.style.display = 'inline-flex';

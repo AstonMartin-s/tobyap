@@ -498,11 +498,17 @@ export function postActionMessages(action: string, data: Record<string, unknown>
     const useMagic = cfg.magicLinks.includes(slot);
     return (useMagic && loginUrl) ? loginUrl : cfg.links[slot];
   };
-  const refImg = cfg.portalRefImg || PORTAL_REF_IMG;
-  const ref = (text: string): BotMsg[] => [
-    { from: 'bot', delayMs: 600, at: now(), text },
-    { from: 'bot', delayMs: 900, at: now(), image: refImg },
-  ];
+  const refImg = (cfg.portalRefImg || '').trim();
+  const destLooksLikeSupport = (url: string) => /\/walink(?:\?|$)|wa\.me|wa\.link/i.test(url);
+  const attachPortalShot = !!refImg && !destLooksLikeSupport(cfg.links.portal_deposit) && !destLooksLikeSupport(cfg.links.portal_withdraw);
+  const ref = (text: string): BotMsg[] => {
+    const msgs: BotMsg[] = [{ from: 'bot', delayMs: 600, at: now(), text }];
+    // Recorte del portal (king-portal-ref.png): solo si el destino ES el portal.
+    // En Luck/ElGanador Cargar/Retirar van a WhatsApp: el recorte no carga y el
+    // chat muestra "Archivo enviado ✓".
+    if (attachPortalShot) msgs.push({ from: 'bot', delayMs: 900, at: now(), image: refImg });
+    return msgs;
+  };
   switch (action) {
     case 'deposit':
       return { messages: ref(renderTemplate('post_deposit', cfg, { portal_deposit: portalUrl('portal_deposit') })) };

@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 // el push de fondo EXIGE que el panel esté instalado en inicio.
 export const metadata: Metadata = {
   manifest: '/panel-manifest.json',
-  appleWebApp: { capable: true, title: 'TrackerIO · Panel', statusBarStyle: 'black-translucent' },
+  appleWebApp: { capable: true, title: 'TrackerIO · Panel', statusBarStyle: 'black' },
 };
 
 export default async function ChatsPage() {

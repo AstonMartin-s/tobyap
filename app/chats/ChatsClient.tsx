@@ -252,14 +252,38 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   // Responsive: en celular pasamos a una sola columna con patrón toggle
   // (lista <-> conversación). Sin esto, el grid de 3 columnas se salía de la
   // pantalla y parecía que "no abría" el chat al tocarlo.
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches);
+  // El acceso directo (PWA standalone) en iPhone a veces reporta ancho de
+  // escritorio: lo tratamos como mobile igual (hover:none + pointer:coarse).
+  const computeMobile = () => {
+    if (typeof window === 'undefined') return false;
+    const narrow = window.matchMedia('(max-width: 820px)').matches;
+    const standalone = window.matchMedia('(display-mode: standalone)').matches
+      || (navigator as { standalone?: boolean }).standalone === true;
+    const coarse = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+    return narrow || (standalone && coarse);
+  };
+  const [isMobile, setIsMobile] = useState(() => computeMobile());
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 820px)');
-    const apply = () => setIsMobile(mq.matches);
+    const apply = () => setIsMobile(computeMobile());
     apply();
-    mq.addEventListener('change', apply);
-    return () => mq.removeEventListener('change', apply);
+    const mqs = [
+      window.matchMedia('(max-width: 820px)'),
+      window.matchMedia('(display-mode: standalone)'),
+      window.matchMedia('(hover: none) and (pointer: coarse)'),
+    ];
+    mqs.forEach((mq) => mq.addEventListener('change', apply));
+    window.addEventListener('resize', apply);
+    return () => {
+      mqs.forEach((mq) => mq.removeEventListener('change', apply));
+      window.removeEventListener('resize', apply);
+    };
   }, []);
+  const chatFullscreen = isMobile && !!sel;
+  useEffect(() => {
+    if (chatFullscreen) document.body.dataset.chatOpen = '1';
+    else delete document.body.dataset.chatOpen;
+    return () => { delete document.body.dataset.chatOpen; };
+  }, [chatFullscreen]);
   // Desktop: rail fijo. Mobile: hoja inferior (si no, 340px se come el chat).
   const dockManual = showManualPanel && !isMobile;
   const sheetManual = showManualPanel && isMobile && manualOpen;
@@ -1020,7 +1044,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
       </div>
     )}
 
-    <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : `${listW}px 10px minmax(0,1fr)`, alignItems: 'stretch', height: isMobile ? (sel ? `calc(100dvh - 3.8rem - env(safe-area-inset-bottom, 0px))` : `calc(100dvh - ${showKpis ? '12.75rem' : '7.15rem'} - env(safe-area-inset-bottom, 0px))`) : `calc(100vh - ${showKpis ? '150px' : '90px'})`, minHeight: isMobile ? 280 : 560 }}>
+    <div ref={gridRef} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : `${listW}px 10px minmax(0,1fr)`, alignItems: 'stretch', height: isMobile ? `calc(100dvh - ${showKpis ? '12.75rem' : '7.15rem'} - env(safe-area-inset-bottom, 0px))` : `calc(100vh - ${showKpis ? '150px' : '90px'})`, minHeight: isMobile ? 280 : 560 }}>
       {/* LISTA — en mobile se oculta cuando hay un chat abierto */}
       <div className="card" style={{ padding: 0, overflow: 'hidden', display: isMobile && sel ? 'none' : 'flex', flexDirection: 'column', minHeight: 0 }}>
         <div style={{ padding: '.6rem .6rem .35rem', flexShrink: 0 }}>
@@ -1110,10 +1134,31 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
           onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--border-2)')} />
       </div>
 
-      {/* DETALLE — en mobile solo se muestra cuando hay un chat seleccionado */}
-      <div className="card" style={{ padding: 0, display: isMobile && !sel ? 'none' : 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', position: 'relative' }}>
+      {/* DETALLE — en mobile/PWA es overlay a pantalla completa (iOS standalone
+          + 100dvh/grid con display:none dejaba la vista en negro al abrir un chat). */}
+      <div className="card" style={{
+        padding: 0,
+        display: isMobile && !sel ? 'none' : 'flex',
+        flexDirection: 'column',
+        minHeight: chatFullscreen ? '100%' : 0,
+        overflow: 'hidden',
+        position: chatFullscreen ? 'fixed' : 'relative',
+        inset: chatFullscreen ? 0 : undefined,
+        zIndex: chatFullscreen ? 90 : undefined,
+        width: chatFullscreen ? '100%' : undefined,
+        height: chatFullscreen ? '100dvh' : undefined,
+        background: 'var(--card, #151a25)',
+        paddingTop: chatFullscreen ? 'env(safe-area-inset-top, 0px)' : undefined,
+        boxSizing: 'border-box',
+        borderRadius: chatFullscreen ? 0 : undefined,
+        margin: chatFullscreen ? 0 : undefined,
+        transform: chatFullscreen ? 'none' : undefined,
+      }}>
         {!detail ? (
-          <div className="empty" style={{ padding: '3rem', margin: 'auto' }}>Elegí un chat para ver la conversación.</div>
+          <div className="empty" style={{ padding: '3rem', margin: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.75rem' }}>
+            {sel ? <span className="spinner" /> : null}
+            {sel ? 'Cargando conversación…' : 'Elegí un chat para ver la conversación.'}
+          </div>
         ) : (
           <>
             {isMobile && (

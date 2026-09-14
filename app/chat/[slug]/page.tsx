@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   return {
     title: `${brand.brandName} — Soporte`,
     manifest: `/api/chat/${params.slug}/manifest`,
-    appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: brand.brandName },
+    appleWebApp: { capable: true, statusBarStyle: 'black', title: brand.brandName },
     icons: { apple: '/chat-apple-180.png', icon: '/chat-icon-192.png' },
   };
 }

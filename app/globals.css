@@ -76,6 +76,8 @@
 
 * { box-sizing: border-box; }
 
+html, body { min-height: 100%; }
+
 body {
   margin: 0;
   background:
@@ -424,6 +426,18 @@ input[type='date']:hover::-webkit-calendar-picker-indicator { opacity: 0.9; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 .spinner { width: 18px; height: 18px; border: 2px solid var(--border-2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+
+/* iOS/PWA: background-attachment:fixed pinta la vista en negro al cambiar de
+   lista a chat. El overlay del chat (body[data-chat-open]) cubre el menú. */
+@media (max-width: 860px), (display-mode: standalone) {
+  body { background-attachment: scroll; }
+}
+@media (display-mode: standalone) {
+  html, body { height: 100%; height: 100dvh; }
+}
+body[data-chat-open] .sidebar { display: none; }
+body[data-chat-open] .shell,
+body[data-chat-open] .shell--wide { margin: 0; padding: 0; max-width: none; }
 
 @media (max-width: 860px) {
   :root,

@@ -6,10 +6,15 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-14 — PWA celular: chat en negro al abrir desde el acceso directo
+
+- En el iPhone, al abrir el panel desde el ícono de inicio y tocar un chat, la vista quedaba negra (spinner iOS). Causa: `background-attachment:fixed` + layout `100dvh`/grid con `display:none` en standalone.
+- Fix: el chat mobile/PWA abre en overlay `position:fixed` a pantalla completa; fondo scroll en standalone; scope del manifest del panel a `/`.
+
 ## Bitácora 2026-09-14 — alta Luck (manual, pixel compartido)
 
 - Nuevo tenant `luck` (Luck Casino Virtual). Provider `manual`, sin Kommo, `readonly`. Event suffix `A11`. Pixel + CAPI copiados de king (`1131496748897137`).
-- Portal `https://ganamosonline.com` (ellos crean usuarios). Demo en welcome: lucky / 123lucky. Welcome = solo botón CBU (como ElGanador). Operador entrega usuario real desde el panel.
+- Portal `https://ganamosonline.com` (ellos crean usuarios; se puede entrar sin usuario). Welcome sin demo: promo + link + botón CBU. Operador entrega el usuario real desde el panel.
 - CBU Laureano Fernandez · mín. $5000 · primeras 3 cargas 30% extra. WA soporte `5493513717264` vía `/l/luck/walink`. Chat color WhatsApp `#008069`. Logo embebido en `chatConfig.avatarUrl`.
 - Script: `scripts/onboard-luck.ts`. Welcome CBU en `lib/chat/welcomeButtons.ts` (necesita deploy).
 

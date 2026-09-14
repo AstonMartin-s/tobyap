@@ -1,7 +1,7 @@
 // Alta de `luck` (Luck Casino Virtual) — plataforma Ganamosonline, SIN Kommo.
-// Provider `manual`: el operador crea el usuario real a mano. El chat da DEMO +
-// botón CBU (misma mecánica que ElGanador). Pixel + CAPI token COPIADOS de
-// Marceneitor (king).
+// Provider `manual`: el operador crea el usuario real a mano. Welcome sin demo:
+// promo + portal + botón CBU (misma mecánica que ElGanador). Pixel + CAPI token
+// COPIADOS de Marceneitor (king).
 //
 // Uso:
 //   npx tsx --env-file=.env scripts/onboard-luck.ts
@@ -89,9 +89,6 @@ async function main() {
           'Bienvenido a *{brand}*.\n\n' +
           '🎁 *Primeras 3 cargas* con *30% extra*.\n' +
           '💰 Mínimo de carga: *$5.000*\n\n' +
-          'Podés entrar a mirar la plataforma con este usuario de prueba:\n' +
-          '👤 Usuario: *lucky*\n' +
-          '🔐 Contraseña: *123lucky*\n\n' +
           `🔗 ${PLAYER_PORTAL}\n\n` +
           'Cuando quieras cargar, tocá el botón de CBU 👇',
       },

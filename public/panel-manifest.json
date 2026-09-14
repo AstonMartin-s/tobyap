@@ -3,7 +3,7 @@
   "short_name": "Panel",
   "description": "Atención de chats y creación de usuarios.",
   "start_url": "/chats",
-  "scope": "/chats",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0a0d12",
