@@ -6,6 +6,13 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-14 — alta Luck (manual, pixel compartido)
+
+- Nuevo tenant `luck` (Luck Casino Virtual). Provider `manual`, sin Kommo, `readonly`. Event suffix `A11`. Pixel + CAPI copiados de king (`1131496748897137`).
+- Portal `https://ganamosonline.com` (ellos crean usuarios). Demo en welcome: lucky / 123lucky. Welcome = solo botón CBU (como ElGanador). Operador entrega usuario real desde el panel.
+- CBU Laureano Fernandez · mín. $5000 · primeras 3 cargas 30% extra. WA soporte `5493513717264` vía `/l/luck/walink`. Chat color WhatsApp `#008069`. Logo embebido en `chatConfig.avatarUrl`.
+- Script: `scripts/onboard-luck.ts`. Welcome CBU en `lib/chat/welcomeButtons.ts` (necesita deploy).
+
 ## Bitácora 2026-09-10 — panel mobile: menú hacia abajo, chat a pantalla
 
 - En el celular el sidebar de escritorio (incluso colapsado) se abría a la derecha y comía el chat. Barra compacta arriba + hamburguesa que despliega el menú hacia abajo. Tablas con scroll horizontal; ajustes de chat en una columna.

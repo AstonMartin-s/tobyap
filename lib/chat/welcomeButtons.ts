@@ -21,10 +21,10 @@ export function welcomeButtons(agentButton = false): WelcomeBtn[] {
 }
 
 export function welcomeButtonsFor(slug: string): WelcomeBtn[] {
-  // ElGanador (manual): ya se le da el DEMO en la bienvenida. No pide usuario —
-  // va directo al CBU. El operador (Luis) le entrega el usuario real desde el
+  // ElGanador / Luck (manual): ya se le da el DEMO en la bienvenida. No pide
+  // usuario — va directo al CBU. El operador entrega el usuario real desde el
   // panel cuando confirma la carga (sin que el cliente lo pida).
-  if (slug === 'elganador') return [WANT_CBU_BTN];
+  if (slug === 'elganador' || slug === 'luck') return [WANT_CBU_BTN];
   if (hasAgentButton(slug)) return welcomeButtons(true);
   return [WANT_ACCOUNT_BTN, HAVE_USER_BTN];
 }
