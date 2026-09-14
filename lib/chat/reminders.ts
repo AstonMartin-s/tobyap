@@ -3,10 +3,10 @@ import { db } from '@/db';
 import { chatSessions, clientSettings } from '@/db/schema';
 import { appendChatMessages } from '@/lib/chat/mutations';
 
-// Recontacto automático: UN solo mensajito corto por chat. Si desde nuestro
-// último mensaje el cliente no contesta en ~10 min, le mandamos un empujoncito
-// breve ("¿seguís por ahí?"). Una vez por chat — nunca se repite. No manda CBU
-// ni links (eso ya está en la conversación); solo reengancha.
+// Recontacto: cada mensaje NUESTRO (bot u operador) que queda sin respuesta
+// 5 min → un empujón. No es una sola vez por chat: si después contestan y
+// volvemos a escribir y se cuelga otra vez, se manda de nuevo. Un mismo
+// mensaje colgado no se re-pica (no spam cada 5 min sobre el mismo).
 
 type Msg = { from: string; text?: string; image?: string; at: number; n?: boolean; op?: boolean };
 
@@ -47,22 +47,21 @@ export async function runReminders(): Promise<{ scanned: number; sent: number }>
   let sent = 0;
   for (const s of rows) {
     const data = (s.data ?? {}) as Record<string, unknown>;
-    if (data.reminderSent) continue; // UNA sola vez por chat
-
     const msgs = (s.messages ?? []) as Msg[];
-    // Último mensaje "real" (no recontacto).
+    // Último mensaje real (no el propio seguimiento). Colgado = lo mandamos
+    // nosotros (bot u operador) y el cliente no contestó.
     let lastReal: Msg | undefined;
     for (let i = msgs.length - 1; i >= 0; i--) { if (!msgs[i].n) { lastReal = msgs[i]; break; } }
-    if (!lastReal || lastReal.from === 'user') continue; // no hablamos último / el cliente ya contestó
-    if (lastReal.op) continue; // el OPERADOR ya está atendiendo a mano — no lo pisamos con un recordatorio automático
+    if (!lastReal || lastReal.from === 'user') continue;
 
-    const quietMin = (Date.now() - lastReal.at) / 60000;
+    const lastAt = lastReal.at < 1e12 ? lastReal.at * 1000 : lastReal.at;
+    const quietMin = (Date.now() - lastAt) / 60000;
     if (quietMin < QUIET_MIN) continue;
+    if (data.reminderForAt === lastReal.at) continue; // ya le hicimos seguimiento a ESTE mensaje
 
     const text = NUDGES[Math.floor(Math.random() * NUDGES.length)];
     const newMsg = { from: 'bot' as const, text, at: Date.now(), n: true };
-    // Append atómico: no pisa un mensaje que el cliente/operador escriba justo ahora.
-    await appendChatMessages(s.id, [newMsg], { dataMerge: { reminderSent: true } });
+    await appendChatMessages(s.id, [newMsg], { dataMerge: { reminderForAt: lastReal.at, reminderSent: true } });
     sent++;
   }
   return { scanned: rows.length, sent };
