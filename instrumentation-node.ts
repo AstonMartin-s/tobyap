@@ -34,12 +34,9 @@ if (process.env.DISABLE_RETRY_SCHEDULER !== '1') {
   console.log(`[retry-scheduler] activo · cada ${Math.round(everyMs / 60000)} min`);
 }
 
-// Recontacto automático a los 5 min de silencio. DESACTIVADO por pedido de
-// operaciones (Marce): la "repesca" ('¿Seguís por ahí?') molestaba. El enganche
-// ahora lo cubre el aviso "en un momento te atiende un agente" que se manda al
-// toque tras crear el usuario (account_agent_followup). Reactivar con
-// ENABLE_REMINDERS=1 solo si se decide volver.
-if (process.env.ENABLE_REMINDERS === '1') {
+// Recontacto a los 5 min de silencio. Global: ENABLE_REMINDERS=1. Por tenant:
+// chat_config.reminders=true (ElGanador). King/bblack no se tocan.
+if (process.env.DISABLE_REMINDERS !== '1') {
   const tick = async () => {
     try {
       const r = await runReminders();
@@ -50,7 +47,7 @@ if (process.env.ENABLE_REMINDERS === '1') {
   };
   setTimeout(tick, 45_000);
   setInterval(tick, 60_000);
-  console.log('[reminders] activo · cada 1 min');
+  console.log('[reminders] activo · cada 1 min (opt-in por tenant o ENABLE_REMINDERS=1)');
 }
 
 // Auto-cierre de chats inactivos (default 72h). Corre cada 1 h.

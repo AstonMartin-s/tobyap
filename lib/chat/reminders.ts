@@ -1,6 +1,6 @@
-import { and, gt, notInArray } from 'drizzle-orm';
+import { and, gt, inArray, notInArray } from 'drizzle-orm';
 import { db } from '@/db';
-import { chatSessions } from '@/db/schema';
+import { chatSessions, clientSettings } from '@/db/schema';
 import { appendChatMessages } from '@/lib/chat/mutations';
 
 // Recontacto automático: UN solo mensajito corto por chat. Si desde nuestro
@@ -20,12 +20,28 @@ const NUDGES = [
   '¿Retomamos? Estás a un paso 🎁',
 ];
 
+async function reminderTenantIds(): Promise<string[]> {
+  // ENABLE_REMINDERS=1 → todos. Si no, solo tenants con chat_config.reminders=true
+  // (ElGanador lo pide; King/bblack no — les molestaba la repesca global).
+  if (process.env.ENABLE_REMINDERS === '1') return [];
+  const settings = await db.select({ tenantId: clientSettings.tenantId, chatConfig: clientSettings.chatConfig }).from(clientSettings);
+  return settings
+    .filter((s) => (s.chatConfig as Record<string, unknown> | null)?.reminders === true)
+    .map((s) => s.tenantId);
+}
+
 export async function runReminders(): Promise<{ scanned: number; sent: number }> {
   const cutoff = new Date(Date.now() - 3 * 3600 * 1000); // solo sesiones recientes
+  const only = await reminderTenantIds();
+  if (process.env.ENABLE_REMINDERS !== '1' && !only.length) return { scanned: 0, sent: 0 };
   const rows = await db
     .select()
     .from(chatSessions)
-    .where(and(notInArray(chatSessions.step, ['done', 'closed', 'no_cargo']), gt(chatSessions.updatedAt, cutoff)))
+    .where(and(
+      notInArray(chatSessions.step, ['done', 'closed', 'no_cargo']),
+      gt(chatSessions.updatedAt, cutoff),
+      ...(only.length ? [inArray(chatSessions.tenantId, only)] : []),
+    ))
     .limit(300);
 
   let sent = 0;
