@@ -716,6 +716,7 @@ export async function POST(req: NextRequest) {
         operator: session.slug,
         value: amount,
         currency: 'ARS',
+        campaign: s.campaign,
         skipKommoStatus: true,
         skipChatRelease: true,
       }).catch((e) => {

@@ -42,7 +42,7 @@ export interface EmitCargoResult {
   ok: boolean;
   eventId: string;
   source: CargoSource;
-  skipped?: 'already_sent' | 'no_id';
+  skipped?: 'already_sent' | 'no_id' | 'test';
   error?: string;
   capi?: CapiResult;
   chatReleased?: boolean;
@@ -52,6 +52,10 @@ export interface EmitCargoResult {
 export function panelApproveEmitsCargo(): boolean {
   const v = process.env.EMIT_CARGO_FROM_PANEL;
   return v !== '0' && v !== 'false';
+}
+
+export function isTestCampaign(c?: string | null): boolean {
+  return (c ?? '').trim().toLowerCase() === 'test';
 }
 
 export function cargoEventId(opts: { kommoLeadId?: number | null; sessionKey?: string | null }): string {
@@ -292,6 +296,11 @@ export async function emitCargo(tenant: ResolvedTenant, input: EmitCargoInput): 
 
   try {
     const ctx = await resolveContext(tenant, ids, input);
+    if (isTestCampaign(input.campaign) || isTestCampaign(ctx.campaign)) {
+      const extra = await sideEffects();
+      console.log(`[emitCargo ${tenant.slug}] skip test campaign`, { eventId: ids.eventId, source: input.source });
+      return { ok: true, eventId: ids.eventId, source: input.source, skipped: 'test', ...extra };
+    }
     const customData: Record<string, unknown> = {
       campaign_id: ctx.campaign ?? undefined,
       internal_event: 'CargoCRM',
