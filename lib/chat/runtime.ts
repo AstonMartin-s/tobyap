@@ -31,6 +31,8 @@ export interface ChatRuntimeConfig {
   templates?: Partial<Record<MessageTemplateId, string>>;
   /** Placeholder y atajos de la barra del operador en Chats. */
   panelQuick?: PanelQuickTexts;
+  /** ElGanador: en el CBU no repetir el mínimo; solo recordar el bono. */
+  cbuOfferOnlyBonus?: boolean;
 }
 
 export const DEFAULT_PORTAL_URL = 'https://greenbet.uno/login';
@@ -143,6 +145,29 @@ export function renderTemplate(
   return raw.replace(/\{(\w+)\}/g, (_, key: string) => map[key] ?? `{${key}}`);
 }
 
+/** Destino de soporte que el cliente cargó (Ajustes / Config walink). Ignora el
+ *  default histórico de King. Si no hay nada propio, el caller cae al hop walink. */
+export function configuredSupportUrl(cc: Record<string, unknown> | null | undefined): string | null {
+  if (!cc) return null;
+  const links = cc.links && typeof cc.links === 'object' && !Array.isArray(cc.links)
+    ? (cc.links as Record<string, unknown>)
+    : {};
+  for (const raw of [cc.waBtnUrl, links.support, cc.supportUrl]) {
+    const s = typeof raw === 'string' ? raw.trim() : '';
+    if (s && s !== DEFAULT_SUPPORT_URL) return s;
+  }
+  return null;
+}
+
+/** URL del botón "Ir a WhatsApp" del header: mismo destino que el chat, no un hop
+ *  distinto. Solo usa /l/<slug>/walink si el cliente nunca configuró soporte. */
+export function resolveHeaderWaUrl(slug: string, cc: Record<string, unknown> | null | undefined): string {
+  const own = configuredSupportUrl(cc);
+  if (own) return own;
+  const ld = typeof cc?.landingDomain === 'string' ? cc.landingDomain : '';
+  return walinkSupportUrl(slug, ld || undefined);
+}
+
 /** Link de soporte del chat: siempre landing walink (rotación), nunca wa.me directo. */
 export function walinkSupportUrl(slug: string, landingOrigin?: string): string {
   const raw = (landingOrigin || process.env.NEXT_PUBLIC_LANDING_ORIGIN || 'https://go.fichaslibres.online').trim();
@@ -212,8 +237,10 @@ function parseLinks(raw: unknown, legacyPortal?: unknown, legacySupport?: unknow
 
 /** Overrides por tenant (sin tocar DB). King: promo cajera post-acreditación deshabilitada por ahora. */
 export function applyTenantRuntimeOverrides(cfg: ChatRuntimeConfig, tenantSlug?: string): ChatRuntimeConfig {
-  if (tenantSlug === 'king') return { ...cfg, postAccreditCajera: false };
-  return cfg;
+  let next = cfg;
+  if (tenantSlug === 'king') next = { ...next, postAccreditCajera: false };
+  if (tenantSlug === 'elganador') next = { ...next, cbuOfferOnlyBonus: true };
+  return next;
 }
 
 export function parseChatRuntime(raw: unknown, fallbackBrand = 'King'): ChatRuntimeConfig {
@@ -251,6 +278,9 @@ export function offerWelcomeLine(cfg: ChatRuntimeConfig): string {
 }
 
 export function offerCbuLine(cfg: ChatRuntimeConfig): string {
+  if (cfg.cbuOfferOnlyBonus && cfg.offerType === 'bonus') {
+    return `Recordá que tenés tu bono del *${cfg.offerValue}%*, espero tu comprobante`;
+  }
   if (cfg.offerType === 'bonus') {
     return `Desde *$${money(cfg.minDeposit)}* y te sumo *${cfg.offerValue}%* 🎁 Espero tu comprobante!`;
   }

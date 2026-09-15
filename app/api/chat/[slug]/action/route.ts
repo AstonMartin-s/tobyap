@@ -13,7 +13,7 @@ import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadFields, updateLeadName, addLeadTags, updateLeadStatus } from '@/lib/kommo';
 import { notifyOperators } from '@/lib/panel/operatorPush';
-import { sendPushToSession } from '@/lib/chat/push';
+import { notifyClientOutgoing } from '@/lib/chat/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +46,7 @@ async function applyFinishUpload(
       body: { ok: true, messages: [], buttons: [], step: 'done', alreadyDone: true, total: dbCountBefore + userTap.length },
     };
   }
+  void notifyClientOutgoing(sessionId, botMsgs).catch(() => {});
   return {
     moved: true,
     body: { ok: true, messages: botMsgs, buttons: [], step: 'validando', total: dbCountBefore + toAdd.length },
@@ -86,6 +87,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         const upd: Record<string, unknown> = { data: nextData, messages: history, updatedAt: new Date() };
         if (run.step) upd.step = run.step;
         await db.update(chatSessions).set(upd).where(eq(chatSessions.id, s.id));
+        void notifyClientOutgoing(s.id, botMsgs).catch(() => {});
         return NextResponse.json({ ok: true, messages: botMsgs, buttons: run.buttons, step: run.step ?? s.step, total: history.length });
       }
       // Sin transición para esa acción: no rompemos.
@@ -100,6 +102,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       const botMsgs = prepareBotBatch(r.messages);
       const history = [...(s.messages ?? []), ...botMsgs];
       await db.update(chatSessions).set({ step: r.step, data: { ...(s.data ?? {}), ...r.data }, messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+      void notifyClientOutgoing(s.id, botMsgs).catch(() => {});
       return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length });
     }
 
@@ -113,6 +116,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       const botMsgs = prepareBotBatch(onFreeTextTienda('support', cfg));
       const history = [...(s.messages ?? []), ...botMsgs];
       await db.update(chatSessions).set({ messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+      void notifyClientOutgoing(s.id, botMsgs).catch(() => {});
       await notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
       return NextResponse.json({ ok: true, messages: botMsgs, buttons: [], step: s.step, total: history.length });
     }
@@ -135,6 +139,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       ...(b.action === 'want_agent' ? { requestedAgent: true } : {}),
     };
     await db.update(chatSessions).set({ step: r.step, data: nextData, messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+    void notifyClientOutgoing(s.id, botMsgs).catch(() => {});
     // Provider manual: la cuenta la crea el operador a mano → avisale por push que
     // hay una creación pendiente de confirmar (solo tenants manuales).
     if (r.step === 'account_pending' && !existing.manualPending) {
@@ -154,13 +159,6 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       updateLeadName(tenant, s.kommoLeadId, String(r.data.username)).catch(() => {});
       addLeadNote(tenant, s.kommoLeadId, `👤 Usuario Pagoda ${r.data.existing ? '(existente, recordado)' : 'creado'}: ${r.data.username}`);
     }
-    if (r.data.username) {
-      void sendPushToSession(s.id, (s.data as Record<string, unknown> | null)?.pushSub, {
-        title: '¡Tu cuenta está lista!',
-        body: 'Ya te dejamos tu usuario y contraseña en el chat.',
-        url: `/chat/${params.slug}`,
-      });
-    }
     return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length, ...supportClientFlags(nextData, r.step) });
   }
 
@@ -171,6 +169,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     const botMsgs = prepareBotBatch(r.messages);
     const history = [...(s.messages ?? []), ...botMsgs];
     await db.update(chatSessions).set({ step: r.step, data: { ...r.data, unread: true }, messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
+    void notifyClientOutgoing(s.id, botMsgs).catch(() => {});
     await notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
     if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, '🔁 El cliente dijo que YA TIENE usuario — derivado a WhatsApp.');
     return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length, ...supportClientFlags(r.data, r.step) });
@@ -229,6 +228,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       messages: history,
       updatedAt: new Date(),
     }).where(eq(chatSessions.id, s.id));
+    void notifyClientOutgoing(s.id, botMsgs).catch(() => {});
     await notifyOperators(tenant, 'cbu', { sessionKey: s.sessionKey, name: s.name });
     if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, '💳 Pidió CBU — datos entregados.');
     return NextResponse.json({ ok: true, messages: botMsgs, buttons: [], step: r.step, total: history.length });
@@ -257,6 +257,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     const patch: Record<string, unknown> = { messages: history, updatedAt: new Date() };
     if (r.step) patch.step = r.step;
     await db.update(chatSessions).set(patch).where(eq(chatSessions.id, s.id));
+    void notifyClientOutgoing(s.id, botMsgs).catch(() => {});
     // Soporte: dejar rastro + etiqueta y MOVER a Atención manual (embudo Clientes)
     // para que un asesor lo tome.
     if (b.action === 'support') {

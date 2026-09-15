@@ -1,4 +1,7 @@
 import webpush from 'web-push';
+import { eq } from 'drizzle-orm';
+import { db } from '@/db';
+import { chatSessions, tenants } from '@/db/schema';
 import { mergeChatData } from '@/lib/chat/mutations';
 
 // Web Push real (entrega con la app/web CERRADA). Es 100% opcional y aditivo:
@@ -79,5 +82,46 @@ export async function sendPushToSession(
   });
   if (res.gone) {
     await mergeChatData(sessionId, {}, ['pushSub']).catch(() => {});
+  }
+}
+
+/**
+ * Avisa al cliente (Web Push + sonido del SO) cuando NOSOTROS escribimos.
+ * Un ping por lote (no uno por burbuja). Best-effort: sin sub = no-op.
+ */
+export async function notifyClientOutgoing(
+  sessionId: string,
+  msgs: Array<{ from?: string; text?: string; image?: string; op?: boolean }>,
+): Promise<void> {
+  try {
+    if (!Array.isArray(msgs) || !sessionId) return;
+    const outgoing = msgs.filter((m) => m.from === 'bot' || m.op);
+    if (!outgoing.length) return;
+    const [row] = await db
+      .select({ data: chatSessions.data, tenantId: chatSessions.tenantId })
+      .from(chatSessions)
+      .where(eq(chatSessions.id, sessionId))
+      .limit(1);
+    if (!row) return;
+    const sub = (row.data as Record<string, unknown> | null)?.pushSub;
+    if (!sub) return;
+    const [t] = await db
+      .select({ slug: tenants.slug, name: tenants.name })
+      .from(tenants)
+      .where(eq(tenants.id, row.tenantId))
+      .limit(1);
+    const last = [...outgoing].reverse().find((m) => (m.text && m.text.trim()) || m.image) ?? outgoing[outgoing.length - 1];
+    const raw = typeof last.text === 'string' ? last.text : '';
+    const body = (raw || (last.image ? '📷 Te mandamos una imagen' : 'Tenés un mensaje nuevo'))
+      .replace(/\*/g, '')
+      .slice(0, 120);
+    await sendPushToSession(sessionId, sub, {
+      title: t?.name || 'Soporte',
+      body,
+      url: t?.slug ? `/chat/${t.slug}` : '/',
+      tag: `tobyap-chat-${Date.now()}`,
+    });
+  } catch {
+    /* best-effort: un fallo de push no puede tumbar el chat */
   }
 }

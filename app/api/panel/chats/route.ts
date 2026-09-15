@@ -11,7 +11,6 @@ import { kommoStatusFromPanelStep, acreditarChat } from '@/lib/chat/release';
 import { purgeChatSession } from '@/lib/chat/deleteSession';
 import { trimBandeja } from '@/lib/chat/bandeja';
 import { appendChatMessages, mergeChatData } from '@/lib/chat/mutations';
-import { sendPushToSession } from '@/lib/chat/push';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { emitCargo, panelApproveEmitsCargo } from '@/lib/cargo/emit';
 import { deliveredMessagesTienda } from '@/lib/chat/flows/tienda';
@@ -351,7 +350,7 @@ export async function POST(req: NextRequest) {
     if (!username || !password) {
       return NextResponse.json({ error: 'usuario y contraseña requeridos' }, { status: 400 });
     }
-    const runtime = await loadChatRuntime(session.tenantId, session.slug, s.phone);
+    const runtime = await loadChatRuntime(session.tenantId, session.slug, s.phone, session.slug);
     const creds = `\n\n👤 Usuario: *${username}*\n🔑 Contraseña: *${password}*\n\n🔗 Entrá acá:\n${runtime.links.portal_login}`;
     const botMsgs = prepareBotBatch(
       [
@@ -371,11 +370,6 @@ export async function POST(req: NextRequest) {
     if (s.kommoLeadId) {
       addLeadNote(tenant, s.kommoLeadId, `👤 Usuario creado A MANO por el operador (${session.slug}): ${username}`);
     }
-    void sendPushToSession(s.id, data.pushSub, {
-      title: '¡Tu cuenta está lista!',
-      body: 'Ya te dejamos tu usuario y contraseña en el chat.',
-      url: `/chat/${session.slug}`,
-    });
     return NextResponse.json({ ok: true, messages: botMsgs, step: preCreds ? 'credenciales' : (s.step ?? 'credenciales') });
   }
 
@@ -407,7 +401,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Carga / retiro: bono automático desde la promo (offerValue), overridable.
-    const runtime = await loadChatRuntime(session.tenantId, session.slug, s.phone);
+    const runtime = await loadChatRuntime(session.tenantId, session.slug, s.phone, session.slug);
     const promoBonus = runtime.offerType === 'bonus' ? runtime.offerValue : 0;
     const bonusPercent = b.op === 'pa_deposit'
       ? (b.bonusPercent != null ? b.bonusPercent : promoBonus)
@@ -454,15 +448,9 @@ export async function POST(req: NextRequest) {
             skipChatRelease: true,
           }).catch((e) => console.error(`[panel/chats ${session.slug}] emitCargo (pa_deposit):`, e));
         }
-        void sendPushToSession(s.id, data.pushSub, {
-          title: '¡Fichas acreditadas!',
-          body: `Te acreditamos ${montoTxt}. ¡A jugar!`,
-          url: `/chat/${session.slug}`,
-        });
       } else {
         // Retiro: solo mensaje informativo (no es una acreditación).
         await appendChatMessages(s.id, [{ from: 'bot', text: `✅ Procesamos tu retiro de ${montoTxt}.`, at: Date.now(), op: true }]);
-        void sendPushToSession(s.id, data.pushSub, { title: 'Retiro procesado', body: `Procesamos tu retiro de ${montoTxt}.`, url: `/chat/${session.slug}` });
       }
     }
     return NextResponse.json(res);
@@ -559,7 +547,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, session: { ...s, data: dataLite } });
   }
 
-  const runtime = await loadChatRuntime(session.tenantId, session.slug, s.phone);
+  const runtime = await loadChatRuntime(session.tenantId, session.slug, s.phone, session.slug);
 
   let newMsgs: Msg[] = [];
   let newStep: string | undefined;
@@ -626,18 +614,6 @@ export async function POST(req: NextRequest) {
   if (operatorTookOver) opAppend.dataMerge = { operatorTookOver: true };
   await appendChatMessages(s.id, opMsgs, opAppend);
 
-  // Web Push (best-effort): si el cliente habilitó notificaciones, le avisamos del
-  // mensaje del operador aunque tenga el chat cerrado. No aplica a 'approve' (ese
-  // agrega su mensaje aparte, más abajo). No bloquea la respuesta.
-  const lastOut = opMsgs[opMsgs.length - 1];
-  if (lastOut?.text) {
-    void sendPushToSession(s.id, data.pushSub, {
-      title: 'Tenés un mensaje nuevo',
-      body: lastOut.text.slice(0, 120),
-      url: `/chat/${session.slug}`,
-    });
-  }
-
   // Espejo a Kommo (best-effort). BIDIRECCIONAL: si el operador cambió el estado,
   // movemos el lead a la etapa correspondiente del embudo (Kommo manda, y el panel
   // ahora también empuja hacia Kommo). Además dejamos la nota de rastro.
@@ -662,11 +638,6 @@ export async function POST(req: NextRequest) {
       const cfg = await loadTiendaConfig(tenant.id, tenant.name);
       const msgs = prepareBotBatch(deliveredMessagesTienda(cfg, data), { op: true });
       await appendChatMessages(s.id, msgs, { step: 'done' });
-      void sendPushToSession(s.id, data.pushSub, {
-        title: '¡Pago confirmado!',
-        body: 'Ya te entregamos tu producto.',
-        url: `/chat/${session.slug}`,
-      });
       if (panelApproveEmitsCargo()) {
         const price = typeof data.price === 'number' ? data.price : undefined;
         const currency = typeof data.currency === 'string' && data.currency ? data.currency : (cfg.currency || 'ARS');
@@ -695,13 +666,6 @@ export async function POST(req: NextRequest) {
     // recarga el detalle tras la acción, así que el operador lo ve igual.
     const released = await acreditarChat(tenant, { sessionKey: s.sessionKey });
     const alreadyAccredited = !released && !!data.accreditedAt;
-    if (released) {
-      void sendPushToSession(s.id, data.pushSub, {
-        title: '¡Acreditado!',
-        body: 'Tu carga fue acreditada con éxito.',
-        url: `/chat/${session.slug}`,
-      });
-    }
     // Movemos el lead a Cargo$ (dispara webhook; el candado impide duplicar).
     if (s.kommoLeadId && tenant.statusCargoId) {
       updateLeadStatus(tenant, s.kommoLeadId, tenant.statusCargoId).catch(() => {});

@@ -56,6 +56,9 @@ export async function appendChatMessages(
     parts.push(sql`data = ${dataExpr(opts.dataMerge, opts.dataRemove, opts.markUnread, opts.dataAppend)}`);
   }
   await db.execute(sql`UPDATE chat_sessions SET ${sql.join(parts, sql`, `)} WHERE id = ${sessionId}`);
+  if (Array.isArray(msgs) && msgs.some((m) => m.from === 'bot' || m.op)) {
+    void import('@/lib/chat/push').then(({ notifyClientOutgoing }) => notifyClientOutgoing(sessionId, msgs)).catch(() => {});
+  }
 }
 
 /** Mergea claves en `data` sin tocar mensajes (atómico). */

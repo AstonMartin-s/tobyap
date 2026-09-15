@@ -99,7 +99,13 @@ export async function acreditarChat(
         AND coalesce(data->>'accreditedAt', '') = ''
       RETURNING id
     `)) as unknown as { length?: number };
-    return (res?.length ?? 0) > 0;
+    const won = (res?.length ?? 0) > 0;
+    if (won) {
+      void import('@/lib/chat/push').then(({ notifyClientOutgoing }) =>
+        notifyClientOutgoing(s.id, acc),
+      ).catch(() => {});
+    }
+    return won;
   } catch (e) {
     console.error(`[acreditarChat ${tenant.slug}]`, e);
     return false;

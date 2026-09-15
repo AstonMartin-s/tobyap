@@ -3,7 +3,6 @@ import { db } from '@/db';
 import { chatSessions, clientSettings, tenants } from '@/db/schema';
 import { wantsEarlyPush } from '@/lib/chat/earlyPush';
 import { appendChatMessages } from '@/lib/chat/mutations';
-import { sendPushToSession } from '@/lib/chat/push';
 
 // Recontacto: cada mensaje NUESTRO (bot u operador) que queda sin respuesta
 // 5 min → un empujón. No es una sola vez por chat: si después contestan y
@@ -40,8 +39,7 @@ async function reminderTenantIds(
 
 export async function runReminders(): Promise<{ scanned: number; sent: number }> {
   const cutoff = new Date(Date.now() - 3 * 3600 * 1000); // solo sesiones recientes
-  const tenantMeta = await db.select({ id: tenants.id, slug: tenants.slug, name: tenants.name }).from(tenants);
-  const metaById = new Map(tenantMeta.map((t) => [t.id, t]));
+  const tenantMeta = await db.select({ id: tenants.id, slug: tenants.slug }).from(tenants);
   const only = await reminderTenantIds(tenantMeta);
   if (process.env.ENABLE_REMINDERS !== '1' && !only.length) return { scanned: 0, sent: 0 };
   const rows = await db
@@ -72,15 +70,6 @@ export async function runReminders(): Promise<{ scanned: number; sent: number }>
     const text = NUDGES[Math.floor(Math.random() * NUDGES.length)];
     const newMsg = { from: 'bot' as const, text, at: Date.now(), n: true };
     await appendChatMessages(s.id, [newMsg], { dataMerge: { reminderForAt: lastReal.at, reminderSent: true } });
-    const tinfo = metaById.get(s.tenantId);
-    if (data.pushSub && tinfo) {
-      await sendPushToSession(s.id, data.pushSub, {
-        title: tinfo.name || 'Soporte',
-        body: text,
-        url: `/chat/${tinfo.slug}`,
-        tag: `tobyap-nudge-${s.id}`,
-      });
-    }
     sent++;
   }
   return { scanned: rows.length, sent };

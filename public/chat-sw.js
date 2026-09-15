@@ -3,8 +3,9 @@
 // referencia chunks de JS con hash; tras un deploy los viejos dan 404 y la app
 // no hidrata (se ve el form pero los botones no responden). Por eso navegación =
 // network-first y cache solo como fallback offline.
-// v4 — Safari/iOS: aviso visual (sin icon/badge) + postMessage si el chat está abierto.
-const CACHE = 'king-chat-v4';
+// v5 — Safari/iOS: aviso visual (sin icon/badge) + postMessage si el chat está abierto.
+// renotify:true para que cada mensaje nuestro vuelva a sonar (tag único por ping).
+const CACHE = 'king-chat-v5';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => {
@@ -77,6 +78,7 @@ self.addEventListener('push', (event) => {
     return self.registration.showNotification(data.title, {
       body: data.body,
       tag: data.tag,
+      renotify: true,
       data: { url: data.url || '/' },
     });
   })());
