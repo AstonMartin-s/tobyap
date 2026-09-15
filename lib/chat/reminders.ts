@@ -12,12 +12,13 @@ type Msg = { from: string; text?: string; image?: string; at: number; n?: boolea
 
 const QUIET_MIN = 5; // minutos de silencio antes del recontacto
 
-// Mensajitos cortos, rotamos uno al azar para que no sea siempre igual.
+// Mensajitos cortos, rotamos uno al azar. Sin montos ni %: la promo ya está
+// en la bienvenida/CBU; Luis (ElGanador) no quiere que el seguimiento la repita.
 const NUDGES = [
-  '¿Seguís por ahí? 👀 Cuando quieras seguimos 🎁',
-  '¿Todo bien? Avisame y terminamos tu bono 🎁',
-  '¡Seguimos cuando puedas! Tu bono sigue reservado 👌',
-  '¿Retomamos? Estás a un paso 🎁',
+  '¿Seguís por ahí? 👀',
+  '¿Todo bien? Cuando quieras seguimos',
+  '¿Seguimos cuando puedas? Acá estamos 👌',
+  '¿Estás por ahí? Cualquier cosa avisame',
 ];
 
 async function reminderTenantIds(): Promise<string[]> {
