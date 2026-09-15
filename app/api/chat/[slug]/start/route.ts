@@ -15,6 +15,8 @@ import { createChatLead, addLeadNote } from '@/lib/chat/kommoMirror';
 import { sendCapiEvent, conversationValue } from '@/lib/meta';
 import { clientIp, rateLimit } from '@/lib/rateLimit';
 import { notifyOperators } from '@/lib/panel/operatorPush';
+import { mergeChatData } from '@/lib/chat/mutations';
+import { normalizePushStatus, pushDataFromStatus } from '@/lib/chat/earlyPush';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +33,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const b = (await req.json().catch(() => ({}))) as Record<string, string>;
   if (!b.phone) return NextResponse.json({ error: 'phone requerido' }, { status: 400 });
+  const pushFields = (() => {
+    const st = normalizePushStatus(b.pushPermission);
+    return st ? pushDataFromStatus(st) : {};
+  })();
 
   const wa = await checkWhatsApp(b.phone);
   if (!wa.ok) {
@@ -86,13 +92,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       const w = buildWelcome(b.name ?? existing.name);
       const welcomeMsgs = prepareBotBatch(w.messages);
       const history = [...(existing.messages ?? []), ...welcomeMsgs];
-      const nextData = { ...((existing.data as Record<string, unknown> | null) ?? {}), ...w.data, unread: true };
+      const nextData = { ...((existing.data as Record<string, unknown> | null) ?? {}), ...w.data, unread: true, ...pushFields };
       await db.update(chatSessions).set({ step: w.step, data: nextData, messages: history, updatedAt: new Date() }).where(eq(chatSessions.id, existing.id));
       await notifyOperators(tenant, 'new_chat', { sessionKey: existing.sessionKey, name: b.name ?? existing.name });
       return NextResponse.json({ ok: true, resumed: true, sessionKey: existing.sessionKey, messages: history, buttons: w.buttons, step: w.step, total: history.length, leadId: existing.kommoLeadId ?? null, ...supportClientFlags(nextData, w.step) });
     }
     // Sesión activa: la reanudamos tal cual (historial + estado actuales).
     if (b.name && !existing.name) await db.update(chatSessions).set({ name: b.name, updatedAt: new Date() }).where(eq(chatSessions.id, existing.id));
+    if (Object.keys(pushFields).length) await mergeChatData(existing.id, pushFields);
     const step = existing.step ?? 'welcome';
     const buttons = buttonsForStep(step, existing.data as Record<string, unknown> | null);
     const msgs = existing.messages ?? [];
@@ -120,7 +127,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     ccpp: b.ccpp ?? null,
     step: w.step,
     kommoLeadId: leadId,
-    data: { ...w.data, unread: true },
+    data: { ...w.data, unread: true, ...pushFields },
     messages: welcomeMsgs,
     updatedAt: new Date(),
   });

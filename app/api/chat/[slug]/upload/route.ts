@@ -14,6 +14,7 @@ import { notifyOperators } from '@/lib/panel/operatorPush';
 import { saveComprobante, isDangerousUploadMime } from '@/lib/storage';
 import { signFilePath } from '@/lib/chat/fileToken';
 import { normalizeUploadImage } from '@/lib/chat/image';
+import { isPushGranted } from '@/lib/chat/earlyPush';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,6 +98,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const data0 = (s.data as Record<string, unknown> | null) ?? {};
   const firstComprobante = data0.comprobanteSentOnce !== true;
   const appActivated = data0.appInstall === true || data0.appNotif === true;
+  const pushOn = isPushGranted(data0);
   const alreadyAccredited = s.step === 'done' || !!data0.accreditedAt;
 
   let step: string;
@@ -110,8 +112,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     step = 'validando';
     botMsgs = prepareBotBatch(comprobanteReviewTienda());
   } else if (firstComprobante) {
-    step = 'app_onboarding'; // primero instala app + notificaciones, luego entra a revisión
-    botMsgs = prepareBotBatch(onComprobante(runtime));
+    step = 'app_onboarding'; // primero instala app (+ notifs si todavía no las aceptó)
+    botMsgs = prepareBotBatch(onComprobante(runtime, { skipNotif: pushOn }));
   } else {
     step = 'validando';
     botMsgs = prepareBotBatch(comprobanteReviewMessages(runtime));

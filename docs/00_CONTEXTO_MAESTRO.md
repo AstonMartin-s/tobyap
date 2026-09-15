@@ -6,6 +6,20 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-14 — modal de monto Cargo tapado en mobile/PWA
+
+- Luis (ElGanador): no veía el bloque para poner el valor al marcar Cargo. No es de ElGanador: el overlay del chat en celular/PWA quedó en z-index 90 y el modal del monto en 70.
+- Fix: modales del panel (Cargo, borrar, export, guía iOS) a z-index 220, fuera del grid. King/bblack/desktop no se veían afectados porque el chat no va fullscreen.
+
+## Bitácora 2026-09-14 — push cliente desde el formulario (piloto)
+
+- Pedido Luis (ElGanador): activar avisos en el form de entrada para que al cliente le llegue el ping con el chat cerrado, como al operador.
+- **Sí se puede** en Android/Chrome y desktop (gesto = Comenzar, integrado a los 2 ticks). iPhone Safari in-tab **no** (Apple): hace falta PWA.
+- Piloto copy en el form: `elganador`, `goldenc`, `luck`, `piliking`, `kingplay` (KingCBA). El diálogo del navegador sale al tocar Comenzar. Se guarda `data.pushStatus` (granted/denied/dismissed/ios_pwa).
+- Si **aceptó**: en el comprobante no se pide de nuevo el Paso 2; queda solo instalar la app. Si **no aceptó**: Paso 2 vuelve a aparecer.
+- Panel: chips **Avisos / Sin avisos**, KPI y badge en la lista.
+- Overlap Claude: `ChatWidget.tsx`, `ChatsClient.tsx`, `flow.ts`.
+
 ## Bitácora 2026-09-14 — PWA celular: chat en negro al abrir desde el acceso directo
 
 - En el iPhone, al abrir el panel desde el ícono de inicio y tocar un chat, la vista quedaba negra (spinner iOS). Causa: `background-attachment:fixed` + layout `100dvh`/grid con `display:none` en standalone.

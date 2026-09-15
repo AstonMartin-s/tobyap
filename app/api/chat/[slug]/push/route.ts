@@ -5,6 +5,7 @@ import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { mergeChatData } from '@/lib/chat/mutations';
 import { pushEnabled, vapidPublicKey } from '@/lib/chat/push';
+import { normalizePushStatus, pushDataFromStatus } from '@/lib/chat/earlyPush';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,16 +21,17 @@ export async function GET() {
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const tenant = await getTenantBySlug(params.slug);
   if (!tenant) return NextResponse.json({ error: 'tenant desconocido' }, { status: 404 });
-  if (!pushEnabled()) return NextResponse.json({ ok: false, disabled: true });
 
   const body = (await req.json().catch(() => null)) as {
     sessionKey?: string;
     subscription?: { endpoint?: string };
+    permission?: string;
   } | null;
   const sessionKey = body?.sessionKey;
   const subscription = body?.subscription;
-  if (!sessionKey || !subscription?.endpoint) {
-    return NextResponse.json({ error: 'sessionKey y subscription requeridos' }, { status: 400 });
+  const status = normalizePushStatus(body?.permission);
+  if (!sessionKey || (!subscription?.endpoint && !status)) {
+    return NextResponse.json({ error: 'sessionKey y subscription o permission requeridos' }, { status: 400 });
   }
 
   const [s] = await db
@@ -38,6 +40,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     .where(and(eq(chatSessions.tenantId, tenant.id), eq(chatSessions.sessionKey, sessionKey)));
   if (!s) return NextResponse.json({ error: 'sesión desconocida' }, { status: 404 });
 
-  await mergeChatData(s.id, { pushSub: subscription, pushAt: Date.now() });
+  if (subscription?.endpoint) {
+    if (!pushEnabled()) return NextResponse.json({ ok: false, disabled: true });
+    await mergeChatData(s.id, { pushSub: subscription, pushAt: Date.now(), ...pushDataFromStatus('granted') });
+  } else if (status) {
+    await mergeChatData(s.id, pushDataFromStatus(status));
+  }
   return NextResponse.json({ ok: true });
 }

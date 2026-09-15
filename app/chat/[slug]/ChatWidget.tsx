@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { wantsEarlyPush, type PushStatus } from '@/lib/chat/earlyPush';
 import { welcomeButtonsFor } from '@/lib/chat/welcomeButtons';
 
 type Msg = { from: 'bot' | 'user'; text?: string; image?: string; mime?: string; name?: string; copy?: string; wa?: string; delayMs?: number };
@@ -43,6 +44,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   const [ackAuto, setAckAuto] = useState(false); // cartel "atención automática + hay gente detrás"
   const [formErr, setFormErr] = useState('');
   const [starting, setStarting] = useState(false);
+  const [iosNeedsPwa, setIosNeedsPwa] = useState(false);
 
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [buttons, setButtons] = useState<Btn[]>([]);
@@ -90,6 +92,14 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
       })
       .catch(() => {});
   }, [slug]);
+
+  // iOS Safari in-tab no puede Web Push (Apple): hay que agregar a inicio.
+  useEffect(() => {
+    const ios = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const standalone = typeof window !== 'undefined'
+      && (window.matchMedia?.('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true);
+    setIosNeedsPwa(ios && !standalone);
+  }, []);
 
   // PWA: registrar el service worker + capturar el instalador nativo (Android/Chrome).
   useEffect(() => {
@@ -287,10 +297,20 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     if (!accept) return setFormErr('Necesitás confirmar que es tu número.');
     setStarting(true);
     try {
-      if (!(isIos() && !isStandalone()) && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      const skipIosSafari = isIos() && !isStandalone();
+      if (!skipIosSafari && typeof Notification !== 'undefined' && Notification.permission === 'default') {
         await Notification.requestPermission().catch(() => 'denied');
       }
-      const r = await fetch(`/api/chat/${slug}/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, name, token, campaign, ccpp }) });
+      const pushPermission: PushStatus = skipIosSafari
+        ? 'ios_pwa'
+        : typeof Notification === 'undefined'
+          ? 'unsupported'
+          : Notification.permission === 'granted'
+            ? 'granted'
+            : Notification.permission === 'denied'
+              ? 'denied'
+              : 'dismissed';
+      const r = await fetch(`/api/chat/${slug}/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, name, token, campaign, ccpp, pushPermission }) });
       const d = await r.json();
       if (!r.ok || !d.ok) { setStarting(false); return setFormErr(d.error || 'No pudimos iniciar. Probá de nuevo.'); }
       setSessionKey(d.sessionKey);
@@ -313,9 +333,9 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
       } else {
         play(d.messages ?? [], d.buttons ?? []);
       }
-      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      if (pushPermission === 'granted') {
         setAppNotif(true);
-        void subscribeWebPush(d.sessionKey);
+        await subscribeWebPush(d.sessionKey);
       }
     } catch {
       setStarting(false);
@@ -443,15 +463,29 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     }
   }
 
+  async function persistPushPermission(key: string, status: PushStatus) {
+    if (!key) return;
+    try {
+      await fetch(`/api/chat/${slug}/push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionKey: key, permission: status }),
+      });
+    } catch { /* best-effort */ }
+  }
+
   async function enableNotifs() {
     if (isIos() && !isStandalone()) {
       setMsgs((p) => [...p, { from: 'bot', text: 'En iPhone las notificaciones se activan al *abrir la app instalada*. Con el Paso 1 ya queda listo, ahí adentro te llegan tus avisos.' }]);
-      setAppNotif(true);
+      void persistPushPermission(sessionKey, 'ios_pwa');
+      // En el piloto no fingimos el permiso: el Paso 2 queda hasta que instalen o salteen.
+      if (!wantsEarlyPush(slug)) setAppNotif(true);
       return;
     }
     if (!('Notification' in window)) {
       setMsgs((p) => [...p, { from: 'bot', text: 'Igual te avisamos por acá' }]);
       setAppNotif(true);
+      void persistPushPermission(sessionKey, 'unsupported');
       return;
     }
     try {
@@ -463,6 +497,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         setMsgs((x) => [...x, { from: 'bot', text: 'Notificaciones activadas.' }]);
       } else {
         // No concedido: no marcamos el paso, lo tiene que aceptar.
+        void persistPushPermission(sessionKey, p === 'denied' ? 'denied' : 'dismissed');
         setMsgs((x) => [...x, { from: 'bot', text: '⚠️ Tenés que *permitir* las notificaciones para poder enviar tu imagen. Tocá de nuevo el Paso 2 y elegí *Permitir*.' }]);
       }
     } catch {
@@ -691,9 +726,11 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
             ) : (
               <button onClick={installApp} style={{ background: '#fff', color: C.send, border: `1px solid ${C.send}`, borderRadius: 12, padding: '11px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer', minWidth: 230, textAlign: 'center' }}>Paso 1: Instalar app</button>
             )}
-            <button onClick={enableNotifs} disabled={appNotif} style={{ background: appNotif ? '#EAF7EF' : '#fff', color: C.send, border: `1px solid ${C.send}`, borderRadius: 12, padding: '11px 18px', fontSize: 14, fontWeight: 600, cursor: appNotif ? 'default' : 'pointer', minWidth: 230, textAlign: 'center', opacity: appNotif ? 0.85 : 1 }}>{appNotif ? 'Notificaciones activas' : 'Paso 2: Activar notificaciones'}</button>
+            {!appNotif && (
+              <button onClick={enableNotifs} style={{ background: '#fff', color: C.send, border: `1px solid ${C.send}`, borderRadius: 12, padding: '11px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer', minWidth: 230, textAlign: 'center' }}>Paso 2: Activar notificaciones</button>
+            )}
             {(() => {
-              const done = appInstall && appNotif;
+              const done = appNotif ? appInstall : (appInstall && appNotif);
               const canSend = done || canSkip15;
               return (
                 <>
@@ -752,6 +789,13 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
                 <input type="checkbox" checked={ackAuto} onChange={(e) => setAckAuto(e.target.checked)} style={{ marginTop: 2 }} />
                 <span>Entendido 👍</span>
               </label>
+              {wantsEarlyPush(slug) && (
+                <p style={{ fontSize: 12, lineHeight: 1.4, color: '#1b3a30', margin: '8px 0 0' }}>
+                  {iosNeedsPwa
+                    ? <>En iPhone los avisos con el chat cerrado se activan si agregás la app a inicio: <b>Compartir → Agregar a inicio</b>.</>
+                    : <>Al tocar <b>Comenzar</b> el navegador te pide permitir avisos. Así te llega un ping aunque cierres el chat.</>}
+                </p>
+              )}
             </div>
             <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, color: '#111827', margin: '6px 0 14px', cursor: 'pointer' }}>
               <input type="checkbox" checked={accept} onChange={(e) => setAccept(e.target.checked)} style={{ marginTop: 2 }} />

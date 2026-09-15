@@ -35,7 +35,8 @@ if (process.env.DISABLE_RETRY_SCHEDULER !== '1') {
 }
 
 // Recontacto a los 5 min de silencio. Global: ENABLE_REMINDERS=1. Por tenant:
-// chat_config.reminders=true (ElGanador). King/bblack no se tocan.
+// chat_config.reminders=true (ElGanador) o piloto early-push (formulario).
+// King/bblack no se tocan.
 if (process.env.DISABLE_REMINDERS !== '1') {
   const tick = async () => {
     try {

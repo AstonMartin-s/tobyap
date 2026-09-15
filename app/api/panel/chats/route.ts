@@ -62,6 +62,12 @@ export async function GET(req: NextRequest) {
   } else if (view === 'precaucion') {
     where = and(base, sql`(${chatSessions.data} ->> 'precaucion') = 'true'`)!;
     limit = 500;
+  } else if (view === 'push_on') {
+    where = and(base, sql`(${chatSessions.data} ->> 'pushStatus') = 'granted'`)!;
+    limit = 500;
+  } else if (view === 'push_off') {
+    where = and(base, sql`coalesce(${chatSessions.data} ->> 'pushStatus', '') <> 'granted'`)!;
+    limit = 500;
   }
 
   // Columnas de la lista: NO traemos el `data` completo (guarda el comprobante en
@@ -127,6 +133,7 @@ export async function GET(req: NextRequest) {
       campaign: chatSessions.campaign,
       estafa: sql<boolean>`(${chatSessions.data} ->> 'estafa') = 'true'`,
       precaucion: sql<boolean>`(${chatSessions.data} ->> 'precaucion') = 'true'`,
+      pushOn: sql<boolean>`(${chatSessions.data} ->> 'pushStatus') = 'granted'`,
     })
     .from(chatSessions)
     .where(eq(chatSessions.tenantId, session.tenantId));
@@ -163,6 +170,7 @@ export async function GET(req: NextRequest) {
         ? sdata.unreadCount
         : (sdata.unread === true ? 1 : 0),
       blocked: sdata.blocked === true,
+      pushOn: sdata.pushStatus === 'granted' || !!sdata.pushSub,
       step: s.step,
       kommoLeadId: s.kommoLeadId,
       campaign: s.campaign,

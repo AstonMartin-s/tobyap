@@ -28,6 +28,7 @@ type Item = {
   unread: boolean;
   unreadCount?: number;
   blocked: boolean;
+  pushOn?: boolean;
   step: string | null;
   kommoLeadId: number | null;
   campaign: string | null;
@@ -177,7 +178,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [detail, setDetail] = useState<{ messages: Msg[]; phone: string | null; name: string | null; username: string | null; step: string | null; kommoLeadId: number | null; data: Record<string, unknown> } | null>(null);
   const [busy, setBusy] = useState(false);
   const [custom, setCustom] = useState('');
-  type ChatFilter = 'inbox' | 'revisar' | 'no_leidos' | 'activos' | 'acreditados' | 'no_cargo' | 'archivadas' | 'estafa' | 'precaucion';
+  type ChatFilter = 'inbox' | 'revisar' | 'no_leidos' | 'activos' | 'acreditados' | 'no_cargo' | 'archivadas' | 'estafa' | 'precaucion' | 'avisos' | 'sin_avisos';
   const [filter, setFilter] = useState<ChatFilter>('inbox');
   const [q, setQ] = useState('');
   const [kpiRange, setKpiRange] = useState<'hoy' | 'ayer' | 'siempre'>('hoy');
@@ -194,7 +195,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const skipNameSave = useRef(false);
-  const [stats, setStats] = useState<Array<{ step: string | null; createdAt: string | null; estafa?: boolean; precaucion?: boolean }>>([]);
+  const [stats, setStats] = useState<Array<{ step: string | null; createdAt: string | null; estafa?: boolean; precaucion?: boolean; pushOn?: boolean }>>([]);
   const [tenantProvider, setTenantProvider] = useState<string>('pagoda');
   const [fichasEnabled, setFichasEnabled] = useState<boolean>(true);
   const [opsOpen, setOpsOpen] = useState(false);
@@ -496,11 +497,12 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     }
     prevInbound.current = inboundNow;
     setItems(its);
-    setStats((r.stats ?? []).map((s: { step: string | null; createdAt: string | null; estafa?: unknown; precaucion?: unknown }) => ({
+    setStats((r.stats ?? []).map((s: { step: string | null; createdAt: string | null; estafa?: unknown; precaucion?: unknown; pushOn?: unknown }) => ({
       step: s.step,
       createdAt: s.createdAt,
       estafa: s.estafa === true || s.estafa === 't' || s.estafa === 'true',
       precaucion: s.precaucion === true || s.precaucion === 't' || s.precaucion === 'true',
+      pushOn: s.pushOn === true || s.pushOn === 't' || s.pushOn === 'true',
     })));
     if (r.tenantProvider) setTenantProvider(r.tenantProvider);
     if (typeof r.fichasEnabled === 'boolean') setFichasEnabled(r.fichasEnabled);
@@ -509,7 +511,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   // Pestañas terminales (Acreditados / No cargó / Archivadas): son estados viejos
   // que quedan fuera de las 200 recientes, así que se piden aparte al server.
   const [termItems, setTermItems] = useState<Item[]>([]);
-  const termView = filter === 'acreditados' ? 'done' : filter === 'no_cargo' ? 'no_cargo' : filter === 'archivadas' ? 'archived' : filter === 'estafa' ? 'estafa' : filter === 'precaucion' ? 'precaucion' : '';
+  const termView = filter === 'acreditados' ? 'done' : filter === 'no_cargo' ? 'no_cargo' : filter === 'archivadas' ? 'archived' : filter === 'estafa' ? 'estafa' : filter === 'precaucion' ? 'precaucion' : filter === 'avisos' ? 'push_on' : filter === 'sin_avisos' ? 'push_off' : '';
   const loadTerm = useCallback(async (view: string) => {
     if (!view) return;
     const r = await fetch(`/api/panel/chats?view=${view}`).then((x) => x.json()).catch(() => null);
@@ -876,6 +878,8 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     if (filter === 'no_cargo') return i.step === 'no_cargo';
     if (filter === 'estafa') return i.estafa;
     if (filter === 'precaucion') return i.precaucion;
+    if (filter === 'avisos') return i.pushOn === true;
+    if (filter === 'sin_avisos') return i.pushOn !== true;
     // Revisar / No leídos: incluyen archivados auto (comprobante o mensaje pendiente).
     if (filter === 'revisar') return needsReview(i);
     if (filter === 'no_leidos') return noLeido(i);
@@ -899,6 +903,8 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     no_cargo: stats.filter((s) => s.step === 'no_cargo').length,
     estafa: stats.filter((s) => s.estafa).length,
     precaucion: stats.filter((s) => s.precaucion).length,
+    avisos: stats.filter((s) => s.pushOn).length,
+    sin_avisos: stats.filter((s) => !s.pushOn).length,
     archivadas: items.filter((i) => i.archived).length,
   };
   const selectedItem = sel
@@ -925,6 +931,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     acreditados: doneRange,
     conv: rangeStats.length ? Math.round((100 * doneRange) / rangeStats.length) : 0,
     sinLeer: items.filter((i) => isOpen(i) && i.unread).length,
+    avisos: rangeStats.filter((i) => i.pushOn).length,
   };
   // Botón de acción plano (sin brillo violeta). filled = sólido de color.
   const abtn = (color?: string, filled?: boolean): React.CSSProperties => ({
@@ -1040,6 +1047,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
           <KPI label="Esperando pago" value={kpis.esperando} color="var(--blue)" />
           <KPI label="Revisar imagen" value={kpis.revisar} color="var(--warn)" />
           <KPI label="Sin leer" value={kpis.sinLeer} color={kpis.sinLeer ? 'var(--success)' : undefined} />
+          <KPI label={`Avisos ${rangeText}`} value={kpis.avisos} color="var(--success)" />
         </div>
       </div>
     )}
@@ -1062,6 +1070,8 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
               { f: 'no_cargo', label: 'No cargó', n: counts.no_cargo, c: '#ef4444' },
               { f: 'estafa', label: 'Estafa', n: counts.estafa, c: '#8b93a9' },
               { f: 'precaucion', label: 'Precaución', n: counts.precaucion, c: '#8b93a9' },
+              { f: 'avisos', label: 'Avisos', n: counts.avisos, c: '#22c55e' },
+              { f: 'sin_avisos', label: 'Sin avisos', n: counts.sin_avisos, c: '#8b93a9' },
               { f: 'archivadas', label: 'Archivadas', n: counts.archivadas, c: '#8b93a9' },
             ] as Array<{ f: ChatFilter; label: string; n: number | null; c: string }>
           ).map(({ f, label, n, c }) => {
@@ -1115,6 +1125,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                   {i.estafa && <span title="Marcado como estafa" style={{ fontSize: '.68rem', fontWeight: 800, color: '#fff', background: '#e11d48', padding: '.12rem .45rem', borderRadius: 5, display: 'inline-flex', alignItems: 'center', gap: '.25rem', letterSpacing: '.02em' }}>{ICONS.estafa} Estafa</span>}
                   {i.precaucion && <span title="Marcado como precaución" style={{ fontSize: '.68rem', fontWeight: 800, color: '#111', background: '#f59e0b', padding: '.12rem .45rem', borderRadius: 5, display: 'inline-flex', alignItems: 'center', gap: '.25rem', letterSpacing: '.02em' }}>{ICONS.precaucion} Precaución</span>}
                   {i.blocked && <span title="Bloqueado" style={{ fontSize: '.6rem', fontWeight: 700, color: '#fff', background: '#b91c1c', padding: '.05rem .4rem', borderRadius: 5, display: 'inline-flex', alignItems: 'center', gap: '.2rem' }}>{ICONS.block} Bloqueado</span>}
+                  {i.pushOn && <span title="Notificaciones activas" style={{ fontSize: '.6rem', fontWeight: 700, color: '#fff', background: '#0ea5e9', padding: '.05rem .4rem', borderRadius: 5 }}>Avisos</span>}
                   {i.campaign && <span style={{ fontSize: '.62rem', color: 'var(--muted-2,#5d6478)' }}>{i.campaign}</span>}
                 </div>
                 <div style={{ fontSize: '.72rem', color: i.unread ? 'var(--text)' : 'var(--muted,#8b93a9)', fontWeight: i.unread ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -1569,9 +1580,10 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
           </>
         )}
       </div>
+    </div>
 
       {opPushIosGuide && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 75, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
           onClick={() => setOpPushIosGuide(false)}>
           <div className="card" style={{ width: 'min(420px, 100%)', padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '.7rem' }}
             onClick={(e) => e.stopPropagation()}>
@@ -1592,9 +1604,9 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
       )}
 
       {cargoOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
           onClick={() => !busy && setCargoOpen(false)}>
-          <div className="card" style={{ width: 'min(400px, 100%)', padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '.7rem' }}
+          <div className="card" style={{ width: 'min(400px, 100%)', padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '.7rem', maxHeight: 'min(90dvh, 560px)', overflowY: 'auto' }}
             onClick={(e) => e.stopPropagation()}>
             <div style={{ fontWeight: 800, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '.45rem' }}>{ICONS.approve} Acreditar Cargo</div>
             <p style={{ fontSize: '.8rem', color: 'var(--muted)', margin: 0, lineHeight: 1.45 }}>
@@ -1626,7 +1638,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
       )}
 
       {deleteOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
           onClick={() => !busy && setDeleteOpen(false)}>
           <div className="card" style={{ width: 'min(440px, 100%)', padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '.75rem' }}
             onClick={(e) => e.stopPropagation()}>
@@ -1654,7 +1666,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
       )}
 
       {exportOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
           onClick={() => !exportBusy && setExportOpen(false)}>
           <div className="card" style={{ width: 'min(420px, 100%)', padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '.75rem' }}
             onClick={(e) => e.stopPropagation()}>
@@ -1701,7 +1713,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
         <div
           role="status"
           onClick={() => setOpPushBanner(null)}
-          style={{ position: 'fixed', top: 12, left: 12, right: 12, zIndex: 80, background: '#111827', color: '#fff', padding: '12px 14px', borderRadius: 12, boxShadow: '0 8px 28px #0007', cursor: 'pointer' }}>
+          style={{ position: 'fixed', top: 12, left: 12, right: 12, zIndex: 230, background: '#111827', color: '#fff', padding: '12px 14px', borderRadius: 12, boxShadow: '0 8px 28px #0007', cursor: 'pointer' }}>
           <div style={{ fontWeight: 800, fontSize: '.9rem' }}>{opPushBanner.title}</div>
           {opPushBanner.body ? (
             <div style={{ fontSize: '.82rem', opacity: 0.92, marginTop: 4, lineHeight: 1.35 }}>{opPushBanner.body}</div>
@@ -1709,9 +1721,8 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
         </div>
       )}
       {toast && (
-        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#111827', color: '#fff', padding: '.6rem 1rem', borderRadius: 10, fontSize: '.85rem', zIndex: 50 }}>{toast}</div>
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#111827', color: '#fff', padding: '.6rem 1rem', borderRadius: 10, fontSize: '.85rem', zIndex: 230 }}>{toast}</div>
       )}
-    </div>
     </>
   );
 }

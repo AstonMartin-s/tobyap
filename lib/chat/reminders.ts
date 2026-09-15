@@ -1,7 +1,9 @@
 import { and, gt, inArray, notInArray } from 'drizzle-orm';
 import { db } from '@/db';
-import { chatSessions, clientSettings } from '@/db/schema';
+import { chatSessions, clientSettings, tenants } from '@/db/schema';
+import { wantsEarlyPush } from '@/lib/chat/earlyPush';
 import { appendChatMessages } from '@/lib/chat/mutations';
+import { sendPushToSession } from '@/lib/chat/push';
 
 // Recontacto: cada mensaje NUESTRO (bot u operador) que queda sin respuesta
 // 5 min → un empujón. No es una sola vez por chat: si después contestan y
@@ -21,19 +23,26 @@ const NUDGES = [
   '¿Estás por ahí? Cualquier cosa avisame',
 ];
 
-async function reminderTenantIds(): Promise<string[]> {
-  // ENABLE_REMINDERS=1 → todos. Si no, solo tenants con chat_config.reminders=true
-  // (ElGanador lo pide; King/bblack no — les molestaba la repesca global).
+async function reminderTenantIds(
+  tenantMeta: Array<{ id: string; slug: string }>,
+): Promise<string[]> {
+  // ENABLE_REMINDERS=1 → todos. Si no: chat_config.reminders=true (ElGanador) +
+  // el piloto de push en el formulario (goldenc/luck/piliking/kingplay).
+  // King/bblack no — les molestaba la repesca global.
   if (process.env.ENABLE_REMINDERS === '1') return [];
   const settings = await db.select({ tenantId: clientSettings.tenantId, chatConfig: clientSettings.chatConfig }).from(clientSettings);
-  return settings
+  const flagged = settings
     .filter((s) => (s.chatConfig as Record<string, unknown> | null)?.reminders === true)
     .map((s) => s.tenantId);
+  const early = tenantMeta.filter((t) => wantsEarlyPush(t.slug)).map((t) => t.id);
+  return [...new Set([...flagged, ...early])];
 }
 
 export async function runReminders(): Promise<{ scanned: number; sent: number }> {
   const cutoff = new Date(Date.now() - 3 * 3600 * 1000); // solo sesiones recientes
-  const only = await reminderTenantIds();
+  const tenantMeta = await db.select({ id: tenants.id, slug: tenants.slug, name: tenants.name }).from(tenants);
+  const metaById = new Map(tenantMeta.map((t) => [t.id, t]));
+  const only = await reminderTenantIds(tenantMeta);
   if (process.env.ENABLE_REMINDERS !== '1' && !only.length) return { scanned: 0, sent: 0 };
   const rows = await db
     .select()
@@ -63,6 +72,15 @@ export async function runReminders(): Promise<{ scanned: number; sent: number }>
     const text = NUDGES[Math.floor(Math.random() * NUDGES.length)];
     const newMsg = { from: 'bot' as const, text, at: Date.now(), n: true };
     await appendChatMessages(s.id, [newMsg], { dataMerge: { reminderForAt: lastReal.at, reminderSent: true } });
+    const tinfo = metaById.get(s.tenantId);
+    if (data.pushSub && tinfo) {
+      await sendPushToSession(s.id, data.pushSub, {
+        title: tinfo.name || 'Soporte',
+        body: text,
+        url: `/chat/${tinfo.slug}`,
+        tag: `tobyap-nudge-${s.id}`,
+      });
+    }
     sent++;
   }
   return { scanned: rows.length, sent };
