@@ -284,7 +284,8 @@ async function accountStepManual(
   const keepUser = typeof prev.suggestedUsername === 'string' ? prev.suggestedUsername.trim() : '';
   const keepPass = typeof prev.suggestedPassword === 'string' ? prev.suggestedPassword : '';
   const suggestedUsername = keepUser || buildManualUsername(session.name, session.phone);
-  const suggestedPassword = keepPass || randomPlayerPassword();
+  const fixedPass = cfg.fixedSuggestedPassword?.trim() || '';
+  const suggestedPassword = fixedPass || keepPass || randomPlayerPassword();
   const cajero = await assignCajeroData(tenant.id);
   return {
     messages: [

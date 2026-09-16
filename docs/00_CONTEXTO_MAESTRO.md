@@ -6,6 +6,12 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-16 — ElGanador: contraseña sugerida fija `123luis`
+
+- Pedido: el alta manual no debe sugerir claves aleatorias (`aaa777`). Siempre `123luis`.
+- Campo `chat_config.fixedSuggestedPassword` + override de tenant `elganador`. Ajustes → Oferta puede cambiarla.
+- Overlap Claude: `flow.ts`, `ChatsClient`/`ManualAccountPanel` (lee `suggestedPassword`), `LivechatClient.tsx`.
+
 ## Bitácora 2026-09-14 — modal de monto Cargo tapado en mobile/PWA
 
 - Luis (ElGanador): no veía el bloque para poner el valor al marcar Cargo. No es de ElGanador: el overlay del chat en celular/PWA quedó en z-index 90 y el modal del monto en 70.

@@ -544,6 +544,10 @@ export async function POST(req: NextRequest) {
     // no desde `data` — así que quitamos el/los base64 pesados del detalle.
     const { comprobante, comprobantes, ...dataLite } = full;
     void comprobante; void comprobantes;
+    const runtime = await loadChatRuntime(session.tenantId, session.slug, s.phone, session.slug);
+    if (runtime.fixedSuggestedPassword) {
+      dataLite.suggestedPassword = runtime.fixedSuggestedPassword;
+    }
     return NextResponse.json({ ok: true, session: { ...s, data: dataLite } });
   }
 

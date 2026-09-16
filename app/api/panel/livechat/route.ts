@@ -85,6 +85,7 @@ export async function PUT(req: NextRequest) {
     waBtnEnabled?: boolean;
     waBtnUrl?: string;
     gate?: { title?: string; note?: string; confirm?: string };
+    fixedSuggestedPassword?: string;
   };
 
   // Normaliza el dominio del landing del cliente a un origin https limpio (sin
@@ -126,6 +127,9 @@ export async function PUT(req: NextRequest) {
     waBtnEnabled: typeof body.waBtnEnabled === 'boolean' ? body.waBtnEnabled : prev.waBtnEnabled ?? true,
     waBtnUrl: typeof body.waBtnUrl === 'string' ? body.waBtnUrl.trim() : (prev.waBtnUrl ?? ''),
     gate: body.gate && typeof body.gate === 'object' ? parseGateCopy(body.gate) : parseGateCopy(prev.gate),
+    fixedSuggestedPassword: typeof body.fixedSuggestedPassword === 'string'
+      ? body.fixedSuggestedPassword.trim()
+      : prev.fixedSuggestedPassword,
   };
   const [saved] = await db
     .insert(clientSettings)
@@ -133,7 +137,7 @@ export async function PUT(req: NextRequest) {
     .onConflictDoUpdate({ target: clientSettings.tenantId, set: { chatConfig: next, updatedAt: new Date() } })
     .returning();
   const brand = parseChatConfig(saved.chatConfig, session.slug, session.slug);
-  const runtime = parseChatRuntime(saved.chatConfig, brand.brandName);
+  const runtime = applyTenantRuntimeOverrides(parseChatRuntime(saved.chatConfig, brand.brandName), session.slug);
   const savedDomain = (saved.chatConfig as Record<string, unknown> | null)?.landingDomain;
   return NextResponse.json({
     ok: true,

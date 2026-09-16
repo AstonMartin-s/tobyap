@@ -33,6 +33,8 @@ export interface ChatRuntimeConfig {
   panelQuick?: PanelQuickTexts;
   /** ElGanador: en el CBU no repetir el mínimo; solo recordar el bono. */
   cbuOfferOnlyBonus?: boolean;
+  /** Si está, el alta manual siempre sugiere esta clave (sin random tipo aaa777). */
+  fixedSuggestedPassword?: string;
 }
 
 export const DEFAULT_PORTAL_URL = 'https://greenbet.uno/login';
@@ -239,7 +241,14 @@ function parseLinks(raw: unknown, legacyPortal?: unknown, legacySupport?: unknow
 export function applyTenantRuntimeOverrides(cfg: ChatRuntimeConfig, tenantSlug?: string): ChatRuntimeConfig {
   let next = cfg;
   if (tenantSlug === 'king') next = { ...next, postAccreditCajera: false };
-  if (tenantSlug === 'elganador') next = { ...next, cbuOfferOnlyBonus: true };
+  if (tenantSlug === 'elganador') {
+    next = {
+      ...next,
+      cbuOfferOnlyBonus: true,
+      // Si Ajustes no tiene clave fija, ElGanador siempre sugiere 123luis.
+      fixedSuggestedPassword: next.fixedSuggestedPassword || '123luis',
+    };
+  }
   return next;
 }
 
@@ -263,6 +272,9 @@ export function parseChatRuntime(raw: unknown, fallbackBrand = 'King'): ChatRunt
     postAccreditCajera: o.postAccreditCajera !== false,
     templates: parseTemplates(o.templates),
     panelQuick: parsePanelQuick(o.panelQuick),
+    fixedSuggestedPassword: typeof o.fixedSuggestedPassword === 'string' && o.fixedSuggestedPassword.trim()
+      ? o.fixedSuggestedPassword.trim()
+      : undefined,
   };
 }
 

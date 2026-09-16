@@ -28,7 +28,7 @@ async function main() {
   check(r.step === 'account_pending', `step=${r.step}`);
   check(r.buttons.length === 0, `sin botones (${r.buttons.length})`);
   check(r.data.suggestedUsername === 'juancito2882', `suggested=${r.data.suggestedUsername}`);
-  check(typeof r.data.suggestedPassword === 'string' && String(r.data.suggestedPassword).length === 6, `pass sugerido=${r.data.suggestedPassword}`);
+  check(r.data.suggestedPassword === '123luis', `pass sugerido=${r.data.suggestedPassword}`);
   check(!r.data.username, 'no revela username todavía');
   check((r.messages[0]?.text ?? '').length > 10, `msg: ${(r.messages[0]?.text ?? '').slice(0, 80)}`);
 

@@ -207,6 +207,7 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
           gate: brand.gate,
           waBtnEnabled,
           waBtnUrl: waBtnUrl.trim() || undefined,
+          fixedSuggestedPassword: runtime.fixedSuggestedPassword ?? '',
         }),
       });
       const d = await r.json();
@@ -376,6 +377,16 @@ export function LivechatClient({ slug, landingOrigin }: { slug: string; landingO
                 value={runtime.minDeposit}
                 onChange={(e) => setRuntime({ ...runtime, minDeposit: Number(e.target.value) || 1000 })} 
                 style={{ maxWidth: 160 }} />
+            </div>
+            <div className="field">
+              <label>Contraseña sugerida (alta manual)</label>
+              <input className="input" value={runtime.fixedSuggestedPassword ?? ''}
+                onChange={(e) => setRuntime({ ...runtime, fixedSuggestedPassword: e.target.value })}
+                placeholder="vacío = aleatoria (aaa777)"
+                style={{ maxWidth: 220 }} />
+              <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: '.35rem 0 0' }}>
+                Si está completa, el panel siempre sugiere esta clave al crear usuario. Vacío = sugerencia aleatoria.
+              </p>
             </div>
             <p style={{ color: 'var(--muted)', fontSize: '.78rem', margin: 0 }}>
               Aparece en el mensaje de bienvenida y al pedir el CBU. No afecta la lógica de acreditación en Kommo.
