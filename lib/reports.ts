@@ -1,6 +1,6 @@
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { metaEvents, tenants, ledger, influencerSpend } from '@/db/schema';
+import { metaEvents, tenants, ledger, influencerSpend, attributions } from '@/db/schema';
 
 // ---------------------------------------------------------------------------
 // Canal de la campaña. Convención operativa: toda campaña de influencer arranca
@@ -195,6 +195,109 @@ export async function getInfluencerSpend(
     .sort((a, b) => b.amount - a.amount);
   const total = byCampaign.reduce((a, r) => a + r.amount, 0);
   return { total, byCampaign };
+}
+
+// ---------------------------------------------------------------------------
+// Trazabilidad admin — agregaciones extra para el hub por cliente (/admin/trazabilidad).
+// Todo es aditivo y read-only; reutiliza meta_events / ledger / influencer_spend /
+// attributions sin tocar los flujos existentes.
+// ---------------------------------------------------------------------------
+
+/** Serie de gráficos (día asc) a partir de las filas del reporte diario. */
+export function buildSeriesFromDailyRows(rows: DailyRow[]): Array<{ day: string; gasto: number; costPerCarga: number; cargas: number }> {
+  return [...rows]
+    .sort((a, b) => (a.day < b.day ? -1 : 1))
+    .map((r) => ({ day: r.day, gasto: r.gasto, costPerCarga: r.costPerCarga, cargas: r.cargas }));
+}
+
+/**
+ * Gasto total del cliente en un rango. Meta/ingreso salen del ledger (día en AR,
+ * texto YYYY-MM-DD); influencer sale de su caja aparte. Devuelve ambos + total.
+ */
+export interface SpendTotals {
+  meta: number; // Σ gasto ledger en el rango
+  ingreso: number; // Σ ingreso/recarga ledger en el rango
+  influencer: number; // Σ influencer_spend en el rango
+  total: number; // meta + influencer
+}
+
+export async function getSpendTotals(
+  tenantId: string,
+  opts: { start?: string; end?: string } = {},
+): Promise<SpendTotals> {
+  const ledConds = [eq(ledger.tenantId, tenantId)];
+  if (opts.start) ledConds.push(gte(ledger.day, opts.start));
+  if (opts.end) ledConds.push(lte(ledger.day, opts.end));
+  const [led] = await db
+    .select({
+      gasto: sql<number>`coalesce(sum(${ledger.gasto}),0)::float`,
+      ingreso: sql<number>`coalesce(sum(${ledger.ingreso}),0)::float`,
+    })
+    .from(ledger)
+    .where(and(...ledConds));
+
+  const spConds = [eq(influencerSpend.tenantId, tenantId)];
+  if (opts.start) spConds.push(gte(influencerSpend.day, opts.start));
+  if (opts.end) spConds.push(lte(influencerSpend.day, opts.end));
+  const [sp] = await db
+    .select({ amount: sql<number>`coalesce(sum(${influencerSpend.amount}),0)::float` })
+    .from(influencerSpend)
+    .where(and(...spConds));
+
+  const meta = led?.gasto ?? 0;
+  const ingreso = led?.ingreso ?? 0;
+  const influencer = sp?.amount ?? 0;
+  return { meta, ingreso, influencer, total: +(meta + influencer).toFixed(2) };
+}
+
+/**
+ * Desglose de atribución (visitas con token PB*) por campaña/ccpp/bono, con la
+ * tasa de match contra leads. Sirve para ver qué código promocional entra y
+ * cuánto matchea realmente en el CRM.
+ */
+export interface AttributionRow {
+  campaign: string;
+  ccpp: string;
+  bono: string;
+  visitas: number;
+  matcheadas: number;
+  matchRate: number; // % matcheadas / visitas
+}
+
+export async function getAttributionBreakdown(
+  tenantId: string,
+  opts: { start?: string; end?: string } = {},
+): Promise<{ rows: AttributionRow[]; totalVisitas: number; totalMatched: number }> {
+  const conds = [eq(attributions.tenantId, tenantId)];
+  if (opts.start) conds.push(gte(attributions.createdAt, new Date(opts.start)));
+  if (opts.end) conds.push(lte(attributions.createdAt, new Date(opts.end)));
+
+  const raw = await db
+    .select({
+      campaign: attributions.campaignId,
+      ccpp: attributions.ccpp,
+      bono: attributions.bono,
+      visitas: sql<number>`count(*)::int`,
+      matcheadas: sql<number>`count(${attributions.matchedLeadId})::int`,
+    })
+    .from(attributions)
+    .where(and(...conds))
+    .groupBy(attributions.campaignId, attributions.ccpp, attributions.bono);
+
+  const rows: AttributionRow[] = raw
+    .map((r) => ({
+      campaign: r.campaign ?? '(sin campaña)',
+      ccpp: r.ccpp ?? '-',
+      bono: r.bono ?? '-',
+      visitas: r.visitas,
+      matcheadas: r.matcheadas,
+      matchRate: r.visitas ? +(100 * r.matcheadas / r.visitas).toFixed(1) : 0,
+    }))
+    .sort((a, b) => b.visitas - a.visitas);
+
+  const totalVisitas = rows.reduce((a, r) => a + r.visitas, 0);
+  const totalMatched = rows.reduce((a, r) => a + r.matcheadas, 0);
+  return { rows, totalVisitas, totalMatched };
 }
 
 function range(start?: string, end?: string) {

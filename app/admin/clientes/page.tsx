@@ -22,7 +22,7 @@ export default async function ClientesPage() {
         <div className="page-head"><div className="page-head__text"><h1>Clientes</h1><p>Cuentas dadas de alta en el sistema.</p></div></div>
         <div className="card">
           <table className="table">
-            <thead><tr><th>Slug</th><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Suffix</th><th>Activo</th></tr></thead>
+            <thead><tr><th>Slug</th><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Suffix</th><th>Activo</th><th>Trazabilidad</th></tr></thead>
             <tbody>
               {rows.map((t) => (
                 <tr key={t.id}>
@@ -32,6 +32,7 @@ export default async function ClientesPage() {
                   <td>{t.role === 'admin' ? <span className="badge badge--warn">admin</span> : <span className="badge badge--muted">client</span>}</td>
                   <td>{t.eventSuffix ?? '—'}</td>
                   <td>{t.active ? <span className="badge badge--green">activo</span> : <span className="badge badge--muted">—</span>}</td>
+                  <td><Link href={`/admin/trazabilidad?tenant=${t.slug}`} style={{ color: 'var(--accent)' }}>ver →</Link></td>
                 </tr>
               ))}
             </tbody>
