@@ -8,10 +8,12 @@ import {
   getAttributionBreakdown,
   getClientKpis,
   getDailyReport,
+  getFirstDataDay,
   getInfluencerSpend,
   getSpendTotals,
   lastNDaysRangeAR,
 } from '@/lib/reports';
+import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { Nav } from '../../_components/Nav';
 import { DailyReportClient } from '../DailyReportClient';
 import { DailyAdsCharts } from '../../reportes/DailyAdsCharts';
@@ -104,7 +106,7 @@ async function TrazabilidadCliente({
   start: string;
   end: string;
 }) {
-  const [kpis, daily, influSpend, spend, attribution] = await Promise.all([
+  const [kpis, daily, influSpend, spend, attribution, firstDay, runtime] = await Promise.all([
     getClientKpis(tenantId, {
       start: `${start}T00:00:00.000Z`,
       end: `${end}T23:59:59.999Z`,
@@ -116,6 +118,8 @@ async function TrazabilidadCliente({
       start: `${start}T00:00:00.000Z`,
       end: `${end}T23:59:59.999Z`,
     }),
+    getFirstDataDay(tenantId),
+    loadChatRuntime(tenantId, name, null, slug),
   ]);
 
   const tot = daily.reduce(
@@ -126,6 +130,13 @@ async function TrazabilidadCliente({
   const costPerChat = tot.chats ? spend.total / tot.chats : 0;
   const costPerCarga = tot.cargas ? spend.total / tot.cargas : 0;
   const convTot = tot.chats ? +(100 * tot.cargas / tot.chats).toFixed(1) : 0;
+  // Días activos: días del rango con al menos un chat o carga.
+  const diasActivos = daily.filter((r) => r.chats + r.cargas > 0).length;
+  // Oferta actual del cliente (chat_config): bono % o cantidad de fichas + mínimo.
+  const ofertaTxt = runtime.offerType === 'fichas'
+    ? `${runtime.offerValue} fichas`
+    : `${runtime.offerValue}%`;
+  const ofertaHint = `Mínimo ${money(runtime.minDeposit)} · ${runtime.brandName}`;
   const series = buildSeriesFromDailyRows(daily);
   const chartTot = daily.reduce(
     (a, r) => ({ chats: a.chats + r.chats, cargas: a.cargas + r.cargas, gasto: a.gasto + r.gasto, recarga: a.recarga + r.recarga }),
@@ -137,6 +148,9 @@ async function TrazabilidadCliente({
       <div className="page-head" style={{ marginTop: '.4rem' }}>
         <div className="page-head__text">
           <h2 style={{ margin: 0 }}>{name} <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: '.9rem' }}>· {slug} · {start} → {end}</span></h2>
+          <p style={{ margin: '.3rem 0 0' }}>
+            Datos desde <b>{firstDay ?? '—'}</b> · <b>{diasActivos}</b> día{diasActivos === 1 ? '' : 's'} activo{diasActivos === 1 ? '' : 's'} en el período · oferta actual <b>{ofertaTxt}</b>
+          </p>
         </div>
         <div className="page-head__actions">
           <a className="btn btn--ghost btn--sm" href={`/admin/clientes/${slug}`}>Configurar cliente →</a>
@@ -163,7 +177,30 @@ async function TrazabilidadCliente({
         <div className="kpi kpi--purple">
           <div className="kpi__label">Costo por chat</div>
           <div className="kpi__value">{money(costPerChat)}</div>
-          <div className="kpi__hint">Costo/carga {money(costPerCarga)}</div>
+          <div className="kpi__hint">gasto total / chats</div>
+        </div>
+      </div>
+
+      <div className="kpis">
+        <div className="kpi kpi--accent">
+          <div className="kpi__label">Costo por carga</div>
+          <div className="kpi__value">{money(costPerCarga)}</div>
+          <div className="kpi__hint">gasto total / cargas</div>
+        </div>
+        <div className="kpi kpi--green">
+          <div className="kpi__label">Días activos</div>
+          <div className="kpi__value">{fmt(diasActivos)}</div>
+          <div className="kpi__hint">días del período con chats o cargas</div>
+        </div>
+        <div className="kpi kpi--blue">
+          <div className="kpi__label">Inicio de datos</div>
+          <div className="kpi__value" style={{ fontSize: '1.15rem' }}>{firstDay ?? '—'}</div>
+          <div className="kpi__hint">primer evento registrado</div>
+        </div>
+        <div className="kpi kpi--purple">
+          <div className="kpi__label">Oferta actual</div>
+          <div className="kpi__value">{ofertaTxt}</div>
+          <div className="kpi__hint">{ofertaHint}</div>
         </div>
       </div>
 

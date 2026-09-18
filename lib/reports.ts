@@ -300,6 +300,17 @@ export async function getAttributionBreakdown(
   return { rows, totalVisitas, totalMatched };
 }
 
+/** Fecha (día AR) del primer evento del cliente en toda la historia. null = sin datos. */
+export async function getFirstDataDay(tenantId: string): Promise<string | null> {
+  const [row] = await db
+    .select({
+      day: sql<string | null>`to_char(min(${metaEvents.sentAt}) AT TIME ZONE 'America/Argentina/Buenos_Aires', 'YYYY-MM-DD')`,
+    })
+    .from(metaEvents)
+    .where(and(eq(metaEvents.tenantId, tenantId), notTestCampaign()));
+  return row?.day ?? null;
+}
+
 function range(start?: string, end?: string) {
   const conds = [];
   if (start) conds.push(gte(metaEvents.sentAt, new Date(start)));
