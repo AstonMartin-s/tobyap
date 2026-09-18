@@ -348,10 +348,23 @@ async function accountStepKingcash(
 ): Promise<{ messages: BotMsg[]; buttons: Btn[]; data: Record<string, unknown>; step: string }> {
   const password = randomPlayerPassword();
   const maxAttempts = 4;
+  let lastErr = '';
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const username = buildPlayerUsername(session.name, session.phone, attempt);
+    let username = buildPlayerUsername(session.name, session.phone, 0).toLowerCase();
+    if (attempt > 0) {
+      const base = username.replace(/\d+$/, '') || 'user';
+      username = `${base}${Math.floor(Math.random() * 900) + 100}`.slice(0, 18);
+    }
+    if (username.length < 6) {
+      const digits = (session.phone ?? '').replace(/\D/g, '').slice(-6);
+      username = `${username}${digits}`.slice(0, 12);
+    }
     try {
-      await kingcashCreatePlayer(tenant, { login: username, password, name: session.name ?? undefined });
+      await kingcashCreatePlayer(tenant, {
+        login: username,
+        password,
+        name: session.name ?? undefined,
+      });
       const creds = `\n\n👤 Usuario: *${username}*\n🔑 Contraseña: *${password}*\n\n🔗 Entrá acá:\n${cfg.links.portal_login}`;
       const cajero = await assignCajeroData(tenant.id);
       return {
@@ -361,23 +374,23 @@ async function accountStepKingcash(
           { from: 'bot', delayMs: 2400, at: now(), text: renderTemplate('account_agent_followup', cfg) },
         ],
         buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
-        data: { username, password, loginUrl: null, portalName: username, existing: false, ...cajero },
+        data: { username, password, loginUrl: null, portalName: username, existing: false, credsError: false, ...cajero },
         step: 'credenciales',
       };
     } catch (e) {
-      const taken = e instanceof KingcashApiError && /exist|tomad|ya\s|duplicad|taken/i.test(e.message);
-      if (!taken || attempt === maxAttempts - 1) {
-        console.error(`[accountStep kingcash] tenant=${tenant.slug} phone=${session.phone} attempt=${attempt}: ${(e as Error).message}`);
-        return {
-          messages: [{ from: 'bot', delayMs: 1200, at: now(), text: renderTemplate('account_error', cfg) }],
-          buttons: [], data: { credsError: true }, step: 'error',
-        };
-      }
+      lastErr = (e as Error).message;
+      const taken = e instanceof KingcashApiError && /exist|tomad|ya\s|duplicad|taken/i.test(lastErr);
+      const confirmMiss = /no se pudo confirmar/i.test(lastErr);
+      const retryable = taken || confirmMiss || !(e instanceof KingcashApiError);
+      console.error(`[accountStep kingcash] tenant=${tenant.slug} phone=${session.phone} attempt=${attempt}: ${lastErr}`);
+      if (!retryable || attempt === maxAttempts - 1) break;
     }
   }
   return {
     messages: [{ from: 'bot', delayMs: 1200, at: now(), text: renderTemplate('account_error', cfg) }],
-    buttons: [], data: { credsError: true }, step: 'error',
+    buttons: [{ id: 'want_account', label: 'Reintentar crear usuario 🔄' }],
+    data: { credsError: true, credsErrorMsg: lastErr || 'kingcash' },
+    step: 'error',
   };
 }
 

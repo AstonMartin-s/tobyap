@@ -138,16 +138,30 @@ function parseArs(v: unknown): number {
   return Number(String(v).replace(/,/g, '')) || 0;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function asciiName(raw: string | undefined, fallback: string): string {
+  const s = (raw ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\x20-\x7E]/g, '')
+    .trim();
+  return s.slice(0, 40) || fallback;
+}
+
 export async function findPlayer(tenant: ResolvedTenant, login: string): Promise<KingcashPlayer | null> {
   const { json } = await call(tenant, 'users', { extra: { search: login, limit: '50' } });
   const rows = (json?.users as Array<Record<string, unknown>> | undefined) ?? [];
-  const row = rows.find((r) => String(r.login ?? '') === login);
+  const target = login.toLowerCase();
+  const row = rows.find((r) => String(r.login ?? '').toLowerCase() === target);
   if (!row) return null;
   const balances = (row.balances as Record<string, unknown> | undefined) ?? {};
   const wager = (row.wager as Record<string, unknown> | undefined) ?? {};
   return {
     id: Number(row.id),
-    login,
+    login: String(row.login ?? login),
     balance: parseArs(balances.ARS),
     wager: parseArs(wager.ARS),
   };
@@ -161,28 +175,47 @@ export interface KingcashCreateInput {
   balance?: number; // carga inicial opcional (default 0)
 }
 
-// Crea el jugador (group 5) y confirma leyéndolo. La API re-dibuja el form tanto
-// en éxito como en colisión de login, así que la confirmación es por lectura.
+// Crea el jugador (group 5) y confirma leyéndolo. GET del frame primero (igual
+// que balance); el POST va SIN type=frame. Si el POST lleva type=frame, Kingcash
+// a veces no crea y devuelve JSON de otra pantalla.
 export async function createPlayer(tenant: ResolvedTenant, input: KingcashCreateInput): Promise<KingcashPlayer> {
+  const login = input.login.trim();
+  const name = asciiName(input.name, login);
   // Si ya existe un login idéntico, NO lo pisamos (sería cuenta ajena).
-  const pre = await findPlayer(tenant, input.login);
+  const pre = await findPlayer(tenant, login);
   if (pre) throw new KingcashApiError('Username already exists', 409);
 
-  await call(tenant, 'createuser', {
-    extra: { type: 'frame' },
+  // Igual que balance: el GET del frame ARMA el form. Sin él el POST a veces
+  // no crea (devuelve JSON de otra pantalla) y findPlayer queda vacío.
+  await call(tenant, 'createuser', { extra: { type: 'frame' }, method: 'GET' });
+  const { json, text, status } = await call(tenant, 'createuser', {
+    extra: {},
     form: {
       group: '5',
       sended: 'true',
-      name: input.name ?? input.login,
-      login: input.login,
+      name,
+      login,
       password: input.password,
       balance: String(input.balance ?? 0),
     },
   });
+  const apiErr = json && (json.error ?? json.errorMessage ?? json.status);
+  if (json && (json.error || json.status === 'error' || json.status === 'fail')) {
+    throw new KingcashApiError(String(apiErr), status);
+  }
 
-  const created = await findPlayer(tenant, input.login);
-  if (!created) throw new KingcashApiError('no se pudo confirmar el alta del jugador');
-  return created;
+  // El alta a veces tarda en indexarse en `users`: reintentamos la lectura
+  // antes de declarar fallo (PiliKing: "no se pudo confirmar el alta").
+  let created: KingcashPlayer | null = null;
+  for (let i = 0; i < 6; i++) {
+    if (i) await sleep(400);
+    created = await findPlayer(tenant, login);
+    if (created) return created;
+  }
+  console.error(
+    `[kingcash create] slug=${tenant.slug} login=${login} http=${status} json=${JSON.stringify(json)?.slice(0, 240) ?? 'null'} text=${text.slice(0, 180)}`,
+  );
+  throw new KingcashApiError('no se pudo confirmar el alta del jugador');
 }
 
 // ── Carga / retiro de fichas ────────────────────────────────────────────────

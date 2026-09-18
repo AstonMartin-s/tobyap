@@ -6,6 +6,21 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-18 — PiliKing: alta Kingcash a veces no confirmaba
+
+- Síntoma: "Uy, tuve un problemita con tu usuario" (Verónica, Mili). Log: `no se pudo confirmar el alta del jugador` en attempt 0.
+- Causa: POST `createuser` con `type=frame` a veces no crea (Kingcash devuelve JSON de otra pantalla). Sin reintento.
+- Fix: GET frame + POST sin `type=frame` (mismo patrón que balance), poll findPlayer, reintentos, botón Reintentar, aviso al operador.
+- Recuperadas Verónica y Mili en el chat.
+
+## Bitácora 2026-09-17 — mooneyatkinson: dump resolve?phone (handoff, sin freeze)
+
+- Pedido CRM `MSG-CRM-TOB-20260917-1`: snapshot `send_list` + inventario landings + DNS.
+- CSV latest-wins en vault (no git): `boveda/tobyap/real/mooneyatkinson-resolve-phone-2026-09-17T1736.csv` · **25336** teléfonos.
+- **No se corta ni se congela el cliente en TOBYAP.** Landings, `resolve` y mint PB* siguen. Solo se entrega la info para que CRM se independice cuando quiera.
+- Tenant ya tenía `readonly=true` / `allowTags=true` (preexistente; no se tocó).
+- **Landings go1 / reactivacion / primario1: no se apagan.** CRM `MSG-CRM-TOB-20260917-3`: goteo prod ya va a wa.me Dogzee; hook MMM no llama resolve. Ads SP3/SP1/BL1 siguen en fichaslibres (fuera de CRM). Apagar landings recién con REF siguiente.
+
 ## Bitácora 2026-09-16 — ElGanador: contraseña sugerida fija `123luis`
 
 - Pedido: el alta manual no debe sugerir claves aleatorias (`aaa777`). Siempre `123luis`.

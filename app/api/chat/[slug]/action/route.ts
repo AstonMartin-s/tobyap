@@ -145,6 +145,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     if (r.step === 'account_pending' && !existing.manualPending) {
       await notifyOperators(tenant, 'account_pending', { sessionKey: s.sessionKey, name: s.name });
     }
+    if (r.step === 'error' && r.data.credsError) {
+      await notifyOperators(tenant, 'account_pending', { sessionKey: s.sessionKey, name: s.name });
+    }
     // Espejo Kommo — MISMA paridad que el bot de WhatsApp: campos PORTAL_* +
     // título del lead = username creado.
     if (s.kommoLeadId && r.data.username) {
