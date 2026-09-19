@@ -6,6 +6,13 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-19 — luck: Green + alta automática (esquema GoldenC)
+
+- Luck ya tenía provider `king` + `greenvip.net` + `king_source_id` 1051850, pero el chat seguía ElGanador: welcome solo CBU, sin crear usuario, portal viejo `ganamosonline.com`.
+- Ajuste: mismo procedimiento que GoldenC (Green sin Pagoda → `accountStepKingApi`). Welcome pide cuenta; CBU después. Links de portal a `greenvip.net`. Fichas del panel ya estaban on.
+- Código: `welcomeButtons.ts` (Luck sale del atajo CBU). Config: `scripts/setup-luck-green.ts`.
+- Overlap Claude: `welcomeButtons.ts`.
+
 ## Bitácora 2026-09-18 — PiliKing: alta Kingcash a veces no confirmaba
 
 - Síntoma: "Uy, tuve un problemita con tu usuario" (Verónica, Mili). Log: `no se pudo confirmar el alta del jugador` en attempt 0.

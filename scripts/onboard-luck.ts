@@ -1,7 +1,7 @@
-// Alta de `luck` (Luck Casino Virtual) — plataforma Ganamosonline, SIN Kommo.
-// Provider `manual`: el operador crea el usuario real a mano. Welcome sin demo:
-// promo + portal + botón CBU (misma mecánica que ElGanador). Pixel + CAPI token
-// COPIADOS de Marceneitor (king).
+// Alta de `luck` (Luck Casino Virtual) — Green (greenvip.net), SIN Kommo.
+// Provider `king` sin Pagoda: el chat crea el usuario por Green API (mismo
+// esquema que GoldenC). Pixel + CAPI token copiados de Marceneitor (king).
+// Re-correr NO pisa provider/token Green ni el avatar si el JPG no está.
 //
 // Uso:
 //   npx tsx --env-file=.env scripts/onboard-luck.ts
@@ -12,7 +12,7 @@ import { upsertTenant, getTenantBySlug } from '@/lib/tenants';
 const BRAND = 'Luck';
 const SLUG = 'luck';
 const SUFFIX = 'A11';
-const PLAYER_PORTAL = 'https://ganamosonline.com';
+const PLAYER_PORTAL = 'https://greenvip.net';
 const SUPPORT_WA = '5493513717264';
 const CHAT_COLOR = '#008069'; // verde WhatsApp (pedido: el chat imita a WhatsApp)
 const LANDING_COLOR = '#166534'; // verde de marca (logo)
@@ -45,10 +45,10 @@ async function main() {
     metaCapiToken: king.metaCapiToken,
     eventSuffix: SUFFIX,
     readonly: true,
-    provider: 'manual',
+    provider: 'king',
     customFields: {
       feat_embudo: 1,
-      feat_fichas: 0,
+      feat_fichas: 1,
       feat_livechat: 1,
     },
     panelUser: PANEL_USER,
@@ -71,16 +71,17 @@ async function main() {
       primaryColor: CHAT_COLOR,
       ...(avatarUrl ? { avatarUrl, avatarPath: null } : {}),
       waBtnEnabled: true,
-      waBtnUrl: '',
+      waBtnUrl: SUPPORT_LANDING,
       supportUrl: SUPPORT_LANDING,
       landingDomain: '',
-      magicLinks: [],
+      magicLinks: ['portal_play', 'portal_forgot', 'portal_deposit', 'portal_withdraw'],
+      postAccreditCajera: false,
       links: {
         portal_login: PLAYER_PORTAL,
         portal_forgot: PLAYER_PORTAL,
         portal_play: PLAYER_PORTAL,
-        portal_deposit: SUPPORT_LANDING,
-        portal_withdraw: SUPPORT_LANDING,
+        portal_deposit: PLAYER_PORTAL,
+        portal_withdraw: PLAYER_PORTAL,
         support: SUPPORT_LANDING,
       },
       templates: {
@@ -89,8 +90,7 @@ async function main() {
           'Bienvenido a *{brand}*.\n\n' +
           '🎁 *Primeras 3 cargas* con *30% extra*.\n' +
           '💰 Mínimo de carga: *$5.000*\n\n' +
-          `🔗 ${PLAYER_PORTAL}\n\n` +
-          'Cuando quieras cargar, tocá el botón de CBU 👇',
+          'Tocá *Quiero mi cuenta* y te la creo al toque 👇',
       },
     },
     landings: [
