@@ -127,7 +127,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ ok: true, messages: [], buttons: [], step: s.step, total: persisted.length });
   }
 
-  if (b.action === 'want_account' || (b.action === 'want_agent' && tenant.provider === 'manual')) {
+  // Luck: el botón "Hablar con un agente" es decorativo (mostrar que hay humanos
+  // detrás), NO abre flujo paralelo: crea la cuenta y ofrece el CBU igual que
+  // "Quiero mi cuenta". Por eso cae en este path y no en el handoff de abajo.
+  const agentInline = b.action === 'want_agent' && (tenant.provider === 'manual' || tenant.slug === 'luck');
+  if (b.action === 'want_account' || agentInline) {
     const existing = (s.data ?? {}) as Record<string, unknown>;
     const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name, existing }, runtime);
     const botMsgs = prepareBotBatch(r.messages);
