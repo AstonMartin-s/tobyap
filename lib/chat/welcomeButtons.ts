@@ -10,7 +10,7 @@ export const WANT_AGENT_PLAIN_BTN: WelcomeBtn = { id: 'want_agent', label: 'Habl
 export const HAVE_USER_BTN: WelcomeBtn = { id: 'have_user', label: 'Ya tengo usuario' };
 export const WANT_CBU_BTN: WelcomeBtn = { id: 'want_cbu', label: 'Quiero el CBU 💳' };
 
-export const AGENT_BUTTON_SLUGS = ['king', 'paradise', 'elganador'];
+export const AGENT_BUTTON_SLUGS = ['king', 'paradise', 'elganador', 'luck'];
 
 export function hasAgentButton(slug: string): boolean {
   return AGENT_BUTTON_SLUGS.includes(slug);
@@ -21,8 +21,9 @@ export function welcomeButtons(agentButton = false): WelcomeBtn[] {
 }
 
 export function welcomeButtonsFor(slug: string): WelcomeBtn[] {
-  // ElGanador (manual): demo en la bienvenida, va directo al CBU. Luck ya no:
-  // Green crea el usuario automático (mismo esquema que GoldenC).
+  // ElGanador (manual): demo en la bienvenida, va directo al CBU.
+  // Luck: mismo esquema que Paradise → [Quiero mi cuenta / Hablar con un agente];
+  // Green crea el usuario automático y luego se ofrece el CBU.
   if (slug === 'elganador') return [WANT_CBU_BTN];
   if (hasAgentButton(slug)) return welcomeButtons(true);
   return [WANT_ACCOUNT_BTN, HAVE_USER_BTN];
