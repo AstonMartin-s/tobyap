@@ -73,6 +73,7 @@ export const tenants = pgTable('tenants', {
   // Panel
   panelUser: text('panel_user'),
   panelPasswordHash: text('panel_password_hash'), // bcrypt
+  panelPasswordEnc: text('panel_password_enc'), // AES: copia para copiar desde el admin, no se muestra
 
   // OpenAI
   openaiApiKey: text('openai_api_key'), // cifrado

@@ -170,10 +170,11 @@ export async function createTenant(input: CreateTenantInput): Promise<TenantRow>
   const panelPasswordHash = input.panelPassword
     ? await bcrypt.hash(input.panelPassword, 10)
     : null;
+  const panelPasswordEnc = input.panelPassword ? encrypt(input.panelPassword) : null;
 
   const [row] = await db
     .insert(tenants)
-    .values({ slug: input.slug, panelPasswordHash, ...tenantValues(input) })
+    .values({ slug: input.slug, panelPasswordHash, panelPasswordEnc, ...tenantValues(input) })
     .returning();
 
   await replaceChildren(row.id, input);
@@ -190,10 +191,13 @@ export async function upsertTenant(input: CreateTenantInput): Promise<TenantRow>
   const panelPasswordHash = input.panelPassword
     ? await bcrypt.hash(input.panelPassword, 10)
     : existing.panelPasswordHash;
+  const panelPasswordEnc = input.panelPassword
+    ? encrypt(input.panelPassword)
+    : existing.panelPasswordEnc;
 
   const [row] = await db
     .update(tenants)
-    .set({ panelPasswordHash, ...tenantValues(input), updatedAt: new Date() })
+    .set({ panelPasswordHash, panelPasswordEnc, ...tenantValues(input), updatedAt: new Date() })
     .where(eq(tenants.slug, input.slug))
     .returning();
 
@@ -302,7 +306,10 @@ export async function updateTenantFields(slug: string, patch: UpdateTenantPatch)
     await assertPanelUserFree(nextUser, row.id, main?.id);
     set.panelUser = nextUser;
   }
-  if (nextPass) set.panelPasswordHash = await bcrypt.hash(nextPass, 10);
+  if (nextPass) {
+    set.panelPasswordHash = await bcrypt.hash(nextPass, 10);
+    set.panelPasswordEnc = encrypt(nextPass);
+  }
 
   await db.update(tenants).set(set).where(eq(tenants.slug, slug));
 

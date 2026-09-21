@@ -6,6 +6,17 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-21 — admin clientes: columna contraseña
+
+- En `/admin/clientes` hay columna Contraseña: puntos y botón Copiar. El texto no se muestra.
+- Se guarda cifrada (`tenants.panel_password_enc`) al crear o cambiar la clave. El hash bcrypt no se puede recuperar, así que las cuentas viejas muestran "—" hasta que se vuelva a guardar la clave.
+
+## Bitácora 2026-09-21 — Luck: promo 30% al acreditar
+
+- Laureano: al apretar Cargo o liberar fichas tiene que salir el texto de las próximas 3 cargas al 30% con link de WhatsApp.
+- Estaba apagado (`postAccreditCajera: false`). Quedó prendido. El texto vive en `accredited_cajera` y se manda una sola vez, junto con "Acreditado", la primera vez que se acredita ese chat.
+- Link: `{support}` → walink de Luck. Sin deploy: sale de `chat_config`.
+
 ## Bitácora 2026-09-21 — Luck: sin paso app
 
 - Pedido Laureano: sacar el paso de instalar la app. En Android baja en dos toques; en iPhone se traba, y es la gente grande la que más juega.

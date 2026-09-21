@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
+import { encrypt } from '@/lib/crypto';
 import { eq, and } from 'drizzle-orm';
 import { db } from '@/db';
-import { panelUsers } from '@/db/schema';
+import { panelUsers, tenants } from '@/db/schema';
 import { getSession } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
@@ -114,7 +115,7 @@ export async function PUT(req: NextRequest) {
 
   // Verify user belongs to this tenant
   const [target] = await db
-    .select({ id: panelUsers.id, role: panelUsers.role })
+    .select({ id: panelUsers.id, role: panelUsers.role, username: panelUsers.username })
     .from(panelUsers)
     .where(and(eq(panelUsers.id, body.id), eq(panelUsers.tenantId, session.tenantId)))
     .limit(1);
@@ -138,8 +139,9 @@ export async function PUT(req: NextRequest) {
     set.role = r;
   }
   if (body.active !== undefined) set.active = body.active;
-  if (body.password && body.password.trim().length >= 6) {
-    set.passwordHash = await bcrypt.hash(body.password.trim(), 10);
+  const nextPass = body.password?.trim() ?? '';
+  if (nextPass.length >= 6) {
+    set.passwordHash = await bcrypt.hash(nextPass, 10);
   }
   if (body.username !== undefined) {
     const u = body.username.trim().toLowerCase();
@@ -150,6 +152,23 @@ export async function PUT(req: NextRequest) {
   }
 
   await db.update(panelUsers).set(set).where(eq(panelUsers.id, body.id));
+
+  // La columna del admin copia la clave del login principal del cliente.
+  if (nextPass.length >= 6 && target.username) {
+    const [tenant] = await db
+      .select({ panelUser: tenants.panelUser })
+      .from(tenants)
+      .where(eq(tenants.id, session.tenantId))
+      .limit(1);
+    const login = (body.username?.trim() || target.username).trim();
+    if (tenant?.panelUser && tenant.panelUser === login) {
+      await db.update(tenants).set({
+        panelPasswordEnc: encrypt(nextPass),
+        panelPasswordHash: set.passwordHash as string,
+        updatedAt: new Date(),
+      }).where(eq(tenants.id, session.tenantId));
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }
