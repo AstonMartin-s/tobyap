@@ -6,6 +6,13 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-21 — Luck: sin paso app
+
+- Pedido Laureano: sacar el paso de instalar la app. En Android baja en dos toques; en iPhone se traba, y es la gente grande la que más juega.
+- Solo slug `luck` (`skipsAppStep`). El comprobante entra directo a revisión (`validando`). No hay gate, botón de descarga en el header ni "Instalar app" post-acreditación.
+- El resto de los clientes sigue con el gate. Avisos al tocar Comenzar quedan.
+- Overlap Claude: `ChatWidget.tsx`, `welcomeButtons.ts`.
+
 ## Bitácora 2026-09-19 — luck: Green + alta automática (esquema GoldenC)
 
 - Luck ya tenía provider `king` + `greenvip.net` + `king_source_id` 1051850, pero el chat seguía ElGanador: welcome solo CBU, sin crear usuario, portal viejo `ganamosonline.com`.

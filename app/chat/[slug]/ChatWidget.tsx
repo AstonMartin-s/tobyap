@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { wantsEarlyPush, type PushStatus } from '@/lib/chat/earlyPush';
-import { welcomeButtonsFor } from '@/lib/chat/welcomeButtons';
+import { skipsAppStep, welcomeButtonsFor } from '@/lib/chat/welcomeButtons';
 
 type Msg = { from: 'bot' | 'user'; text?: string; image?: string; mime?: string; name?: string; copy?: string; wa?: string; delayMs?: number };
 type Btn = { id: string; label: string };
@@ -653,6 +653,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
                 <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
               )}
             </button>
+            {!skipsAppStep(slug) && (
             <button
               onClick={installApp}
               disabled={appInstall}
@@ -667,6 +668,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
                 <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
               )}
             </button>
+            )}
           </div>
         )}
       </div>
@@ -756,7 +758,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         {/* Menú POST-acreditación: todo empuja a operar desde el portal */}
         {step === 'done' && !typing && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end', marginTop: 4 }}>
-            {POST_MENU.map((m) => (
+            {(skipsAppStep(slug) ? POST_MENU.filter((m) => m.id !== 'download_app') : POST_MENU).map((m) => (
               <button key={m.id} onClick={() => tapMenu(m.id, m.label)} style={{ background: '#fff', color: '#111827', border: `1px solid #D1D7DB`, borderRadius: 12, padding: '10px 16px', fontSize: 14, fontWeight: 500, cursor: 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,.05)', minWidth: 200, textAlign: 'center' }}>{m.label}</button>
             ))}
           </div>

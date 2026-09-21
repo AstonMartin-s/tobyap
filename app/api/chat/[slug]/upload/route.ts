@@ -15,6 +15,7 @@ import { saveComprobante, isDangerousUploadMime } from '@/lib/storage';
 import { signFilePath } from '@/lib/chat/fileToken';
 import { normalizeUploadImage } from '@/lib/chat/image';
 import { isPushGranted } from '@/lib/chat/earlyPush';
+import { skipsAppStep } from '@/lib/chat/welcomeButtons';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,6 +101,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const appActivated = data0.appInstall === true || data0.appNotif === true;
   const pushOn = isPushGranted(data0);
   const alreadyAccredited = s.step === 'done' || !!data0.accreditedAt;
+  const skipApp = skipsAppStep(tenant.slug);
 
   let step: string;
   let botMsgs: ReturnType<typeof prepareBotBatch>;
@@ -111,13 +113,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     // Tienda: sin gate de app. El comprobante entra directo a verificación.
     step = 'validando';
     botMsgs = prepareBotBatch(comprobanteReviewTienda());
-  } else if (firstComprobante) {
+  } else if (firstComprobante && !skipApp) {
     step = 'app_onboarding'; // primero instala app (+ notifs si todavía no las aceptó)
     botMsgs = prepareBotBatch(onComprobante(runtime, { skipNotif: pushOn }));
   } else {
     step = 'validando';
     botMsgs = prepareBotBatch(comprobanteReviewMessages(runtime));
-    if (!appActivated) {
+    if (!appActivated && !skipApp) {
       botMsgs.push({
         from: 'bot',
         text: '📲 Si querés, activá las notificaciones desde el menú para enterarte al toque cuando te acreditamos y de tus bonos semanales. Es opcional 🎁',
@@ -161,7 +163,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (s.kommoLeadId) {
     // URL pública real (detrás del proxy de Railway, req.nextUrl.origin miente).
     const base = process.env.APP_PUBLIC_URL ?? 'https://tobyap-production.up.railway.app';
-    if (firstComprobante) {
+    if (firstComprobante && !skipApp) {
       addLeadNote(tenant, s.kommoLeadId, `📸 Comprobante recibido (${file.name}).\nVerlo: ${base}${fileUrl}\n(El cliente está completando la instalación de la app para enviarlo.)`);
     } else {
       addLeadNote(tenant, s.kommoLeadId, `📸 Nuevo comprobante recibido (${file.name}).\nVerlo: ${base}${fileUrl}\n🔎 Chequealo y mové a Cargo$ para acreditar.`);

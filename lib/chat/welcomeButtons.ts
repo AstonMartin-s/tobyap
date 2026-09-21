@@ -12,6 +12,14 @@ export const WANT_CBU_BTN: WelcomeBtn = { id: 'want_cbu', label: 'Quiero el CBU 
 
 export const AGENT_BUTTON_SLUGS = ['king', 'paradise', 'elganador', 'luck'];
 
+// Luck (Laureano): sin gate de instalar app. La gente grande se traba, sobre
+// todo en iPhone. El comprobante entra directo a revisión.
+export const SKIP_APP_STEP_SLUGS = ['luck'];
+
+export function skipsAppStep(slug: string): boolean {
+  return SKIP_APP_STEP_SLUGS.includes(slug);
+}
+
 export function hasAgentButton(slug: string): boolean {
   return AGENT_BUTTON_SLUGS.includes(slug);
 }
