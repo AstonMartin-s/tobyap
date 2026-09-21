@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { tenants } from '@/db/schema';
 import { getSession } from '@/lib/session';
-import { getDayCards, getDailyReport, todayAR } from '@/lib/reports';
+import { getDayCards, getDailyReport, todayAR, REPORT_EXCLUDE_TENANTS } from '@/lib/reports';
 import { Nav } from '../_components/Nav';
 import { DailyReportClient } from './DailyReportClient';
 
@@ -24,10 +24,11 @@ export default async function AdminPage({
   const start = searchParams.start ?? today;
   const end = searchParams.end ?? today;
 
-  const clientList = await db
+  const clientListAll = await db
     .select({ slug: tenants.slug, name: tenants.name, id: tenants.id })
     .from(tenants)
     .where(eq(tenants.role, 'client'));
+  const clientList = clientListAll.filter((c) => !REPORT_EXCLUDE_TENANTS.includes(c.slug));
   const selected = clientList.find((c) => c.slug === searchParams.tenant);
 
   const [cards, daily] = await Promise.all([

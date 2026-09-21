@@ -22,6 +22,13 @@ const dayExpr = sql<string>`to_char(${metaEvents.sentAt} AT TIME ZONE 'America/A
 /** Campañas de testeo interno — las filas quedan en DB pero NO suman en reportes. */
 export const REPORT_EXCLUDE_CAMPAIGNS = ['test'];
 
+/**
+ * Clientes ocultos de las vistas admin agregadas (Reporte del día, listas de
+ * selección). NO afecta su operación ni su propio panel: el cliente sigue
+ * activo y ve sus reportes. Solo lo saca del tablero del administrador.
+ */
+export const REPORT_EXCLUDE_TENANTS = ['mayofa'];
+
 /** SQL: excluye eventos de campañas de prueba (case-insensitive). */
 function notTestCampaign() {
   return sql`(lower(${metaEvents.campaignId}) not in ('test') OR ${metaEvents.campaignId} is null)`;
@@ -346,7 +353,7 @@ export async function getAdminReport(start?: string, end?: string, channel: Chan
     else if (r.eventType === 'redirect') c.redirects += r.n;
   }
 
-  const list = [...map.values()];
+  const list = [...map.values()].filter((c) => !REPORT_EXCLUDE_TENANTS.includes(c.slug));
   for (const c of list) c.conversion = c.conversaciones ? +(100 * c.cargas / c.conversaciones).toFixed(1) : 0;
   list.sort((a, b) => b.conversaciones - a.conversaciones);
   return list;
@@ -377,7 +384,8 @@ export async function getDayCards(day = todayAR(), opts: { channel?: Channel } =
     .where(and(sql`${dayExpr} = ${day}`, notTestCampaign(), chCond))
     .groupBy(metaEvents.tenantId, metaEvents.eventType);
 
-  const ts = await db.select({ id: tenants.id, slug: tenants.slug, name: tenants.name }).from(tenants).where(eq(tenants.role, 'client'));
+  const tsAll = await db.select({ id: tenants.id, slug: tenants.slug, name: tenants.name }).from(tenants).where(eq(tenants.role, 'client'));
+  const ts = tsAll.filter((t) => !REPORT_EXCLUDE_TENANTS.includes(t.slug));
   const led = await db.select().from(ledger).where(eq(ledger.day, day));
   const ledByTenant = new Map(led.map((l) => [l.tenantId, l]));
 
