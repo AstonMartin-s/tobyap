@@ -52,6 +52,7 @@ export default async function BasesPage({ searchParams }: { searchParams: { tena
                 <th>7 días</th>
                 <th>Chats</th>
                 <th>En Kommo</th>
+                <th>Lista</th>
               </tr>
             </thead>
             <tbody>
@@ -66,6 +67,7 @@ export default async function BasesPage({ searchParams }: { searchParams: { tena
                   <td>{b.new7d.toLocaleString('es-AR')}</td>
                   <td style={{ color: 'var(--muted)' }}>{b.sessions.toLocaleString('es-AR')}</td>
                   <td>{b.hasKommo ? b.inKommo.toLocaleString('es-AR') : <span className="badge badge--muted">sin Kommo</span>}</td>
+                  <td><DownloadCsv slug={b.slug} compact disabled={b.uniquePhones === 0} /></td>
                 </tr>
               ))}
             </tbody>
