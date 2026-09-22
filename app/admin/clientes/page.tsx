@@ -40,7 +40,7 @@ export default async function ClientesPage() {
                   <td><Link href={`/admin/clientes/${t.slug}`} style={{ color: 'var(--accent)', fontWeight: 600 }}>{t.slug}</Link></td>
                   <td>{t.name}</td>
                   <td style={{ color: 'var(--muted)' }}>{t.panelUser ?? '—'}</td>
-                  <td><CopyPassword value={copyablePassword(t.panelPasswordEnc)} /></td>
+                  <td><CopyPassword slug={t.slug} value={copyablePassword(t.panelPasswordEnc)} /></td>
                   <td>{t.role === 'admin' ? <span className="badge badge--warn">admin</span> : <span className="badge badge--muted">client</span>}</td>
                   <td>{t.eventSuffix ?? '—'}</td>
                   <td>

@@ -6,6 +6,11 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-22 — ElGanador: pauta fuera de fichaslibres
+
+- Ads de `entrada` pasan a `https://go.juegayahorra.online/l/elganador/entrada?ccpp=A5&campaign=L2`. El chat queda en el mismo host. `go.fichaslibres.online` sigue respondiendo.
+- Soporte, cargar y retirar siguen en `go.fichaslibres.online/l/elganador/walink`. Sin deploy: solo `chat_config.landingDomain`.
+
 ## Bitácora 2026-09-21 — admin: activo togglea y sale del reporte del día
 
 - En Clientes, Activo es un switch (perilla + texto). Clic lo pasa a inactivo, salvo la sesión admin.
@@ -15,7 +20,7 @@
 ## Bitácora 2026-09-21 — admin clientes: columna contraseña
 
 - En `/admin/clientes` hay columna Contraseña: puntos y botón Copiar. El texto no se muestra.
-- Se guarda cifrada (`tenants.panel_password_enc`) al crear o cambiar la clave. El hash bcrypt no se puede recuperar, así que las cuentas viejas muestran "—" hasta que se vuelva a guardar la clave.
+- Se guarda cifrada (`tenants.panel_password_enc`) al crear o cambiar la clave. El hash bcrypt no se puede recuperar, así que las cuentas viejas muestran un campo para cargarla. Al guardar, esa clave pasa a ser la del panel.
 
 ## Bitácora 2026-09-21 — Luck: promo 30% al acreditar
 
