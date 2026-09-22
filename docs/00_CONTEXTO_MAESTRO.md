@@ -8,7 +8,7 @@
 
 ## Bitácora 2026-09-21 — admin: activo togglea y sale del reporte del día
 
-- En Clientes, Activo se puede pasar a inactivo (excepto la sesión admin).
+- En Clientes, Activo es un switch (perilla + texto). Clic lo pasa a inactivo, salvo la sesión admin.
 - `getDayCards` no arma tarjeta ni la lista "sin actividad" para `active = false`.
 - La tabla de reportes diarios sigue pudiendo filtrar ese cliente.
 
