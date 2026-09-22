@@ -6,6 +6,12 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-21 — admin: activo togglea y sale del reporte del día
+
+- En Clientes, Activo se puede pasar a inactivo (excepto la sesión admin).
+- `getDayCards` no arma tarjeta ni la lista "sin actividad" para `active = false`.
+- La tabla de reportes diarios sigue pudiendo filtrar ese cliente.
+
 ## Bitácora 2026-09-21 — admin clientes: columna contraseña
 
 - En `/admin/clientes` hay columna Contraseña: puntos y botón Copiar. El texto no se muestra.

@@ -6,6 +6,7 @@ import { tenants } from '@/db/schema';
 import { getSession } from '@/lib/session';
 import { decryptOptional } from '@/lib/crypto';
 import { Nav } from '../../_components/Nav';
+import { ActiveToggle } from './ActiveToggle';
 import { CopyPassword } from './CopyPassword';
 
 function copyablePassword(blob: string | null): string | null {
@@ -42,7 +43,13 @@ export default async function ClientesPage() {
                   <td><CopyPassword value={copyablePassword(t.panelPasswordEnc)} /></td>
                   <td>{t.role === 'admin' ? <span className="badge badge--warn">admin</span> : <span className="badge badge--muted">client</span>}</td>
                   <td>{t.eventSuffix ?? '—'}</td>
-                  <td>{t.active ? <span className="badge badge--green">activo</span> : <span className="badge badge--muted">—</span>}</td>
+                  <td>
+                    {t.slug === session.slug ? (
+                      <span className="badge badge--green">activo</span>
+                    ) : (
+                      <ActiveToggle slug={t.slug} active={t.active !== false} />
+                    )}
+                  </td>
                   <td><Link href={`/admin/trazabilidad?tenant=${t.slug}`} style={{ color: 'var(--accent)' }}>ver →</Link></td>
                 </tr>
               ))}

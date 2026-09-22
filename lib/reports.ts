@@ -384,8 +384,11 @@ export async function getDayCards(day = todayAR(), opts: { channel?: Channel } =
     .where(and(sql`${dayExpr} = ${day}`, notTestCampaign(), chCond))
     .groupBy(metaEvents.tenantId, metaEvents.eventType);
 
-  const tsAll = await db.select({ id: tenants.id, slug: tenants.slug, name: tenants.name }).from(tenants).where(eq(tenants.role, 'client'));
-  const ts = tsAll.filter((t) => !REPORT_EXCLUDE_TENANTS.includes(t.slug));
+  const tsAll = await db
+    .select({ id: tenants.id, slug: tenants.slug, name: tenants.name, active: tenants.active })
+    .from(tenants)
+    .where(eq(tenants.role, 'client'));
+  const ts = tsAll.filter((t) => t.active !== false && !REPORT_EXCLUDE_TENANTS.includes(t.slug));
   const led = await db.select().from(ledger).where(eq(ledger.day, day));
   const ledByTenant = new Map(led.map((l) => [l.tenantId, l]));
 
