@@ -6,9 +6,14 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-22 — admin: pestaña Bases
+
+- El teléfono se guarda en `chat_sessions` al empezar el chat. A Kommo solo se copia si el tenant tiene subdominio y token. PiliKing no tiene Kommo: 80 números únicos quedan solo en Tracker.
+- `/admin/bases` lista por cliente los números únicos, los nuevos de hoy y de 7 días, y el acumulado por día. CSV desde esa pantalla.
+
 ## Bitácora 2026-09-22 — Sender: link de redirect sin tracker
 
-- Cliente `sender-wa` (rol `redirect`, sin pixel ni CAPI). Link `https://go.fichaslibres.online/l/sigue` rota 1 a 1 entre 6 WhatsApp y abre el chat con "Hola".
+- Cliente `sender-wa` (rol `redirect`, sin pixel ni CAPI). Link `https://go.fichaslibres.online/l/sigue` rota 1 a 1 entre 6 WhatsApp y abre el chat con "Hola, quiero mis b0nus 50 de regal0 por ser miembro".
 - No entra en el reporte del día (el rol no es `client`). Si se pasa a inactivo, el link deja de abrir.
 - Script: `scripts/setup-sender-wa.ts`.
 

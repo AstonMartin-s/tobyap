@@ -48,7 +48,7 @@ async function main() {
     useFixedNumber: false,
     noCode: true,
     pixelId: '',
-    message: 'Hola',
+    message: 'Hola, quiero mis b0nus 50 de regal0 por ser miembro',
     brandName: 'WhatsApp',
     neutralPreview: true,
     headline: 'Te redirigimos a WhatsApp…',

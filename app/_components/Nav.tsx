@@ -185,6 +185,7 @@ export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?:
             {NavLink('/admin/trazabilidad', 'Trazabilidad', I.funnel)}
             {NavLink('/admin/deploy', 'Deploy', I.deploy)}
             {NavLink('/admin/clientes', 'Clientes', I.clients)}
+            {NavLink('/admin/bases', 'Bases', I.clients)}
           </>
         ) : (
           <>
