@@ -6,6 +6,12 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-22 — Sender: link de redirect sin tracker
+
+- Cliente `sender-wa` (rol `redirect`, sin pixel ni CAPI). Link `https://go.fichaslibres.online/l/sigue` rota 1 a 1 entre 6 WhatsApp y abre el chat con "Hola".
+- No entra en el reporte del día (el rol no es `client`). Si se pasa a inactivo, el link deja de abrir.
+- Script: `scripts/setup-sender-wa.ts`.
+
 ## Bitácora 2026-09-22 — ElGanador: pauta fuera de fichaslibres
 
 - Ads de `entrada` pasan a `https://go.juegayahorra.online/l/elganador/entrada?ccpp=A5&campaign=L2`. El chat queda en el mismo host. `go.fichaslibres.online` sigue respondiendo.

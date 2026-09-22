@@ -37,12 +37,13 @@ export async function generateMetadata({
   const base = baseUrl();
   const [sMeta] = await db.select({ chatConfig: clientSettings.chatConfig }).from(clientSettings).where(eq(clientSettings.tenantId, tenant.id)).limit(1);
   const isolated = usesAdsSameOrigin(sMeta?.chatConfig) && !!c.chatSlug;
+  const neutral = isolated || String(c.neutralPreview) === 'true';
   return landingMetadata({
     brand: c.brandName ? String(c.brandName) : tenant.name,
     fichas,
-    logoAbs: isolated ? null : (c.logoUrl ? base + String(c.logoUrl) : null),
+    logoAbs: neutral ? null : (c.logoUrl ? base + String(c.logoUrl) : null),
     url: `${base}/l/${params.slug}/${params.landing}`,
-    neutral: isolated,
+    neutral,
   });
 }
 
