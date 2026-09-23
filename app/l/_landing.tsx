@@ -21,6 +21,9 @@ export function landingMetadata(o: {
   url: string;
   /** Preview neutro (sin marca/fichas/foto) para crawlers de ads. */
   neutral?: boolean;
+  /** Texto fijo del preview (WhatsApp). Si viene, no se arma desde las fichas. */
+  previewTitle?: string | null;
+  previewDescription?: string | null;
 }): Metadata {
   if (o.neutral) {
     const title = 'Hola! Vas a recibir atención';
@@ -33,10 +36,10 @@ export function landingMetadata(o: {
       robots: { index: false, follow: false },
     };
   }
-  const title = o.fichas ? `🎁 ${o.fichas} fichas libres` : o.brand;
-  const description = o.fichas
+  const title = o.previewTitle || (o.fichas ? `🎁 ${o.fichas} fichas libres` : o.brand);
+  const description = o.previewDescription || (o.fichas
     ? `Reclamá tus ${o.fichas} fichas gratis en ${o.brand} 🎰`
-    : `Reclamá tu bono en ${o.brand} 🎰`;
+    : `Reclamá tu bono en ${o.brand} 🎰`);
   const images = o.logoAbs ? [{ url: o.logoAbs }] : undefined;
   return {
     title,

@@ -6,6 +6,16 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-23 — Cliente A3: spam a kplobby
+
+- Landing `https://go.fichaslibres.online/l/bblack/spam`. Destino `https://kplobby.com`. Preview: "10.000 en giros libres" y avatar de KingPlay.
+- El avatar se sirve aunque el tenant esté inactivo (KingCba lo está). Script: `scripts/setup-bblack-spam.ts`.
+
+## Bitácora 2026-09-22 — PiliKing: landing Duplica
+
+- `https://go.fichaslibres.online/l/piliking/duplica` rota 1 a 1 entre `5491176506098` y `5491178292653`. Promo `A200` (Duplica). El soporte walink sigue fijo en numero1.
+- Script: `scripts/setup-piliking-duplica.ts`.
+
 ## Bitácora 2026-09-22 — admin: pestaña Bases
 
 - El teléfono se guarda en `chat_sessions` al empezar el chat. A Kommo solo se copia si el tenant tiene subdominio y token. PiliKing no tiene Kommo: 80 números únicos quedan solo en Tracker.

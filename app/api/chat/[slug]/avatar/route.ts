@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db } from '@/db';
-import { clientSettings } from '@/db/schema';
-import { getTenantBySlug } from '@/lib/tenants';
+import { clientSettings, tenants } from '@/db/schema';
 import { readComprobante } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(_req: NextRequest, { params }: { params: { slug: string } }) {
-  const tenant = await getTenantBySlug(params.slug);
+  // La foto es pública (preview de WhatsApp). Se sirve aunque el cliente esté inactivo.
+  const tenant = await db.query.tenants.findFirst({ where: eq(tenants.slug, params.slug) });
   if (!tenant) return NextResponse.json({ error: 'tenant desconocido' }, { status: 404 });
   const [row] = await db.select({ chatConfig: clientSettings.chatConfig }).from(clientSettings).where(eq(clientSettings.tenantId, tenant.id)).limit(1);
   const path = (row?.chatConfig as Record<string, unknown> | null)?.avatarPath;

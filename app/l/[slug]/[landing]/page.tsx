@@ -44,6 +44,8 @@ export async function generateMetadata({
     logoAbs: neutral ? null : (c.logoUrl ? base + String(c.logoUrl) : null),
     url: `${base}/l/${params.slug}/${params.landing}`,
     neutral,
+    previewTitle: c.previewTitle ? String(c.previewTitle) : null,
+    previewDescription: c.previewDescription ? String(c.previewDescription) : null,
   });
 }
 
