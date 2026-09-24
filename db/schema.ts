@@ -116,6 +116,13 @@ export const tenants = pgTable('tenants', {
   // entrante que nos devuelve conversiones por code (registro / primera carga).
   affiliateWebhookSecret: text('affiliate_webhook_secret'), // cifrado
 
+  // Inbox de WhatsApp no-API vía Blaster (servicio externo). Solo los tenants con
+  // esto configurado tienen el canal WhatsApp en el panel. Mapeo 1:1 tenant→sesión.
+  blasterBaseUrl: text('blaster_base_url'), // ej: https://blaster.internal
+  blasterSessionId: text('blaster_session_id'), // id de la sesión (kind:'tracker')
+  blasterToken: text('blaster_token'), // cifrado — token de máquina para /send /state /connect
+  waInboundSecret: text('wa_inbound_secret'), // cifrado — HMAC del webhook wa-in
+
   // Override por cliente del mapa CCPP -> bono (ej. { "A1": "Bono10%" }).
   // Si falta una clave, se usa el mapa global por defecto (lib/attribution).
   bonoMap: jsonb('bono_map').$type<Record<string, string>>().default({}),
@@ -433,7 +440,10 @@ export const chatSessions = pgTable('chat_sessions', {
   token: text('token'), // código de atribución del redirect
   campaign: text('campaign'),
   ccpp: text('ccpp'),
-  step: text('step').default('form'), // form|welcome|credenciales|cbu|comprobante|done
+  step: text('step').default('form'), // form|welcome|credenciales|cbu|comprobante|done|wa
+  // Canal de la conversación: 'livechat' (chat web, default) o 'whatsapp' (inbox
+  // no-API vía Blaster). Aditivo: todo lo existente queda 'livechat' por backfill.
+  channel: text('channel').default('livechat'),
   kommoLeadId: bigint('kommo_lead_id', { mode: 'number' }),
   data: jsonb('data').$type<Record<string, unknown>>().default({}), // credenciales, etc.
   messages: jsonb('messages').$type<Array<{ from: 'bot' | 'user'; text?: string; image?: string; at: number }>>().default([]),

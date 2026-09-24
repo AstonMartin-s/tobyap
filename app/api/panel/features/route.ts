@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getTenantBySlug } from '@/lib/tenants';
+import { hasWhatsappChannel } from '@/lib/blaster';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,5 +13,6 @@ export async function GET() {
   const tenant = await getTenantBySlug(session.slug);
   const features = tenant?.features ?? { reportes: true, embudo: true, livechat: true, fichas: true };
   const niche = tenant?.niche ?? 'circo';
-  return NextResponse.json({ features, niche });
+  const whatsapp = tenant ? hasWhatsappChannel(tenant) : false;
+  return NextResponse.json({ features, niche, whatsapp });
 }

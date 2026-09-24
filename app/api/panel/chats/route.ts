@@ -12,6 +12,7 @@ import { purgeChatSession } from '@/lib/chat/deleteSession';
 import { trimBandeja } from '@/lib/chat/bandeja';
 import { appendChatMessages, mergeChatData } from '@/lib/chat/mutations';
 import { sendPushToSession } from '@/lib/chat/push';
+import { blasterConfig, blasterSendText } from '@/lib/blaster';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { emitCargo, panelApproveEmitsCargo } from '@/lib/cargo/emit';
 import { deliveredMessagesTienda } from '@/lib/chat/flows/tienda';
@@ -68,6 +69,7 @@ export async function GET(req: NextRequest) {
     waVerified: chatSessions.waVerified,
     campaign: chatSessions.campaign,
     step: chatSessions.step,
+    channel: chatSessions.channel,
     kommoLeadId: chatSessions.kommoLeadId,
     messages: chatSessions.messages,
     data: sql<Record<string, unknown>>`${chatSessions.data} - 'comprobante' - 'comprobantes'`,
@@ -147,6 +149,8 @@ export async function GET(req: NextRequest) {
         ? sdata.unreadCount
         : (sdata.unread === true ? 1 : 0),
       blocked: sdata.blocked === true,
+      channel: s.channel ?? 'livechat',
+      fromLivechat: sdata.fromLivechat === true,
       step: s.step,
       kommoLeadId: s.kommoLeadId,
       campaign: s.campaign,
@@ -473,6 +477,20 @@ export async function POST(req: NextRequest) {
     case 'custom': {
       const t = (b.text ?? '').trim();
       if (!t) return NextResponse.json({ error: 'texto vacío' }, { status: 400 });
+      // Canal WhatsApp (Blaster): el mensaje del operador sale por el gateway no-API
+      // hacia el WhatsApp real. Sin web-push (el cliente no es suscriptor web).
+      if (s.channel === 'whatsapp') {
+        const tenant = await getTenantBySlug(session.slug);
+        const cfg = tenant ? blasterConfig(tenant) : null;
+        if (!cfg) return NextResponse.json({ error: 'canal WhatsApp no configurado' }, { status: 409 });
+        if (!s.phone) return NextResponse.json({ error: 'sesión sin teléfono' }, { status: 400 });
+        const sent = await blasterSendText(cfg, s.phone, t);
+        if (!sent.ok) return NextResponse.json({ error: `no se pudo enviar a WhatsApp: ${sent.error ?? 'error'}` }, { status: 502 });
+        await appendChatMessages(s.id, [{ from: 'bot', text: t, at: Date.now(), op: true }], {
+          dataMerge: { operatorTookOver: true, ...(sent.id ? { lastWaMsgId: sent.id } : {}) },
+        });
+        return NextResponse.json({ ok: true, sent: true, waMsgId: sent.id ?? null });
+      }
       newMsgs = [{ from: 'bot', text: t, at: Date.now(), op: true }];
       note = `✍️ Mensaje manual del operador: "${t.slice(0, 120)}"`;
       operatorTookOver = true;

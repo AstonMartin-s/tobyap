@@ -6,6 +6,21 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-24 — Inbox WhatsApp no-API (vía Blaster) — TOBYAP Parte B (backend + UI)
+
+Plan: `~/.claude/plans/armemos-todo-el-detalle-giggly-falcon.md`. ADITIVO, tsc verde. NO deployado aún (depende de migración + Blaster Parte A). Livechat intacto para tenants sin WhatsApp.
+
+- **Schema:** `chat_sessions.channel TEXT DEFAULT 'livechat'` ('livechat'|'whatsapp'). `tenants`: `blaster_base_url`, `blaster_session_id`, `blaster_token` (cifrado), `wa_inbound_secret` (cifrado). Migración `scripts/migrate-wa-inbox.ts` (idempotente, ALTER IF NOT EXISTS). **PENDIENTE correr en prod antes del deploy.**
+- **types/tenants:** ResolvedTenant + Create/Update mapean los 4 campos (patrón encrypt/decryptOptional).
+- **`lib/blaster.ts` (NUEVO):** cliente HTTP a Blaster — `blasterConfig(tenant)` (null si no hay canal), `hasWhatsappChannel`, `blasterSendText`, `blasterState`, `blasterConnect`. Token de máquina por Bearer.
+- **`app/api/chat/[slug]/wa-in/route.ts` (NUEVO):** receptor entrantes. HMAC-SHA256 sobre body crudo (secreto cifrado del tenant), crea/rehidrata sesión channel='whatsapp' step='wa', append atómico (markUnread), dedup ring `data.waSeen` (25), `data.fromLivechat` si hay match por teléfono. SIEMPRE 200 (401 solo si no autentica). Imágenes → data URL en `image`.
+- **Envío operador:** `panel/chats` op `custom` — si `s.channel==='whatsapp'` sale por `blasterSendText`, append `op:true`, SIN web-push. Livechat sin cambios.
+- **Lista:** GET `panel/chats` incluye `channel` + `fromLivechat` por item (agregado a `listCols`).
+- **Proxies (NUEVOS):** `GET /api/panel/wa-status` (cache 15s → state de Blaster) y `POST /api/panel/wa-reconnect` (→ connect). `features` expone `whatsapp:boolean`.
+- **UI `ChatsClient.tsx`:** 3 pestañas de canal (Todos/WhatsApp/Livechat, solo si hasWa) + filtro; chip de estado del número (verde/ámbar/rojo + botón Reconectar); chips por item ("WhatsApp", "ya cargó"); en canal WhatsApp se ocultan los botones del bot (aprobar/pendiente/erróneo/no cargó/soporte/cargar/retirar/datos/editar), queda Mensaje libre + Archivar.
+
+R1 abierto: **Parte A en Blaster [BLA]** (repo aparte) — /send 1:1, InboundEvent enriquecido, reenvío HMAC a wa-in, `kind:'tracker'` oculto del panel. Contrato del webhook fijado (abajo).
+
 ## Bitácora 2026-09-02 — Tienda: dominios trackerapp.site + constructor de flujo (backend)
 
 - **Dominios casaurbana VERDES:** `go.trackerapp.site` (landing) y `chat.trackerapp.site` (widget) con cert **VÁLIDO** en Railway. La traba era ownership: faltaban los TXT `_railway-verify.go` / `_railway-verify.chat` en Hostinger (el CNAME solo no alcanza). Agregados → validó y emitió al instante. Config de casaurbana ya apunta ahí (`chat_config.landingDomain` + `chatDomain`).

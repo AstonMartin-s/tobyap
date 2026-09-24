@@ -16,6 +16,8 @@ type Item = {
   unreadCount?: number;
   blocked: boolean;
   step: string | null;
+  channel?: string | null;
+  fromLivechat?: boolean;
   kommoLeadId: number | null;
   campaign: string | null;
   waVerified: boolean | null;
@@ -222,6 +224,10 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [panelQuick, setPanelQuick] = useState<PanelQuickTexts>({ barPresets: [] });
   const [niche, setNiche] = useState<'circo' | 'tienda'>('circo');
   const isTienda = niche === 'tienda';
+  const [hasWa, setHasWa] = useState(false);
+  const [channelTab, setChannelTab] = useState<'all' | 'whatsapp' | 'livechat'>('all');
+  const [waState, setWaState] = useState<{ status: string; lastError: string | null } | null>(null);
+  const [waReconnecting, setWaReconnecting] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   // Autoscroll SOLO si el operador ya está al fondo (o abrió otro chat). Si está
   // leyendo hacia arriba, el poll no lo debe arrastrar hacia abajo.
@@ -349,9 +355,39 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   useEffect(() => {
     fetch('/api/panel/features')
       .then((r) => r.json())
-      .then((d) => { if (d?.niche === 'tienda' || d?.niche === 'circo') setNiche(d.niche); })
+      .then((d) => {
+        if (d?.niche === 'tienda' || d?.niche === 'circo') setNiche(d.niche);
+        if (d?.whatsapp === true) setHasWa(true);
+      })
       .catch(() => { /* mantiene circo */ });
   }, []);
+
+  // Estado de conexión del número de WhatsApp (chip). Poll cada 20s solo si hay canal.
+  useEffect(() => {
+    if (!hasWa) return;
+    let alive = true;
+    const pull = () => {
+      fetch('/api/panel/wa-status')
+        .then((r) => r.json())
+        .then((d) => { if (alive && d?.enabled) setWaState({ status: String(d.status ?? 'unknown'), lastError: d.lastError ?? null }); })
+        .catch(() => { /* ignora */ });
+    };
+    pull();
+    const t = setInterval(pull, 20000);
+    return () => { alive = false; clearInterval(t); };
+  }, [hasWa]);
+
+  const reconnectWa = async () => {
+    setWaReconnecting(true);
+    try {
+      await fetch('/api/panel/wa-reconnect', { method: 'POST' });
+      setTimeout(() => {
+        fetch('/api/panel/wa-status').then((r) => r.json()).then((d) => { if (d?.enabled) setWaState({ status: String(d.status ?? 'unknown'), lastError: d.lastError ?? null }); }).catch(() => {});
+      }, 2500);
+    } finally {
+      setWaReconnecting(false);
+    }
+  };
 
   useEffect(() => { loadList(); const t = setInterval(loadList, 8000); return () => clearInterval(t); }, [loadList]);
   // Si llegamos desde el Embudo con ?s=<sessionKey>, abrimos ese chat.
@@ -578,6 +614,12 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
       const hay = `${i.name ?? ''} ${i.username ?? ''} ${i.phone ?? ''} ${i.campaign ?? ''}`.toLowerCase();
       if (!hay.includes(ql)) return false;
     }
+    // Filtro por canal (WhatsApp / Livechat / All). Solo aplica si el tenant tiene WA.
+    if (hasWa && channelTab !== 'all') {
+      const ch = i.channel ?? 'livechat';
+      if (channelTab === 'whatsapp' && ch !== 'whatsapp') return false;
+      if (channelTab === 'livechat' && ch === 'whatsapp') return false;
+    }
     if (filter === 'archivadas') return i.archived;
     // Pestañas terminales (report/export): muestran TODO el estado, archivado o no,
     // para que la lista coincida con el contador (calculado sobre toda la base).
@@ -742,6 +784,39 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
           <input className="input" placeholder="Buscar nombre, usuario, teléfono…" value={q}
             onChange={(e) => setQ(e.target.value)} style={{ width: '100%', fontSize: '.8rem', padding: '.4rem .6rem' }} />
         </div>
+        {hasWa && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', padding: '0 .6rem .5rem', flexWrap: 'wrap' }}>
+            {(['all', 'whatsapp', 'livechat'] as const).map((ct) => {
+              const on = channelTab === ct;
+              const label = ct === 'all' ? 'Todos' : ct === 'whatsapp' ? 'WhatsApp' : 'Livechat';
+              return (
+                <button key={ct} onClick={() => setChannelTab(ct)}
+                  style={{ padding: '.24rem .6rem', fontSize: '.72rem', fontWeight: on ? 700 : 500, borderRadius: 7, cursor: 'pointer', border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`, background: on ? 'var(--accent-soft)' : 'transparent', color: on ? 'var(--accent)' : 'var(--muted)' }}>
+                  {label}
+                </button>
+              );
+            })}
+            {waState && (() => {
+              const st = waState.status;
+              const ok = st === 'connected';
+              const warn = st === 'reconnecting' || st === 'connecting' || st === 'unknown';
+              const color = ok ? '#22c55e' : warn ? '#f59e0b' : '#ef4444';
+              const txt = ok ? 'WhatsApp: conectado' : warn ? 'WhatsApp: reconectando' : 'WhatsApp: caído';
+              return (
+                <span title={waState.lastError ?? ''} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '.35rem', fontSize: '.68rem', color }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}` }} />
+                  {txt}
+                  {!ok && !warn && (
+                    <button disabled={waReconnecting} onClick={reconnectWa}
+                      style={{ marginLeft: '.3rem', padding: '.12rem .45rem', fontSize: '.66rem', fontWeight: 700, borderRadius: 6, border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', cursor: 'pointer' }}>
+                      {waReconnecting ? '…' : 'Reconectar'}
+                    </button>
+                  )}
+                </span>
+              );
+            })()}
+          </div>
+        )}
         <div style={{ display: 'flex', gap: '.3rem', padding: '0 .6rem .6rem', borderBottom: '1px solid var(--border)', flexShrink: 0, flexWrap: 'wrap' }}>
           {([
             ['inbox', 'Inbox', null, '#8b93a9'],
@@ -792,7 +867,10 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '.35rem', alignItems: 'center', margin: '.28rem 0' }}>
-                  <span style={{ fontSize: '.62rem', fontWeight: 700, color: '#fff', background: si.color, padding: '.05rem .4rem', borderRadius: 5 }}>{si.label}</span>
+                  {(i.channel ?? 'livechat') === 'whatsapp'
+                    ? <span title="Conversación de WhatsApp (Blaster)" style={{ fontSize: '.6rem', fontWeight: 700, color: '#fff', background: '#25D366', padding: '.05rem .4rem', borderRadius: 5 }}>WhatsApp</span>
+                    : <span style={{ fontSize: '.62rem', fontWeight: 700, color: '#fff', background: si.color, padding: '.05rem .4rem', borderRadius: 5 }}>{si.label}</span>}
+                  {i.fromLivechat && <span title="Ya tuvo una conversación en el chat web" style={{ fontSize: '.6rem', fontWeight: 700, color: '#fff', background: '#0ea5e9', padding: '.05rem .4rem', borderRadius: 5 }}>ya cargó</span>}
                   {i.blocked && <span title="Bloqueado" style={{ fontSize: '.6rem', fontWeight: 700, color: '#fff', background: '#b91c1c', padding: '.05rem .4rem', borderRadius: 5, display: 'inline-flex', alignItems: 'center', gap: '.2rem' }}>{ICONS.block} Bloqueado</span>}
                   {i.campaign && <span style={{ fontSize: '.62rem', color: 'var(--muted-2,#5d6478)' }}>{i.campaign}</span>}
                 </div>
@@ -1013,27 +1091,33 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
               {(() => {
                 const cur = items.find((i) => i.sessionKey === sel);
                 const isArch = cur?.archived;
+                // Canal WhatsApp (Blaster): atención 100% manual. Ocultamos toda la
+                // botonera del bot (aprobar/cargar/retirar/CBU/soporte/guion) — solo
+                // queda "Mensaje libre" (que sale por WhatsApp) y archivar.
+                const isWa = (cur?.channel ?? 'livechat') === 'whatsapp';
                 return (
                   <>
                     <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <Link href={isTienda ? '/producto' : '/livechat?tab=guion'} className="tt tt--down tt--down-left" data-tt={isTienda ? 'Producto → matriz de venta' : 'Ajustes de chat → Guion'}
-                        style={{
-                          fontSize: '.6rem', fontWeight: 700, color: 'var(--accent,#7c5cff)', textTransform: 'uppercase',
-                          letterSpacing: '.04em', marginRight: '.15rem', textDecoration: 'none', padding: '.2rem .35rem',
-                          borderRadius: 6, border: '1px solid rgba(124,92,255,.35)', background: 'rgba(124,92,255,.08)',
-                        }}>
-                        Editar
-                      </Link>
-                      <button className="tt tt--down" data-tt={isTienda ? 'Pago válido → entrega el producto y dispara la conversión (Purchase) a Meta' : 'Comprobante válido → acredita y pasa a Cargo$ (dispara la conversión a Meta)'} disabled={busy} onClick={() => act('approve')} style={opStyle('#16a34a', true)}>{ICONS.approve} {isTienda ? 'Liberar producto' : 'Aprobar'}</button>
-                      <button className="tt tt--down" data-tt="En revisión — le avisa que estamos validando" disabled={busy} onClick={() => act('pending')} style={opStyle()}>{ICONS.pending} Pendiente</button>
-                      <button className="tt tt--down" data-tt="Comprobante ilegible/incompleto — le pide reenviarlo" disabled={busy} onClick={() => act('reject')} style={opStyle('#f59e0b')}>{ICONS.reject} Erróneo</button>
-                      <button className="tt tt--down" data-tt={isTienda ? 'No compró — lo saca de atención' : 'No depositó — lo pasa a No Cargo (sale de atención)'} disabled={busy} onClick={() => act('set_step', undefined, 'no_cargo')} style={opStyle('#ef4444')}>{ICONS.noCargo} {isTienda ? 'No compró' : 'No cargó'}</button>
-                      <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 .1rem' }} />
-                      <button className="tt tt--down" data-tt="Le pasa el WhatsApp de soporte (walink)" disabled={busy} onClick={() => act('support')} style={opStyle()}>{ICONS.support} Soporte</button>
+                      {!isWa && (
+                        <Link href={isTienda ? '/producto' : '/livechat?tab=guion'} className="tt tt--down tt--down-left" data-tt={isTienda ? 'Producto → matriz de venta' : 'Ajustes de chat → Guion'}
+                          style={{
+                            fontSize: '.6rem', fontWeight: 700, color: 'var(--accent,#7c5cff)', textTransform: 'uppercase',
+                            letterSpacing: '.04em', marginRight: '.15rem', textDecoration: 'none', padding: '.2rem .35rem',
+                            borderRadius: 6, border: '1px solid rgba(124,92,255,.35)', background: 'rgba(124,92,255,.08)',
+                          }}>
+                          Editar
+                        </Link>
+                      )}
+                      {!isWa && <button className="tt tt--down" data-tt={isTienda ? 'Pago válido → entrega el producto y dispara la conversión (Purchase) a Meta' : 'Comprobante válido → acredita y pasa a Cargo$ (dispara la conversión a Meta)'} disabled={busy} onClick={() => act('approve')} style={opStyle('#16a34a', true)}>{ICONS.approve} {isTienda ? 'Liberar producto' : 'Aprobar'}</button>}
+                      {!isWa && <button className="tt tt--down" data-tt="En revisión — le avisa que estamos validando" disabled={busy} onClick={() => act('pending')} style={opStyle()}>{ICONS.pending} Pendiente</button>}
+                      {!isWa && <button className="tt tt--down" data-tt="Comprobante ilegible/incompleto — le pide reenviarlo" disabled={busy} onClick={() => act('reject')} style={opStyle('#f59e0b')}>{ICONS.reject} Erróneo</button>}
+                      {!isWa && <button className="tt tt--down" data-tt={isTienda ? 'No compró — lo saca de atención' : 'No depositó — lo pasa a No Cargo (sale de atención)'} disabled={busy} onClick={() => act('set_step', undefined, 'no_cargo')} style={opStyle('#ef4444')}>{ICONS.noCargo} {isTienda ? 'No compró' : 'No cargó'}</button>}
+                      {!isWa && <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 .1rem' }} />}
+                      {!isWa && <button className="tt tt--down" data-tt="Le pasa el WhatsApp de soporte (walink)" disabled={busy} onClick={() => act('support')} style={opStyle()}>{ICONS.support} Soporte</button>}
                       {/* Cargar / Retirar / Datos son de circo (portal de fichas). */}
-                      {!isTienda && <button className="tt tt--down" data-tt="Le manda cómo cargar saldo" disabled={busy} onClick={() => act('deposit')} style={opStyle()}>{ICONS.deposit} Cargar</button>}
-                      {!isTienda && <button className="tt tt--down" data-tt="Le manda cómo retirar" disabled={busy} onClick={() => act('withdraw')} style={opStyle()}>{ICONS.withdraw} Retirar</button>}
-                      {!isTienda && <button className="tt tt--down" data-tt="Le reenvía usuario y contraseña" disabled={busy} onClick={() => act('forgot_user')} style={opStyle()}>{ICONS.datos} Datos</button>}
+                      {!isWa && !isTienda && <button className="tt tt--down" data-tt="Le manda cómo cargar saldo" disabled={busy} onClick={() => act('deposit')} style={opStyle()}>{ICONS.deposit} Cargar</button>}
+                      {!isWa && !isTienda && <button className="tt tt--down" data-tt="Le manda cómo retirar" disabled={busy} onClick={() => act('withdraw')} style={opStyle()}>{ICONS.withdraw} Retirar</button>}
+                      {!isWa && !isTienda && <button className="tt tt--down" data-tt="Le reenvía usuario y contraseña" disabled={busy} onClick={() => act('forgot_user')} style={opStyle()}>{ICONS.datos} Datos</button>}
                       <button className="tt tt--down tt--right" data-tt={isArch ? 'Volver a la bandeja' : 'Sacar de la bandeja; vuelve solo si el cliente escribe'} disabled={busy} onClick={() => act(isArch ? 'unarchive' : 'archive')} style={opStyle()}>{isArch ? ICONS.unarchive : ICONS.archive}{isArch ? ' Desarch.' : ' Archivar'}</button>
                     </div>
                   </>
