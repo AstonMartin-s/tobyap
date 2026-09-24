@@ -391,6 +391,15 @@ export async function getTenantBySlug(slug: string): Promise<ResolvedTenant | nu
   return tenant;
 }
 
+// Igual que getTenantBySlug pero NO filtra por active. Las landings públicas
+// (URLs de pauta/spam en vivo) deben servirse aunque el tenant esté inactivo:
+// el flag active gobierna el login de panel, no la disponibilidad de la landing.
+export async function getTenantBySlugAnyStatus(slug: string): Promise<ResolvedTenant | null> {
+  const row = await db.query.tenants.findFirst({ where: eq(tenants.slug, slug) });
+  if (!row) return null;
+  return resolve(row);
+}
+
 export function invalidateTenant(slug: string) {
   cache.delete(slug);
 }

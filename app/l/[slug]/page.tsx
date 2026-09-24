@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { tenants, clientSettings, landings } from '@/db/schema';
-import { getTenantBySlug } from '@/lib/tenants';
+import { getTenantBySlugAnyStatus } from '@/lib/tenants';
 import { resolveBono } from '@/lib/attribution';
 import { pickNumberByCategory } from '@/lib/rotation';
 import { usesAdsSameOrigin, isChatLandingConfig } from '@/lib/chat/adsIsolation';
@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 // cliente), y si no matchea ninguno, como ALIAS de una landing puntual (URL
 // corta que no expone el nombre del cliente: /l/<alias>).
 async function resolveBySlugOrAlias(slug: string) {
-  const direct = await getTenantBySlug(slug);
+  const direct = await getTenantBySlugAnyStatus(slug);
   if (direct) {
     const rows = await db
       .select()
@@ -35,7 +35,7 @@ async function resolveBySlugOrAlias(slug: string) {
   if (!lp) return null;
   const tenantRow = await db.query.tenants.findFirst({ where: eq(tenants.id, lp.tenantId) });
   if (!tenantRow) return null;
-  const tenant = await getTenantBySlug(tenantRow.slug);
+  const tenant = await getTenantBySlugAnyStatus(tenantRow.slug);
   if (!tenant) return null;
   return { tenant, landing: lp };
 }

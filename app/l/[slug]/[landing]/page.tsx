@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { tenants, clientSettings, landings } from '@/db/schema';
-import { getTenantBySlug } from '@/lib/tenants';
+import { getTenantBySlugAnyStatus } from '@/lib/tenants';
 import { resolveBono } from '@/lib/attribution';
 import { pickNumberByCategory } from '@/lib/rotation';
 import { applySupportDestFallback } from '@/lib/chat/runtime';
@@ -24,7 +24,7 @@ export async function generateMetadata({
   params: { slug: string; landing: string };
   searchParams: { ccpp?: string };
 }): Promise<Metadata> {
-  const tenant = await getTenantBySlug(params.slug);
+  const tenant = await getTenantBySlugAnyStatus(params.slug);
   if (!tenant) return {};
   const [lp] = await db
     .select()
@@ -55,8 +55,10 @@ export default async function NamedLanding({
 }: {
   params: { slug: string; landing: string };
 }) {
+  // La landing pública se sirve aunque el tenant esté inactivo (es la URL de
+  // pauta en vivo). active gobierna el login del panel, no la landing.
   const t = await db.query.tenants.findFirst({ where: eq(tenants.slug, params.slug) });
-  if (!t || !t.active) {
+  if (!t) {
     return <main style={{ padding: '20vh 1rem', textAlign: 'center' }}>Landing no disponible</main>;
   }
 
