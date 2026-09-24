@@ -17,6 +17,8 @@ import {
 export const opsWallet = pgTable('ops_wallet', {
   id: text('id').primaryKey().default('main'),
   amount: doublePrecision('amount'),
+  // Clientes externos (fuera del sistema) cuyo dinero también tengo en la wallet.
+  extras: jsonb('extras').$type<Array<{ name: string; amount: number }>>().default([]),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 

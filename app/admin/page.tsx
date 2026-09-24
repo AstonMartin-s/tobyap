@@ -7,7 +7,7 @@ import { getDayCards, getDailyReport, todayAR, REPORT_EXCLUDE_TENANTS } from '@/
 import { Nav } from '../_components/Nav';
 import { DailyReportClient } from './DailyReportClient';
 import { WalletPanel } from './WalletPanel';
-import { getWalletTotal, listWalletRows } from '@/lib/wallet';
+import { getWalletExtras, getWalletTotal, listWalletRows } from '@/lib/wallet';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,11 +33,12 @@ export default async function AdminPage({
   const clientList = clientListAll.filter((c) => !REPORT_EXCLUDE_TENANTS.includes(c.slug));
   const selected = clientList.find((c) => c.slug === searchParams.tenant);
 
-  const [cards, daily, wallets, walletTotal] = await Promise.all([
+  const [cards, daily, wallets, walletTotal, walletExtras] = await Promise.all([
     getDayCards(today, { channel: 'meta' }),
     getDailyReport({ start, end, tenantId: selected?.id, channel: 'meta' }),
     listWalletRows(),
     getWalletTotal(),
+    getWalletExtras(),
   ]);
 
   const activos = cards.filter((c) => c.chats + c.cargas > 0);
@@ -54,7 +55,7 @@ export default async function AdminPage({
           </div>
         </div>
 
-        <WalletPanel rows={wallets} wallet={walletTotal} />
+        <WalletPanel rows={wallets} wallet={walletTotal} extras={walletExtras} />
         {/* ---- Reporte del día (tarjetas) ---- */}
         <div className="card">
           <div className="card__title">

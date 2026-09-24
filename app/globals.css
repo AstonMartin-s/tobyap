@@ -222,14 +222,32 @@ a { color: inherit; }
 .wallet-list__title { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.5rem; }
 .wallet-list { display: flex; flex-direction: column; }
 .wallet-line {
-  display: flex; justify-content: space-between; gap: 0.6rem; align-items: baseline;
+  display: grid; grid-template-columns: 1fr auto; gap: 0.6rem; align-items: baseline;
   font-size: 0.84rem; padding: 0.32rem 0; border-top: 1px solid var(--border);
 }
 .wallet-line:first-child { border-top: none; }
 .wallet-line span { color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wallet-line b { font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+.wallet-line b { font-variant-numeric: tabular-nums; text-align: right; letter-spacing: -0.01em; }
 .wallet-line b.neg { color: var(--danger); }
 .wallet-line--off span { color: var(--muted-2); }
+
+/* Clientes externos: renglones editables */
+.wallet-extras { display: flex; flex-direction: column; gap: 0.4rem; }
+.wallet-extra { display: grid; grid-template-columns: 1fr 110px 26px; gap: 0.4rem; align-items: center; }
+.wallet-extra .input { width: 100%; padding: 0.35rem 0.5rem; font-size: 0.82rem; }
+.wallet-extra__amount { text-align: right; font-variant-numeric: tabular-nums; }
+.wallet-extra__del {
+  border: 1px solid var(--border); background: var(--bg-2); color: var(--muted);
+  border-radius: var(--radius-sm); width: 26px; height: 30px; line-height: 1; font-size: 1.1rem;
+  cursor: pointer; padding: 0; transition: color 0.15s, border-color 0.15s;
+}
+.wallet-extra__del:hover { color: var(--danger); border-color: var(--danger); }
+.wallet-add {
+  margin-top: 0.55rem; width: 100%; padding: 0.45rem; font-size: 0.8rem;
+  background: transparent; color: var(--muted); border: 1px dashed var(--border);
+  border-radius: var(--radius-sm); cursor: pointer; transition: color 0.15s, border-color 0.15s;
+}
+.wallet-add:hover { color: var(--text); border-color: var(--border-2); }
 @media (max-width: 1560px) {
   .wallet-rail { display: none; }
 }

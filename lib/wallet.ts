@@ -34,7 +34,17 @@ export async function listWalletRows(): Promise<WalletRow[]> {
     .sort((a, b) => b.saldo - a.saldo || a.name.localeCompare(b.name, 'es'));
 }
 
+export type WalletExtra = { name: string; amount: number };
+
 export async function getWalletTotal(): Promise<number | null> {
   const [row] = await db.select({ amount: opsWallet.amount }).from(opsWallet).where(eq(opsWallet.id, 'main')).limit(1);
   return row?.amount == null ? null : +Number(row.amount).toFixed(2);
+}
+
+export async function getWalletExtras(): Promise<WalletExtra[]> {
+  const [row] = await db.select({ extras: opsWallet.extras }).from(opsWallet).where(eq(opsWallet.id, 'main')).limit(1);
+  const list = Array.isArray(row?.extras) ? row!.extras : [];
+  return list
+    .filter((e) => e && typeof e.name === 'string')
+    .map((e) => ({ name: String(e.name), amount: +Number(e.amount || 0).toFixed(2) }));
 }
