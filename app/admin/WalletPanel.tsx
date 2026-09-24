@@ -59,42 +59,46 @@ export function WalletPanel({ rows, wallet }: { rows: WalletRow[]; wallet: numbe
     setDraft(formatInput(next));
   }
 
+  const diffCls = diff == null ? 'none' : Math.abs(diff) < 0.01 ? 'ok' : diff > 0 ? 'up' : 'down';
+  const diffLabel = diff == null ? 'Cargá la wallet'
+    : Math.abs(diff) < 0.01 ? 'Cuadra'
+      : diff > 0 ? `Sobrante ${money(diff)}`
+        : `Faltante ${money(Math.abs(diff))}`;
+
   return (
     <aside className="card wallet-rail">
       <div className="card__title">
         Saldo y wallet <span className="card__sub">detalle y suma</span>
       </div>
-      <div className="wallet-sum">
-        <span>Suma</span>
-        <b>{money(suma)}</b>
+      <div className="wallet-head">
+        <div className="wallet-metric"><span>Suma clientes</span><b>{money(suma)}</b></div>
+        <label className="wallet-field">
+          En wallet
+          <input
+            className="input"
+            inputMode="decimal"
+            placeholder="0,00"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => void save()}
+            onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+          />
+        </label>
       </div>
-      <label className="wallet-row__field">
-        En wallet
-        <input
-          className="input"
-          inputMode="decimal"
-          placeholder="0,00"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => void save()}
-          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-        />
-      </label>
-      <div className="wallet-row__diff">
-        {diff == null ? <span style={{ color: 'var(--muted-2)' }}>—</span>
-          : Math.abs(diff) < 0.01 ? <b style={{ color: 'var(--success)' }}>Cuadra</b>
-            : diff > 0 ? <b style={{ color: 'var(--success)' }}>Sobrante {money(diff)}</b>
-              : <b style={{ color: 'var(--danger)' }}>Faltante {money(Math.abs(diff))}</b>}
+      <div className={`wallet-diff wallet-diff--${diffCls}`}>
+        <span>Diferencia</span>
+        <b>{diffLabel}</b>
       </div>
+      {err ? <p style={{ color: 'var(--danger)', fontSize: 12, margin: '0 0 0.6rem' }}>{err}</p> : null}
+      <p className="wallet-list__title">Saldo por cliente</p>
       <div className="wallet-list">
         {rows.map((r) => (
-          <div className="wallet-line" key={r.slug} style={{ opacity: r.active ? 1 : 0.55 }}>
+          <div className={`wallet-line${r.active ? '' : ' wallet-line--off'}`} key={r.slug}>
             <span>{r.name}</span>
-            <b>{money(r.saldo)}</b>
+            <b className={r.saldo < 0 ? 'neg' : undefined}>{money(r.saldo)}</b>
           </div>
         ))}
       </div>
-      {err ? <p style={{ color: 'var(--danger)', fontSize: 12, margin: '0.6rem 0 0' }}>{err}</p> : null}
     </aside>
   );
 }

@@ -180,29 +180,57 @@ a { color: inherit; }
 .wallet-rail {
   position: fixed;
   top: 1.75rem;
-  left: calc(var(--sidebar-w) + 1180px + 12px);
-  width: min(300px, calc(100vw - var(--sidebar-w) - 1180px - 28px));
+  left: calc(var(--sidebar-w) + 1180px + 20px);
+  width: min(320px, calc(100vw - var(--sidebar-w) - 1180px - 40px));
   max-height: calc(100vh - 3.5rem);
   overflow: auto;
   margin: 0;
-  z-index: 20;
+  padding: 1.1rem 1.15rem;
 }
-.wallet-sum {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 0.7rem;
-  font-variant-numeric: tabular-nums;
+.wallet-rail::-webkit-scrollbar { width: 8px; }
+.wallet-rail::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 8px; }
+
+/* Resumen: suma / wallet / diferencia en bloques limpios */
+.wallet-head { display: grid; gap: 0.5rem; margin-bottom: 0.9rem; }
+.wallet-metric {
+  display: flex; justify-content: space-between; align-items: baseline;
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 0.55rem 0.7rem;
 }
-.wallet-sum span { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
-.wallet-sum b { font-size: 1.15rem; }
-.wallet-row__field { display: block; color: var(--muted); font-size: 0.72rem; }
-.wallet-row__field .input { margin-top: 0.2rem; width: 100%; }
-.wallet-row__diff { margin: 0.45rem 0 0.8rem; font-size: 0.9rem; }
-.wallet-list { display: flex; flex-direction: column; gap: 0.35rem; border-top: 1px solid var(--border); padding-top: 0.7rem; }
-.wallet-line { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.84rem; font-variant-numeric: tabular-nums; }
-.wallet-line span { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 1540px) {
+.wallet-metric span { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.wallet-metric b { font-size: 1.05rem; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+
+.wallet-field { display: block; }
+.wallet-field span { display: block; color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+.wallet-field .input { width: 100%; font-variant-numeric: tabular-nums; }
+
+.wallet-diff {
+  display: flex; justify-content: space-between; align-items: center;
+  border-radius: var(--radius-sm); padding: 0.5rem 0.7rem; margin: 0.6rem 0 0.9rem;
+  font-size: 0.9rem; font-weight: 600;
+}
+.wallet-diff span { font-size: 0.7rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.wallet-diff--ok { background: color-mix(in srgb, var(--success) 14%, transparent); }
+.wallet-diff--ok b { color: var(--success); }
+.wallet-diff--up { background: color-mix(in srgb, var(--success) 14%, transparent); }
+.wallet-diff--up b { color: var(--success); }
+.wallet-diff--down { background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.wallet-diff--down b { color: var(--danger); }
+.wallet-diff--none { background: var(--bg-2); }
+.wallet-diff--none b { color: var(--muted-2); }
+
+.wallet-list__title { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.5rem; }
+.wallet-list { display: flex; flex-direction: column; }
+.wallet-line {
+  display: flex; justify-content: space-between; gap: 0.6rem; align-items: baseline;
+  font-size: 0.84rem; padding: 0.32rem 0; border-top: 1px solid var(--border);
+}
+.wallet-line:first-child { border-top: none; }
+.wallet-line span { color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wallet-line b { font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+.wallet-line b.neg { color: var(--danger); }
+.wallet-line--off span { color: var(--muted-2); }
+@media (max-width: 1560px) {
   .wallet-rail { display: none; }
 }
 .page-head { margin-bottom: 1.6rem; display: flex; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
