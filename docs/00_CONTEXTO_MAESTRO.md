@@ -6,9 +6,18 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-24 — GoldenC: WhatsApp al entregar el CBU
+
+- Al pedir el CBU, además de los datos sale un botón a su WhatsApp: "Escribime por aca y completamos tu carga." El resto de los clientes sigue con "Abrir WhatsApp" solo en soporte/cajero.
+
+## Bitácora 2026-09-24 — Luck: pauta en losarmandocereales
+
+- `go.fichaslibres.online` y `go.juegayahorra.online` quedaron gastados para ads. Dominio nuevo `go.losarmandocereales.site` (CNAME + TXT `_railway-verify.go`).
+- Ads: `https://go.losarmandocereales.site/l/luck/go?ccpp=A5&campaign=Luck1`. Chat same-origin. Soporte sigue en `go.fichaslibres.online/l/luck/walink`.
+
 ## Bitácora 2026-09-23 — Cliente A3: spam a kplobby
 
-- Landing `https://go.fichaslibres.online/l/bblack/spam`. Destino `https://kplobby.com`. Preview: "10.000 en giros libres" y avatar de KingPlay.
+- Landing `https://go.fichaslibres.online/l/bblack/giros`. Destino `https://kplobby.com`. Preview: "10.000 en giros libres" y avatar de KingPlay.
 - El avatar se sirve aunque el tenant esté inactivo (KingCba lo está). Script: `scripts/setup-bblack-spam.ts`.
 
 ## Bitácora 2026-09-22 — PiliKing: landing Duplica
@@ -23,7 +32,7 @@
 
 ## Bitácora 2026-09-22 — Sender: link de redirect sin tracker
 
-- Cliente `sender-wa` (rol `redirect`, sin pixel ni CAPI). Link `https://go.fichaslibres.online/l/sigue` rota 1 a 1 entre 6 WhatsApp y abre el chat con "Hola, quiero mis b0nus 50 de regal0 por ser miembro".
+- Cliente `sender-wa` (rol `redirect`, sin pixel ni CAPI). Link `https://go.fichaslibres.online/l/sigue` rota 1 a 1 entre 4 WhatsApp y abre el chat con "Hola, quiero mis b0nus 50 de regal0 por ser miembro". Bajas 2026-09-23: 5491164675373 y 5491164675351. Preview: "Recibi tu bonus del 50% de nuevo" / "de parte de TEAM FC".
 - No entra en el reporte del día (el rol no es `client`). Si se pasa a inactivo, el link deja de abrir.
 - Script: `scripts/setup-sender-wa.ts`.
 

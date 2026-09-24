@@ -32,7 +32,7 @@ import {
 } from '@/lib/chat/welcomeButtons';
 
 export type Btn = WelcomeBtn;
-export interface BotMsg { from: 'bot'; text?: string; copy?: string; image?: string; wa?: string; delayMs?: number; at: number }
+export interface BotMsg { from: 'bot'; text?: string; copy?: string; image?: string; wa?: string; waLabel?: string; delayMs?: number; at: number }
 
 export {
   AGENT_BUTTON_SLUGS,
@@ -453,6 +453,20 @@ export async function cbuStep(tenant: ResolvedTenant, cfg: ChatRuntimeConfig = D
   ];
   if (cbu) messages.push({ from: 'bot', delayMs: 1100, at: now(), text: cbu, copy: cbu }); // CBU solo + botón copiar
   messages.push({ from: 'bot', delayMs: 1000, at: now(), text: offerCbuLine(cfg) });
+  // GoldenC: al entregar el CBU, WhatsApp para completar la carga sin el comprobante.
+  if (tenant.slug === 'goldenc') {
+    const url = (cfg.links.support || '').trim();
+    if (/^https?:\/\//i.test(url)) {
+      messages.push({
+        from: 'bot',
+        delayMs: 900,
+        at: now(),
+        text: 'Si te complica el comprobante, lo completamos juntos 👇',
+        wa: url,
+        waLabel: 'Escribime por aca y completamos tu carga.',
+      });
+    }
+  }
   return { messages, data: { cbu, titular }, step: 'comprobante' };
 }
 
