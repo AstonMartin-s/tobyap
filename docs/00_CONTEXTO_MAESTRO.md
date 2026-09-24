@@ -6,6 +6,14 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-09-24 — Admin: saldo contra wallet
+
+- En Reportes, a la derecha, cada cliente muestra el saldo del libro y un campo para anotar lo que hay en la wallet. La diferencia dice sobrante, faltante o cuadra. Columna `tenants.wallet_usd`.
+
+## Bitácora 2026-09-24 — Cliente A2: clave de panel
+
+- `cd6239742` estaba inactivo, por eso el login decía credenciales inválidas con cualquier clave. Se reactivó y se renovó la clave del usuario `cd6239742@gmail.com`. La clave no se anota acá.
+
 ## Bitácora 2026-09-24 — GoldenC: WhatsApp al entregar el CBU
 
 - Al pedir el CBU, además de los datos sale un botón a su WhatsApp: "Escribime por aca y completamos tu carga." El resto de los clientes sigue con "Abrir WhatsApp" solo en soporte/cajero.

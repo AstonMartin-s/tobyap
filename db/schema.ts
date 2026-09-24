@@ -131,6 +131,8 @@ export const tenants = pgTable('tenants', {
   rotationCursor: integer('rotation_cursor').default(0),
 
   active: boolean('active').default(true),
+  // Lo que el admin tiene en la wallet de ese cliente, para contrastar con el saldo del libro.
+  walletUsd: doublePrecision('wallet_usd'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
