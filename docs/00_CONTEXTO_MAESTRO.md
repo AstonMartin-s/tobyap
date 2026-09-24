@@ -8,7 +8,7 @@
 
 ## Bitácora 2026-09-24 — Admin: saldo contra wallet
 
-- En Reportes, a la derecha, cada cliente muestra el saldo del libro y un campo para anotar lo que hay en la wallet. La diferencia dice sobrante, faltante o cuadra. Columna `tenants.wallet_usd`.
+- En el hueco negro de Reportes (el ancho de las tarjetas no cambia): lista del saldo de cada cliente, la suma, y un solo campo de wallet. Sobrante o faltante sale de wallet menos esa suma. Tabla `ops_wallet`.
 
 ## Bitácora 2026-09-24 — Cliente A2: clave de panel
 

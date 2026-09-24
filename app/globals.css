@@ -176,46 +176,34 @@ a { color: inherit; }
   max-width: none;
   padding: 1.25rem 1.5rem 1.25rem;
 }
-.shell--admin { max-width: none; padding-right: 1.25rem; }
-.admin-split {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 1.25rem;
-  align-items: start;
-}
+/* Flota en el hueco negro, a la derecha del shell de 1180px. No entra en el flujo. */
 .wallet-rail {
-  position: sticky;
-  top: 1rem;
-  max-height: calc(100vh - 2rem);
+  position: fixed;
+  top: 1.75rem;
+  left: calc(var(--sidebar-w) + 1180px + 12px);
+  width: min(300px, calc(100vw - var(--sidebar-w) - 1180px - 28px));
+  max-height: calc(100vh - 3.5rem);
   overflow: auto;
+  margin: 0;
+  z-index: 20;
 }
-.wallet-total {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1.2fr;
-  gap: 0.45rem;
-  margin-bottom: 0.8rem;
+.wallet-sum {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.7rem;
+  font-variant-numeric: tabular-nums;
 }
-.wallet-total div {
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 0.45rem 0.55rem;
-}
-.wallet-total span { display: block; color: var(--muted); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; }
-.wallet-total b { font-size: 0.92rem; font-variant-numeric: tabular-nums; }
-.wallet-note { color: var(--muted-2); font-size: 0.75rem; margin: 0 0 0.7rem; }
-.wallet-list { display: flex; flex-direction: column; gap: 0.7rem; }
-.wallet-row { border-top: 1px solid var(--border); padding-top: 0.7rem; }
-.wallet-row__head { display: flex; justify-content: space-between; gap: 0.5rem; align-items: baseline; }
-.wallet-row__head span { color: var(--muted-2); font-size: 0.72rem; }
-.wallet-row__saldo { color: var(--muted); font-size: 0.82rem; margin: 0.25rem 0 0.4rem; }
-.wallet-row__saldo b { color: var(--text); }
+.wallet-sum span { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.wallet-sum b { font-size: 1.15rem; }
 .wallet-row__field { display: block; color: var(--muted); font-size: 0.72rem; }
 .wallet-row__field .input { margin-top: 0.2rem; width: 100%; }
-.wallet-row__diff { margin-top: 0.35rem; font-size: 0.82rem; }
-@media (max-width: 1100px) {
-  .admin-split { grid-template-columns: 1fr; }
-  .wallet-rail { position: static; max-height: none; }
+.wallet-row__diff { margin: 0.45rem 0 0.8rem; font-size: 0.9rem; }
+.wallet-list { display: flex; flex-direction: column; gap: 0.35rem; border-top: 1px solid var(--border); padding-top: 0.7rem; }
+.wallet-line { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.84rem; font-variant-numeric: tabular-nums; }
+.wallet-line span { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1540px) {
+  .wallet-rail { display: none; }
 }
 .page-head { margin-bottom: 1.6rem; display: flex; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
 .page-head__text { flex: 1 1 auto; }

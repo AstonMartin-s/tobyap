@@ -1,6 +1,6 @@
 import { eq, sql } from 'drizzle-orm';
 import { db } from '@/db';
-import { ledger, tenants } from '@/db/schema';
+import { ledger, opsWallet, tenants } from '@/db/schema';
 import { REPORT_EXCLUDE_TENANTS } from '@/lib/reports';
 
 export type WalletRow = {
@@ -8,7 +8,6 @@ export type WalletRow = {
   name: string;
   active: boolean;
   saldo: number;
-  wallet: number | null;
 };
 
 export async function listWalletRows(): Promise<WalletRow[]> {
@@ -17,13 +16,12 @@ export async function listWalletRows(): Promise<WalletRow[]> {
       slug: tenants.slug,
       name: tenants.name,
       active: tenants.active,
-      wallet: tenants.walletUsd,
       saldo: sql<string>`coalesce(sum(coalesce(${ledger.ingreso}, 0) - coalesce(${ledger.gasto}, 0)), 0)`,
     })
     .from(tenants)
     .leftJoin(ledger, eq(ledger.tenantId, tenants.id))
     .where(eq(tenants.role, 'client'))
-    .groupBy(tenants.id, tenants.slug, tenants.name, tenants.active, tenants.walletUsd);
+    .groupBy(tenants.id, tenants.slug, tenants.name, tenants.active);
 
   return rows
     .filter((r) => !REPORT_EXCLUDE_TENANTS.includes(r.slug))
@@ -32,7 +30,11 @@ export async function listWalletRows(): Promise<WalletRow[]> {
       name: r.name,
       active: r.active !== false,
       saldo: +Number(r.saldo).toFixed(2),
-      wallet: r.wallet == null ? null : +Number(r.wallet).toFixed(2),
     }))
-    .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, 'es'));
+    .sort((a, b) => b.saldo - a.saldo || a.name.localeCompare(b.name, 'es'));
+}
+
+export async function getWalletTotal(): Promise<number | null> {
+  const [row] = await db.select({ amount: opsWallet.amount }).from(opsWallet).where(eq(opsWallet.id, 'main')).limit(1);
+  return row?.amount == null ? null : +Number(row.amount).toFixed(2);
 }

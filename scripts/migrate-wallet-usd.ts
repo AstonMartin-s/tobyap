@@ -3,7 +3,14 @@ import { db } from '../db';
 
 async function main() {
   await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS wallet_usd double precision`);
-  console.log('wallet_usd ok');
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS ops_wallet (
+      id text PRIMARY KEY DEFAULT 'main',
+      amount double precision,
+      updated_at timestamptz DEFAULT now()
+    )
+  `);
+  console.log('wallet ok');
   process.exit(0);
 }
 

@@ -7,7 +7,7 @@ import { getDayCards, getDailyReport, todayAR, REPORT_EXCLUDE_TENANTS } from '@/
 import { Nav } from '../_components/Nav';
 import { DailyReportClient } from './DailyReportClient';
 import { WalletPanel } from './WalletPanel';
-import { listWalletRows } from '@/lib/wallet';
+import { getWalletTotal, listWalletRows } from '@/lib/wallet';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,10 +33,11 @@ export default async function AdminPage({
   const clientList = clientListAll.filter((c) => !REPORT_EXCLUDE_TENANTS.includes(c.slug));
   const selected = clientList.find((c) => c.slug === searchParams.tenant);
 
-  const [cards, daily, wallets] = await Promise.all([
+  const [cards, daily, wallets, walletTotal] = await Promise.all([
     getDayCards(today, { channel: 'meta' }),
     getDailyReport({ start, end, tenantId: selected?.id, channel: 'meta' }),
     listWalletRows(),
+    getWalletTotal(),
   ]);
 
   const activos = cards.filter((c) => c.chats + c.cargas > 0);
@@ -45,7 +46,7 @@ export default async function AdminPage({
   return (
     <>
       <Nav slug={session.slug} role="admin" />
-      <main className="shell shell--admin">
+      <main className="shell">
         <div className="page-head">
           <div className="page-head__text">
             <h1>Panel de administración</h1>
@@ -53,8 +54,7 @@ export default async function AdminPage({
           </div>
         </div>
 
-        <div className="admin-split">
-        <div>
+        <WalletPanel rows={wallets} wallet={walletTotal} />
         {/* ---- Reporte del día (tarjetas) ---- */}
         <div className="card">
           <div className="card__title">
@@ -125,9 +125,6 @@ export default async function AdminPage({
           </form>
           {!selected && <p style={{ color: 'var(--muted-2)', fontSize: '.78rem', marginTop: 0 }}>Elegí un cliente para ver el saldo de su cuenta correctamente.</p>}
           <DailyReportClient initial={daily} />
-        </div>
-        </div>
-        <WalletPanel rows={wallets} />
         </div>
       </main>
     </>

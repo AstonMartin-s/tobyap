@@ -12,6 +12,15 @@ import {
 } from 'drizzle-orm/pg-core';
 
 // ---------------------------------------------------------------------------
+// ops_wallet — un solo importe: lo que hay en la wallet, contra la suma de saldos.
+// ---------------------------------------------------------------------------
+export const opsWallet = pgTable('ops_wallet', {
+  id: text('id').primaryKey().default('main'),
+  amount: doublePrecision('amount'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
 // ledger — gasto/ingreso (depósitos) manual por cliente y día. Alimenta los
 // reportes diarios de ads: $/chat, $/carga, balance. Una fila por (tenant, día);
 // "Agregar Ingreso/Gasto" suma sobre la fila del día.
