@@ -12,6 +12,12 @@ export const WANT_CBU_BTN: WelcomeBtn = { id: 'want_cbu', label: 'Quiero el CBU 
 
 export const AGENT_BUTTON_SLUGS = ['king', 'paradise', 'elganador', 'luck'];
 
+// Clientes que NO muestran el botón "Ya tengo usuario" en la bienvenida.
+// PiliKing (Pili): gente sin usuario lo tocaba y se iba a WhatsApp sin crear
+// cuenta ni interactuar. Los recurrentes igual pueden escribir "ya tengo
+// usuario" por texto (HAVE_USER_RE) y se desbloquea igual.
+export const NO_HAVE_USER_SLUGS = ['piliking'];
+
 // Luck (Laureano): sin gate de instalar app. La gente grande se traba, sobre
 // todo en iPhone. El comprobante entra directo a revisión.
 export const SKIP_APP_STEP_SLUGS = ['luck'];
@@ -34,5 +40,6 @@ export function welcomeButtonsFor(slug: string): WelcomeBtn[] {
   // Green crea el usuario automático y luego se ofrece el CBU.
   if (slug === 'elganador') return [WANT_CBU_BTN];
   if (hasAgentButton(slug)) return welcomeButtons(true);
+  if (NO_HAVE_USER_SLUGS.includes(slug)) return [WANT_ACCOUNT_BTN];
   return [WANT_ACCOUNT_BTN, HAVE_USER_BTN];
 }
