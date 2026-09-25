@@ -349,6 +349,9 @@ async function accountStepKingcash(
   const password = randomPlayerPassword();
   const maxAttempts = 4;
   let lastErr = '';
+  // PiliKing: los usuarios creados por la automatización llevan prefijo "TT"
+  // para identificarlos en el panel de agente. El resto de clientes no cambia.
+  const prefix = tenant.slug === 'piliking' ? 'TT' : '';
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     let username = buildPlayerUsername(session.name, session.phone, 0).toLowerCase();
     if (attempt > 0) {
@@ -359,6 +362,7 @@ async function accountStepKingcash(
       const digits = (session.phone ?? '').replace(/\D/g, '').slice(-6);
       username = `${username}${digits}`.slice(0, 12);
     }
+    if (prefix) username = (prefix + username).slice(0, 18);
     try {
       await kingcashCreatePlayer(tenant, {
         login: username,
