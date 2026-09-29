@@ -817,7 +817,17 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
               ) : (
                 <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#25D366', display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 700 }}>{initial}</div>
               )}
-              <div style={{ fontWeight: 700, fontSize: 18, color: '#111827' }}>{skin.brand}</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ fontWeight: 700, fontSize: 18, color: '#111827' }}>{skin.brand}</div>
+                  {slug === 'luck' && <span className="luck-pill">🎁 Reclamá</span>}
+                </div>
+                {slug === 'luck' && (
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#15803d', marginTop: 2, lineHeight: 1.25 }}>
+                    Bonificación de nuevo usuario activada
+                  </div>
+                )}
+              </div>
             </div>
             <p style={{ color: '#54656F', fontSize: 14, margin: '4px 0 16px' }}>{skin.gate?.title || (niche === 'tienda' ? 'Dejanos tu número para coordinar tu compra y enviarte el producto' : 'Dejanos tu número para crear tu usuario y darte tu bonificación')}</p>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre o apodo" style={inputStyle} />
@@ -879,7 +889,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         </div>
       )}
 
-      <style>{`.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#9aa;animation:b 1.2s infinite}.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}@keyframes b{0%,60%,100%{opacity:.3}30%{opacity:1}}.wa-hdr{animation:waH 5s infinite}@keyframes waH{0%,88%,100%{transform:scale(1)}93%{transform:scale(1.08)}96%{transform:scale(1)}}.wa-hdr--fast{animation:waHF 2s infinite}@keyframes waHF{0%,70%,100%{transform:scale(1)}35%{transform:scale(1.08)}}.hdr-pulse{animation:hp 1.6s infinite}@keyframes hp{0%{box-shadow:0 0 0 0 rgba(255,255,255,.55)}70%{box-shadow:0 0 0 8px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}.dl-attn{animation:dlAttn 1.8s infinite;box-shadow:0 0 0 0 rgba(245,158,11,.6)}@keyframes dlAttn{0%{transform:translateY(0) scale(1);box-shadow:0 0 0 0 rgba(245,158,11,.6)}25%{transform:translateY(-3px) scale(1.12)}50%{transform:translateY(0) scale(1)}70%{box-shadow:0 0 0 7px rgba(245,158,11,0)}100%{transform:translateY(0) scale(1);box-shadow:0 0 0 0 rgba(245,158,11,0)}}`}</style>
+      <style>{`.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#9aa;animation:b 1.2s infinite}.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}@keyframes b{0%,60%,100%{opacity:.3}30%{opacity:1}}.wa-hdr{animation:waH 5s infinite}@keyframes waH{0%,88%,100%{transform:scale(1)}93%{transform:scale(1.08)}96%{transform:scale(1)}}.wa-hdr--fast{animation:waHF 2s infinite}@keyframes waHF{0%,70%,100%{transform:scale(1)}35%{transform:scale(1.08)}}.hdr-pulse{animation:hp 1.6s infinite}@keyframes hp{0%{box-shadow:0 0 0 0 rgba(255,255,255,.55)}70%{box-shadow:0 0 0 8px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}.luck-pill{display:inline-flex;align-items:center;background:#15803d;color:#fff;font-size:11px;font-weight:800;letter-spacing:.03em;border-radius:999px;padding:3px 8px;line-height:1.2;animation:luckPill 1.4s infinite}@keyframes luckPill{0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.55)}70%{box-shadow:0 0 0 6px rgba(22,163,74,0)}}.dl-attn{animation:dlAttn 1.8s infinite;box-shadow:0 0 0 0 rgba(245,158,11,.6)}@keyframes dlAttn{0%{transform:translateY(0) scale(1);box-shadow:0 0 0 0 rgba(245,158,11,.6)}25%{transform:translateY(-3px) scale(1.12)}50%{transform:translateY(0) scale(1)}70%{box-shadow:0 0 0 7px rgba(245,158,11,0)}100%{transform:translateY(0) scale(1);box-shadow:0 0 0 0 rgba(245,158,11,0)}}`}</style>
     </div>
   );
 }
