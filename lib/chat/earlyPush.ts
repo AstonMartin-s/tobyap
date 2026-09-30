@@ -6,7 +6,6 @@ export const EARLY_PUSH_SLUGS = [
   'elganador',
   'goldenc',
   'luck',
-  'piliking',
   'kingplay', // KingCBA
 ] as const;
 

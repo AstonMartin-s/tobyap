@@ -4,7 +4,7 @@ import { clientSettings } from '@/db/schema';
 import { createPortalAccount, buildPortalName } from '@/lib/pagoda';
 import { createPlayerWithRetry, buildPlayerUsername, randomPlayerPassword } from '@/lib/partner-api';
 import { createUser as kingCreateUser, KingApiError } from '@/lib/king-api';
-import { createPlayer as kingcashCreatePlayer, KingcashApiError } from '@/lib/kingcash-api';
+import { createPlayer as kingcashCreatePlayer, kingcashPlayerLoginUrl, KingcashApiError } from '@/lib/kingcash-api';
 import { pickCajero } from '@/lib/rotation';
 import type { ResolvedTenant } from '@/lib/types';
 import {
@@ -340,7 +340,7 @@ async function accountStepPartnerApi(
 // Kingcash7 (panel de agente): igual que partner_api, ACÁ generamos
 // username/password y reintentamos con otro username si el elegido ya existe.
 // El alta crea el jugador con saldo 0; la carga de fichas la hace el operario
-// desde el panel. Sin magic-link: mostramos la página de login estable.
+// desde el panel. El link de entrada lleva ?u=&p= para abrir el portal ya logueado.
 async function accountStepKingcash(
   tenant: ResolvedTenant,
   session: { phone: string; name?: string | null },
@@ -369,7 +369,8 @@ async function accountStepKingcash(
         password,
         name: session.name ?? undefined,
       });
-      const creds = `\n\n👤 Usuario: *${username}*\n🔑 Contraseña: *${password}*\n\n🔗 Entrá acá:\n${cfg.links.portal_login}`;
+      const loginUrl = kingcashPlayerLoginUrl(cfg.links.portal_login || cfg.links.portal_play, username, password);
+      const creds = `\n\n👤 Usuario: *${username}*\n🔑 Contraseña: *${password}*\n\n🔗 Entrá acá:\n${loginUrl || cfg.links.portal_login}`;
       const cajero = await assignCajeroData(tenant.id);
       return {
         messages: [
@@ -378,7 +379,7 @@ async function accountStepKingcash(
           { from: 'bot', delayMs: 2400, at: now(), text: renderTemplate('account_agent_followup', cfg) },
         ],
         buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
-        data: { username, password, loginUrl: null, portalName: username, existing: false, credsError: false, ...cajero },
+        data: { username, password, loginUrl: loginUrl || null, portalName: username, existing: false, credsError: false, ...cajero },
         step: 'credenciales',
       };
     } catch (e) {

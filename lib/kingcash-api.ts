@@ -260,6 +260,21 @@ export async function getPlayerOrThrow(tenant: ResolvedTenant, login: string): P
   return p;
 }
 
+// El portal del jugador (piliking.click) lee ?u=&p= y abre el juego ya logueado.
+// Es el mecanismo nativo de esa plataforma (no hay magic-link de un solo uso).
+export function kingcashPlayerLoginUrl(portal: string, username: string, password: string): string {
+  const raw = (portal || '').trim();
+  if (!raw || !username || !password) return raw;
+  try {
+    const u = new URL(raw);
+    u.searchParams.set('u', username);
+    u.searchParams.set('p', password);
+    return u.toString();
+  } catch {
+    return raw;
+  }
+}
+
 export async function deposit(tenant: ResolvedTenant, playerId: number, amount: number): Promise<KingcashMoneyResult> {
   return money(tenant, playerId, 'in', amount);
 }
