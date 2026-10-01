@@ -160,10 +160,18 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       where: and(eq(metaEvents.tenantId, tenant.id), eq(metaEvents.eventId, convId), eq(metaEvents.status, 'sent')),
     });
     if (!dup) {
+      const ip = clientIp(req);
       sendCapiEvent(tenant, {
         eventName: 'Conversacion',
         eventId: convId,
-        userData: { phone: wa.phone, fbc: attr?.fbc, fbp: attr?.fbp, fbclid: attr?.fbclid },
+        userData: {
+          phone: wa.phone,
+          fbc: attr?.fbc,
+          fbp: attr?.fbp,
+          fbclid: attr?.fbclid,
+          clientIp: ip && ip !== 'unknown' ? ip : null,
+          userAgent: req.headers.get('user-agent'),
+        },
         customData: { campaign_id: attr?.campaignId ?? b.campaign, internal_event: 'ConversacionCRM', ...conversationValue(tenant) },
         eventSourceUrl: attr?.eventSourceUrl ?? null,
         leadId: null,
