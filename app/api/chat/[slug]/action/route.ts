@@ -127,14 +127,16 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     return NextResponse.json({ ok: true, messages: [], buttons: [], step: s.step, total: persisted.length });
   }
 
-  // Luck: el botón "Hablar con un agente" es decorativo (mostrar que hay humanos
-  // detrás), NO abre flujo paralelo: crea la cuenta y ofrece el CBU igual que
-  // "Quiero mi cuenta". Por eso cae en este path y no en el handoff de abajo.
-  const agentInline = b.action === 'want_agent' && (tenant.provider === 'manual' || tenant.slug === 'luck');
+  // Luck y PiliKing: "Hablar con un agente" NO abre otro flujo. Sigue el mismo
+  // alta que "Quiero mi cuenta". En PiliKing, antes, simula que escribe Pili.
+  const agentInline = b.action === 'want_agent' && (tenant.provider === 'manual' || tenant.slug === 'luck' || tenant.slug === 'piliking');
   if (b.action === 'want_account' || agentInline) {
     const existing = (s.data ?? {}) as Record<string, unknown>;
     const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name, existing }, runtime);
-    const botMsgs = prepareBotBatch(r.messages);
+    const script = b.action === 'want_agent' && tenant.slug === 'piliking'
+      ? [{ from: 'bot' as const, delayMs: 4000, at: Date.now(), text: 'Hola soy Pili y estoy aca para atenderte, continuemos con tu acceso, lo que necesites me decis y te ayudo :)' }, ...r.messages]
+      : r.messages;
+    const botMsgs = prepareBotBatch(script);
     const history = [...(s.messages ?? []), ...botMsgs];
     const nextData = {
       ...existing,
