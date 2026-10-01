@@ -10,6 +10,7 @@ import { advanceByButton } from '@/lib/chat/flowGraph';
 import { prepareBotBatch } from '@/lib/chat/stagger';
 import { appendChatMessages } from '@/lib/chat/mutations';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
+import { renderTemplate } from '@/lib/chat/runtime';
 import { addLeadNote } from '@/lib/chat/kommoMirror';
 import { updateLeadFields, updateLeadName, addLeadTags, updateLeadStatus } from '@/lib/kommo';
 import { notifyOperators } from '@/lib/panel/operatorPush';
@@ -133,8 +134,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (b.action === 'want_account' || agentInline) {
     const existing = (s.data ?? {}) as Record<string, unknown>;
     const r = await accountStep(tenant, { phone: s.phone ?? '', name: s.name, existing }, runtime);
-    const script = b.action === 'want_agent' && tenant.slug === 'piliking'
-      ? [{ from: 'bot' as const, delayMs: 4000, at: Date.now(), text: 'Hola soy Pili y estoy aca para atenderte, continuemos con tu acceso, lo que necesites me decis y te ayudo :)' }, ...r.messages]
+    const piliAgent = b.action === 'want_agent' && tenant.slug === 'piliking';
+    const creating = renderTemplate('account_creating', runtime);
+    const rest = piliAgent ? r.messages.filter((m) => m.text !== creating) : r.messages;
+    const script = piliAgent
+      ? [{ from: 'bot' as const, delayMs: 4000, at: Date.now(), text: 'Hola soy Pili y estoy aca para atenderte, continuemos con tu acceso, lo que necesites me decis y te ayudo :)' }, ...rest]
       : r.messages;
     const botMsgs = prepareBotBatch(script);
     const history = [...(s.messages ?? []), ...botMsgs];
