@@ -20,6 +20,7 @@ import { depositOp, withdrawOp, consultBalance, operationsSummary } from '@/lib/
 import { kingDepositOp, kingWithdrawOp, kingConsultBalance } from '@/lib/king-ops';
 import { kingcashDepositOp, kingcashWithdrawOp, kingcashConsultBalance } from '@/lib/kingcash-ops';
 import {
+  accreditedMessages,
   comprobantePendingMessages,
   comprobanteRejectedMessages,
   supportMessage,
@@ -226,6 +227,7 @@ export async function POST(req: NextRequest) {
     bonusPercent?: number;
     username?: string;
     password?: string;
+    kind?: string;
   };
 
   // Export CSV flexible: rango de creación + filtro opcional por estado. Para cruzar
@@ -559,6 +561,26 @@ export async function POST(req: NextRequest) {
   }
 
   const runtime = await loadChatRuntime(session.tenantId, session.slug, s.phone, session.slug);
+
+  // WhatsApp: el operador pide el texto del botón para cargarlo en la caja.
+  // No manda, no cambia el estado. Livechat sigue disparando la acción al click.
+  if (b.op === 'compose') {
+    const kind = (b.kind ?? '').trim();
+    let msgs: Array<{ text?: string }> = [];
+    if (kind === 'pending') msgs = comprobantePendingMessages(runtime);
+    else if (kind === 'reject') msgs = comprobanteRejectedMessages(runtime);
+    else if (kind === 'support') msgs = supportMessage(runtime, data);
+    else if (kind === 'deposit' || kind === 'withdraw' || kind === 'forgot_user') {
+      msgs = postActionMessages(kind, data, runtime).messages;
+    } else if (kind === 'approve') {
+      msgs = accreditedMessages(loginUrl, runtime, data);
+    } else {
+      return NextResponse.json({ error: 'texto desconocido' }, { status: 400 });
+    }
+    const text = msgs.map((m) => (m.text ?? '').trim()).filter(Boolean).join('\n\n');
+    if (!text) return NextResponse.json({ error: 'ese botón no tiene texto' }, { status: 400 });
+    return NextResponse.json({ ok: true, text });
+  }
 
   let newMsgs: Msg[] = [];
   let newStep: string | undefined;

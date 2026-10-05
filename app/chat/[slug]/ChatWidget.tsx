@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { wantsEarlyPush, type PushStatus } from '@/lib/chat/earlyPush';
 import { skipsAppStep, welcomeButtonsFor } from '@/lib/chat/welcomeButtons';
+import { ImageZoom } from '@/app/_components/ImageZoom';
 
 type Msg = { from: 'bot' | 'user'; text?: string; image?: string; mime?: string; name?: string; copy?: string; wa?: string; waLabel?: string; delayMs?: number };
 type Btn = { id: string; label: string };
@@ -97,6 +98,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   const [waUnlocked, setWaUnlocked] = useState(false); // cargo hecho o "Ya tengo usuario"
   const [waBtnClicked, setWaBtnClicked] = useState(false);
   const [waBtnToast, setWaBtnToast] = useState(false);
+  const [imgZoom, setImgZoom] = useState<string | null>(null);
   const [pushBanner, setPushBanner] = useState<{ title: string; body: string } | null>(null);
   const pushBannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -693,10 +695,11 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
                   📄 {m.name || 'Comprobante PDF'}
                 </a>
                 ) : (
-                <a href={m.image} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+                <>
                   <img
                     src={m.image}
                     alt=""
+                    onClick={() => m.image && setImgZoom(m.image)}
                     onError={(e) => {
                       const img = e.currentTarget as HTMLImageElement;
                       // Recorte de portal / imagen rota del bot: se oculta. No
@@ -711,12 +714,12 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
                       const span = img.nextElementSibling as HTMLElement | null;
                       if (span) span.style.display = 'inline-flex';
                     }}
-                    style={{ maxWidth: 240, maxHeight: 320, borderRadius: 8, display: 'block' }}
+                    style={{ maxWidth: 240, maxHeight: 320, borderRadius: 8, display: 'block', cursor: 'zoom-in' }}
                   />
                   <span style={{ display: 'none', alignItems: 'center', gap: 6, padding: '8px 10px', fontSize: 14, fontWeight: 600, color: C.send }}>
                     📄 Archivo enviado ✓
                   </span>
-                </a>
+                </>
                 )
               ) : (
                 m.copy ? (
@@ -889,6 +892,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         </div>
       )}
 
+      <ImageZoom src={imgZoom} onClose={() => setImgZoom(null)} />
       <style>{`.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#9aa;animation:b 1.2s infinite}.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}@keyframes b{0%,60%,100%{opacity:.3}30%{opacity:1}}.wa-hdr{animation:waH 5s infinite}@keyframes waH{0%,88%,100%{transform:scale(1)}93%{transform:scale(1.08)}96%{transform:scale(1)}}.wa-hdr--fast{animation:waHF 2s infinite}@keyframes waHF{0%,70%,100%{transform:scale(1)}35%{transform:scale(1.08)}}.hdr-pulse{animation:hp 1.6s infinite}@keyframes hp{0%{box-shadow:0 0 0 0 rgba(255,255,255,.55)}70%{box-shadow:0 0 0 8px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}.luck-pill{display:inline-flex;align-items:center;background:#15803d;color:#fff;font-size:11px;font-weight:800;letter-spacing:.03em;border-radius:999px;padding:3px 8px;line-height:1.2;animation:luckPill 1.4s infinite}@keyframes luckPill{0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.55)}70%{box-shadow:0 0 0 6px rgba(22,163,74,0)}}.dl-attn{animation:dlAttn 1.8s infinite;box-shadow:0 0 0 0 rgba(245,158,11,.6)}@keyframes dlAttn{0%{transform:translateY(0) scale(1);box-shadow:0 0 0 0 rgba(245,158,11,.6)}25%{transform:translateY(-3px) scale(1.12)}50%{transform:translateY(0) scale(1)}70%{box-shadow:0 0 0 7px rgba(245,158,11,0)}100%{transform:translateY(0) scale(1);box-shadow:0 0 0 0 rgba(245,158,11,0)}}`}</style>
     </div>
   );

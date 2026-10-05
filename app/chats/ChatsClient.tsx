@@ -7,6 +7,7 @@ import { DEFAULT_PANEL_QUICK, type PanelQuickTexts } from '@/lib/chat/templates'
 import { buildGanamosUsername, buildPhoneUsername } from '@/lib/chat/manualUsername';
 import OperationsPanel from './OperationsPanel';
 import ManualAccountPanel from './ManualAccountPanel';
+import { ImageZoom } from '@/app/_components/ImageZoom';
 
 // Piden usuario o cuenta. No alcanza un "hola".
 const ASKS_ACCOUNT_RE = /(quiero|necesito|dame|pasame|crea|haceme|abr[ií]me).{0,30}(usuario|cuenta)|crear (un )?usuario|abrir cuenta|usuario y contrase/i;
@@ -219,12 +220,6 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [opsOpen, setOpsOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [imgZoom, setImgZoom] = useState<string | null>(null);
-  useEffect(() => {
-    if (!imgZoom) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setImgZoom(null); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [imgZoom]);
   useEffect(() => { setImgZoom(null); }, [sel]);
   // Cajero sticky asignado al lead + pool disponible (para reasignar a mano).
   const [cajeros, setCajeros] = useState<Array<{ phone: string; name: string | null }>>([]);
@@ -829,6 +824,23 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
       setTimeout(() => setToast(null), 2500);
       return false;
     }
+  }
+
+  async function composeToBox(kind: string) {
+    if (!sel || busy) return;
+    setBusy(true);
+    const r = await fetch('/api/panel/chats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionKey: sel, op: 'compose', kind }),
+    }).then((x) => x.json()).catch(() => null);
+    setBusy(false);
+    if (r?.ok && typeof r.text === 'string' && r.text.trim()) {
+      setCustom(r.text);
+      return;
+    }
+    setToast(r?.error ?? 'No se pudo armar el texto');
+    setTimeout(() => setToast(null), 2200);
   }
 
   function startRename() {
@@ -1508,28 +1520,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
               })}
             </div>
 
-            {/* Visor interno de imagen: se abre sobre el chat, cierra con ✕ o click afuera. */}
-            {imgZoom && (
-              <div
-                onClick={() => setImgZoom(null)}
-                style={{ position: 'absolute', inset: 0, zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.78)', padding: '2.5rem 1.2rem', cursor: 'zoom-out' }}
-              >
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); setImgZoom(null); }}
-                  aria-label="Cerrar"
-                  style={{ position: 'absolute', top: 12, right: 14, width: 34, height: 34, borderRadius: '50%', border: '1px solid rgba(255,255,255,.25)', background: 'rgba(0,0,0,.5)', color: '#fff', fontSize: '1.1rem', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >
-                  ✕
-                </button>
-                <img
-                  src={imgZoom}
-                  alt=""
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 10, objectFit: 'contain', boxShadow: '0 10px 40px rgba(0,0,0,.5)' }}
-                />
-              </div>
-            )}
+            <ImageZoom src={imgZoom} onClose={() => setImgZoom(null)} />
 
             {/* ACCIONES */}
             <div style={{ borderTop: '1px solid var(--border)', padding: isMobile ? '.4rem .5rem calc(.4rem + env(safe-area-inset-bottom, 0px))' : '.7rem .9rem', display: 'flex', flexDirection: 'column', gap: isMobile ? '.35rem' : '.5rem', background: 'var(--bg-2, rgba(255,255,255,.012))', flexShrink: 0, overflow: 'visible', position: 'relative', zIndex: 4 }}>
@@ -1564,26 +1555,26 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                 return (
                   <>
                     <div className="hide-scroll" style={{ display: 'flex', gap: '.4rem', flexWrap: isMobile ? 'nowrap' : 'wrap', alignItems: 'center', overflowX: isMobile ? 'auto' : 'visible', paddingBottom: isMobile ? 4 : 0 }}>
-                      {!isWa && <Link href={isTienda ? '/producto' : '/livechat?tab=guion'} className="tt tt--down tt--down-left" data-tt={isTienda ? 'Producto → matriz de venta' : 'Ajustes de chat → Guion'}
+                      <Link href={isTienda ? '/producto' : '/livechat?tab=guion'} className="tt tt--down tt--down-left" data-tt={isTienda ? 'Producto → matriz de venta' : 'Ajustes de chat → Guion'}
                         style={{
                           fontSize: '.6rem', fontWeight: 700, color: 'var(--accent,#7c5cff)', textTransform: 'uppercase',
                           letterSpacing: '.04em', marginRight: '.15rem', textDecoration: 'none', padding: '.2rem .35rem',
                           borderRadius: 6, border: '1px solid rgba(124,92,255,.35)', background: 'rgba(124,92,255,.08)',
                         }}>
                         Editar
-                      </Link>}
-                      {!isWa && <button className="tt tt--down" data-tt={isTienda ? 'Pago válido → entrega el producto y dispara la conversión (Purchase) a Meta' : 'Comprobante válido → pide el monto, acredita, manda el mensaje y dispara Cargo a Meta'} disabled={busy} onClick={() => isTienda ? act('approve') : (setCargoAmount(''), setCargoOpen(true))} style={opStyle('#16a34a', true)}>{ICONS.approve} {isTienda ? 'Liberar producto' : 'Cargo'}</button>}
-                      {!isWa && <button className="tt tt--down" data-tt="En revisión — le avisa que estamos validando" disabled={busy} onClick={() => act('pending')} style={opStyle()}>{ICONS.pending} Pendiente</button>}
-                      {!isWa && <button className="tt tt--down" data-tt="Comprobante ilegible/incompleto — le pide reenviarlo" disabled={busy} onClick={() => act('reject')} style={opStyle('#f59e0b')}>{ICONS.reject} Erróneo</button>}
-                      {!isWa && <button className="tt tt--down" data-tt={isTienda ? 'No compró — lo saca de atención' : 'No depositó — lo pasa a No Cargo (sale de atención)'} disabled={busy} onClick={() => act('set_step', undefined, 'no_cargo')} style={opStyle('#ef4444')}>{ICONS.noCargo} {isTienda ? 'No compró' : 'No cargó'}</button>}
-                      {!isWa && <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 .1rem' }} />}
+                      </Link>
+                      <button className="tt tt--down" data-tt={isWa ? 'Carga el texto de acreditación en la caja. Enviar o Enter lo manda.' : (isTienda ? 'Pago válido → entrega el producto y dispara la conversión (Purchase) a Meta' : 'Comprobante válido → pide el monto, acredita, manda el mensaje y dispara Cargo a Meta')} disabled={busy} onClick={() => isWa ? composeToBox('approve') : (isTienda ? act('approve') : (setCargoAmount(''), setCargoOpen(true)))} style={opStyle('#16a34a', true)}>{ICONS.approve} {isTienda ? 'Liberar producto' : 'Cargo'}</button>
+                      <button className="tt tt--down" data-tt={isWa ? 'Carga el texto en la caja. Enviar o Enter lo manda.' : 'En revisión — le avisa que estamos validando'} disabled={busy} onClick={() => isWa ? composeToBox('pending') : act('pending')} style={opStyle()}>{ICONS.pending} Pendiente</button>
+                      <button className="tt tt--down" data-tt={isWa ? 'Carga el texto en la caja. Enviar o Enter lo manda.' : 'Comprobante ilegible/incompleto — le pide reenviarlo'} disabled={busy} onClick={() => isWa ? composeToBox('reject') : act('reject')} style={opStyle('#f59e0b')}>{ICONS.reject} Erróneo</button>
+                      <button className="tt tt--down" data-tt={isTienda ? 'No compró — lo saca de atención' : 'No depositó — lo pasa a No Cargo (sale de atención)'} disabled={busy} onClick={() => act('set_step', undefined, 'no_cargo')} style={opStyle('#ef4444')}>{ICONS.noCargo} {isTienda ? 'No compró' : 'No cargó'}</button>
+                      <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 .1rem' }} />
                       <button className="tt tt--down" data-tt={isPrecaucion ? 'Sacar de Precaución' : 'Vigilar — queda en Inbox y en la pestaña Precaución'} disabled={busy} onClick={() => act(isPrecaucion ? 'unmark_precaucion' : 'mark_precaucion')} style={opStyle('#f59e0b', !!isPrecaucion)}>{ICONS.precaucion} Precaución</button>
                       <button className="tt tt--down" data-tt={isEstafa ? 'Sacar de Estafa' : 'Comprobante trucho — sale del Inbox y queda en Estafa'} disabled={busy} onClick={() => act(isEstafa ? 'unmark_estafa' : 'mark_estafa')} style={opStyle('#e11d48', !!isEstafa)}>{ICONS.estafa} Estafa</button>
-                      {!isWa && <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 .1rem' }} />}
-                      {!isWa && <button className="tt tt--down" data-tt="Le pasa el WhatsApp de soporte (walink)" disabled={busy} onClick={() => act('support')} style={opStyle()}>{ICONS.support} Soporte</button>}
-                      {!isWa && !isTienda && <button className="tt tt--down" data-tt="Le manda cómo cargar saldo" disabled={busy} onClick={() => act('deposit')} style={opStyle()}>{ICONS.deposit} Cargar</button>}
-                      {!isWa && !isTienda && <button className="tt tt--down" data-tt="Le manda cómo retirar" disabled={busy} onClick={() => act('withdraw')} style={opStyle()}>{ICONS.withdraw} Retirar</button>}
-                      {!isWa && !isTienda && <button className="tt tt--down" data-tt="Le reenvía usuario y contraseña" disabled={busy} onClick={() => act('forgot_user')} style={opStyle()}>{ICONS.datos} Datos</button>}
+                      <span style={{ width: 1, height: 20, background: 'var(--border)', margin: '0 .1rem' }} />
+                      <button className="tt tt--down" data-tt={isWa ? 'Carga el texto de soporte en la caja. Enviar o Enter lo manda.' : 'Le pasa el WhatsApp de soporte (walink)'} disabled={busy} onClick={() => isWa ? composeToBox('support') : act('support')} style={opStyle()}>{ICONS.support} Soporte</button>
+                      {!isTienda && <button className="tt tt--down" data-tt={isWa ? 'Carga el texto en la caja. Enviar o Enter lo manda.' : 'Le manda cómo cargar saldo'} disabled={busy} onClick={() => isWa ? composeToBox('deposit') : act('deposit')} style={opStyle()}>{ICONS.deposit} Cargar</button>}
+                      {!isTienda && <button className="tt tt--down" data-tt={isWa ? 'Carga el texto en la caja. Enviar o Enter lo manda.' : 'Le manda cómo retirar'} disabled={busy} onClick={() => isWa ? composeToBox('withdraw') : act('withdraw')} style={opStyle()}>{ICONS.withdraw} Retirar</button>}
+                      {!isTienda && <button className="tt tt--down" data-tt={isWa ? 'Carga el texto en la caja. Enviar o Enter lo manda.' : 'Le reenvía usuario y contraseña'} disabled={busy} onClick={() => isWa ? composeToBox('forgot_user') : act('forgot_user')} style={opStyle()}>{ICONS.datos} Datos</button>}
                       <button className="tt tt--down tt--right" data-tt={isArch ? 'Volver a la bandeja' : 'Sacar de la bandeja; vuelve solo si el cliente escribe'} disabled={busy} onClick={() => act(isArch ? 'unarchive' : 'archive')} style={opStyle()}>{isArch ? ICONS.unarchive : ICONS.archive}{isArch ? ' Desarch.' : ' Archivar'}</button>
                     </div>
                   </>
