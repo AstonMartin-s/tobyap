@@ -218,6 +218,14 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [fichasEnabled, setFichasEnabled] = useState<boolean>(true);
   const [opsOpen, setOpsOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  const [imgZoom, setImgZoom] = useState<string | null>(null);
+  useEffect(() => {
+    if (!imgZoom) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setImgZoom(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [imgZoom]);
+  useEffect(() => { setImgZoom(null); }, [sel]);
   // Cajero sticky asignado al lead + pool disponible (para reasignar a mano).
   const [cajeros, setCajeros] = useState<Array<{ phone: string; name: string | null }>>([]);
   const [assignedWa, setAssignedWa] = useState<string | null>(null);
@@ -1468,15 +1476,16 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                           // Imagen de referencia del bot/operador (ej. portal). Si el
                           // archivo falta, se oculta (igual que en el chat del cliente)
                           // para no mostrar un ícono roto que parece un comprobante.
-                          <img src={m.image} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} style={{ maxWidth: 150, maxHeight: 150, borderRadius: 10, display: 'block', objectFit: 'cover' }} />
+                          <img src={m.image} alt="" onClick={() => m.image && setImgZoom(m.image)} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} style={{ maxWidth: 150, maxHeight: 150, borderRadius: 10, display: 'block', objectFit: 'cover', cursor: 'zoom-in' }} />
                         ) : (
-                          // Comprobante del cliente. Si el navegador no puede renderizar
-                          // el formato (ej. HEIC viejo de iPhone o PDF sin mime), mostramos
-                          // un enlace visible en vez de un ícono roto.
-                          <a href={m.image} target="_blank" rel="noreferrer" title="Abrir comprobante">
+                          // Comprobante del cliente. Click = visor interno (no nueva
+                          // pestaña). Si el navegador no puede renderizar el formato
+                          // (HEIC viejo, PDF sin mime), cae a un enlace visible.
+                          <>
                             <img
                               src={m.image}
                               alt="comprobante"
+                              onClick={() => m.image && setImgZoom(m.image)}
                               onError={(e) => {
                                 const img = e.currentTarget as HTMLImageElement;
                                 img.style.display = 'none';
@@ -1485,11 +1494,11 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                               }}
                               style={{ maxWidth: 150, maxHeight: 150, borderRadius: 10, display: 'block', objectFit: 'cover', cursor: 'zoom-in' }}
                             />
-                            <span style={{ display: 'none', alignItems: 'center', gap: '.4rem', padding: '.5rem .7rem', fontSize: '.8rem', fontWeight: 600, color: '#7c5cff', border: '1px solid rgba(124,92,255,.4)', borderRadius: 10, background: 'rgba(124,92,255,.08)' }}>
+                            <a href={m.image} target="_blank" rel="noreferrer" style={{ display: 'none', alignItems: 'center', gap: '.4rem', padding: '.5rem .7rem', fontSize: '.8rem', fontWeight: 600, color: '#7c5cff', border: '1px solid rgba(124,92,255,.4)', borderRadius: 10, background: 'rgba(124,92,255,.08)', textDecoration: 'none' }}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                               Abrir PDF / comprobante
-                            </span>
-                          </a>
+                            </a>
+                          </>
                         )
                       ) : m.text}
                       {m.image && m.text ? <div style={{ marginTop: '.35rem', whiteSpace: 'pre-wrap' }}>{m.text}</div> : null}
@@ -1498,6 +1507,29 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                 );
               })}
             </div>
+
+            {/* Visor interno de imagen: se abre sobre el chat, cierra con ✕ o click afuera. */}
+            {imgZoom && (
+              <div
+                onClick={() => setImgZoom(null)}
+                style={{ position: 'absolute', inset: 0, zIndex: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.78)', padding: '2.5rem 1.2rem', cursor: 'zoom-out' }}
+              >
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setImgZoom(null); }}
+                  aria-label="Cerrar"
+                  style={{ position: 'absolute', top: 12, right: 14, width: 34, height: 34, borderRadius: '50%', border: '1px solid rgba(255,255,255,.25)', background: 'rgba(0,0,0,.5)', color: '#fff', fontSize: '1.1rem', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  ✕
+                </button>
+                <img
+                  src={imgZoom}
+                  alt=""
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 10, objectFit: 'contain', boxShadow: '0 10px 40px rgba(0,0,0,.5)' }}
+                />
+              </div>
+            )}
 
             {/* ACCIONES */}
             <div style={{ borderTop: '1px solid var(--border)', padding: isMobile ? '.4rem .5rem calc(.4rem + env(safe-area-inset-bottom, 0px))' : '.7rem .9rem', display: 'flex', flexDirection: 'column', gap: isMobile ? '.35rem' : '.5rem', background: 'var(--bg-2, rgba(255,255,255,.012))', flexShrink: 0, overflow: 'visible', position: 'relative', zIndex: 4 }}>
