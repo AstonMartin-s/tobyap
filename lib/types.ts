@@ -41,6 +41,12 @@ export interface ResolvedTenant {
   // Afiliados Telegram — secreto HMAC del webhook entrante (descifrado).
   affiliateWebhookSecret: string | null;
 
+  // Inbox WhatsApp no-API (Blaster). null si el tenant no tiene el canal.
+  blasterBaseUrl: string | null;
+  blasterSessionId: string | null;
+  blasterToken: string | null;
+  waInboundSecret: string | null;
+
   // Mapa de custom fields de Kommo
   customFields: Record<string, number>;
   // Override CCPP -> bono (se combina con el mapa global por defecto)
@@ -173,6 +179,10 @@ export interface CreateTenantInput {
   partnerApiUrl?: string;
   partnerApiKey?: string; // cifrado
   affiliateWebhookSecret?: string; // cifrado
+  blasterBaseUrl?: string;
+  blasterSessionId?: string;
+  blasterToken?: string; // cifrado
+  waInboundSecret?: string; // cifrado
 
   // Sub-entidades opcionales (se insertan en sus tablas)
   settings?: TenantSettingsInput;

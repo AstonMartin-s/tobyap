@@ -128,6 +128,12 @@ export const tenants = pgTable('tenants', {
   // entrante que nos devuelve conversiones por code (registro / primera carga).
   affiliateWebhookSecret: text('affiliate_webhook_secret'), // cifrado
 
+  // Inbox de WhatsApp no-API vía Blaster. Solo los tenants con esto tienen el canal.
+  blasterBaseUrl: text('blaster_base_url'),
+  blasterSessionId: text('blaster_session_id'),
+  blasterToken: text('blaster_token'), // cifrado — token de máquina
+  waInboundSecret: text('wa_inbound_secret'), // cifrado — HMAC del webhook wa-in
+
   // Override por cliente del mapa CCPP -> bono (ej. { "A1": "Bono10%" }).
   // Si falta una clave, se usa el mapa global por defecto (lib/attribution).
   bonoMap: jsonb('bono_map').$type<Record<string, string>>().default({}),
@@ -447,7 +453,9 @@ export const chatSessions = pgTable('chat_sessions', {
   token: text('token'), // código de atribución del redirect
   campaign: text('campaign'),
   ccpp: text('ccpp'),
-  step: text('step').default('form'), // form|welcome|account_pending|credenciales|cbu|comprobante|done
+  step: text('step').default('form'), // form|welcome|account_pending|credenciales|cbu|comprobante|done|wa
+  // 'livechat' (default) o 'whatsapp' (inbox no-API vía Blaster).
+  channel: text('channel').default('livechat'),
   kommoLeadId: bigint('kommo_lead_id', { mode: 'number' }),
   data: jsonb('data').$type<Record<string, unknown>>().default({}), // credenciales, etc.
   messages: jsonb('messages').$type<Array<{ from: 'bot' | 'user'; text?: string; image?: string; at: number }>>().default([]),

@@ -51,6 +51,10 @@ function tenantValues(input: CreateTenantInput) {
     partnerApiUrl: input.partnerApiUrl ?? null,
     partnerApiKey: encryptOptional(input.partnerApiKey),
     affiliateWebhookSecret: encryptOptional(input.affiliateWebhookSecret),
+    blasterBaseUrl: input.blasterBaseUrl ?? null,
+    blasterSessionId: input.blasterSessionId ?? null,
+    blasterToken: encryptOptional(input.blasterToken),
+    waInboundSecret: encryptOptional(input.waInboundSecret),
   };
 }
 
@@ -226,6 +230,10 @@ export interface UpdateTenantPatch {
   partnerApiUrl?: string;
   partnerApiKey?: string;
   affiliateWebhookSecret?: string;
+  blasterBaseUrl?: string;
+  blasterSessionId?: string;
+  blasterToken?: string;
+  waInboundSecret?: string;
 }
 
 // Login mira panel_users primero y después tenants.panel_user. El admin
@@ -297,6 +305,10 @@ export async function updateTenantFields(slug: string, patch: UpdateTenantPatch)
   if (patch.partnerApiUrl !== undefined) set.partnerApiUrl = patch.partnerApiUrl;
   if (patch.partnerApiKey) set.partnerApiKey = encrypt(patch.partnerApiKey);
   if (patch.affiliateWebhookSecret) set.affiliateWebhookSecret = encrypt(patch.affiliateWebhookSecret);
+  if (patch.blasterBaseUrl !== undefined) set.blasterBaseUrl = patch.blasterBaseUrl;
+  if (patch.blasterSessionId !== undefined) set.blasterSessionId = patch.blasterSessionId;
+  if (patch.blasterToken) set.blasterToken = encrypt(patch.blasterToken);
+  if (patch.waInboundSecret) set.waInboundSecret = encrypt(patch.waInboundSecret);
 
   const nextUser = typeof patch.panelUser === 'string' ? patch.panelUser.trim() : undefined;
   const nextPass = patch.panelPassword?.trim() || undefined;
@@ -355,6 +367,10 @@ function resolve(row: TenantRow): ResolvedTenant {
     partnerApiUrl: row.partnerApiUrl,
     partnerApiKey: decryptOptional(row.partnerApiKey),
     affiliateWebhookSecret: decryptOptional(row.affiliateWebhookSecret),
+    blasterBaseUrl: row.blasterBaseUrl ?? null,
+    blasterSessionId: row.blasterSessionId ?? null,
+    blasterToken: decryptOptional(row.blasterToken),
+    waInboundSecret: decryptOptional(row.waInboundSecret),
     customFields: cf,
     bonoMap: (row.bonoMap ?? {}) as Record<string, string>,
     readonly: row.readonly ?? false,

@@ -6,6 +6,12 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-10-04 — Inbox WhatsApp: columnas, token sin tenant
+
+- Prod ya tiene `chat_sessions.channel` y en `tenants`: `blaster_base_url`, `blaster_session_id`, `blaster_token`, `wa_inbound_secret`. Todas vacías. El código que las lee sigue en la rama `feat/tob/wa-inbox` (otro checkout), no en el deploy actual.
+- Piloto: `ClienteA1`. Token y `wa_inbound_secret` cifrados en el tenant. Base `https://api-production-be91.up.railway.app`. Sesión tracker `s1791164614376mzkn` (label ClienteA1 inbox). Secreto en bóveda `boveda/tobyap/real/clientea1-wa-inbound.env`, no en chat. Probe CRED no se usó.
+- El código del inbox se portó sobre main (la rama `feat/tob/wa-inbox` estaba 75 commits atrás). Otros clientes no ven el canal.
+
 ## Bitácora 2026-09-24 — Admin: saldo contra wallet
 
 - En el hueco negro de Reportes (el ancho de las tarjetas no cambia): lista del saldo de cada cliente, la suma, y un solo campo de wallet. Sobrante o faltante sale de wallet menos esa suma. Tabla `ops_wallet`.
@@ -40,7 +46,7 @@
 
 ## Bitácora 2026-09-22 — Sender: link de redirect sin tracker
 
-- Cliente `sender-wa` (rol `redirect`, sin pixel ni CAPI). Link `https://go.fichaslibres.online/l/sigue` rota 1 a 1 entre 4 WhatsApp y abre el chat con "Hola, quiero mis b0nus 50 de regal0 por ser miembro". Bajas 2026-09-23: 5491164675373 y 5491164675351. Preview: "Recibi tu bonus del 50% de nuevo" / "de parte de TEAM FC".
+- Cliente `sender-wa` (rol `redirect`, sin pixel ni CAPI). Link `https://go.fichaslibres.online/l/sigue` rota 1 a 1 entre los WhatsApp activos y abre el chat con "Hola, quiero mis b0nus 50 de regal0 por ser miembro". Activos 2026-10-01: 5491157437044 y 5491171513674. Bajas: 5491164675373, 5491164675351 (2026-09-23), 5491168043891 y 5491155634024 (2026-10-01). Preview: "Recibi tu regalo de parte de Team FC".
 - No entra en el reporte del día (el rol no es `client`). Si se pasa a inactivo, el link deja de abrir.
 - Script: `scripts/setup-sender-wa.ts`.
 
