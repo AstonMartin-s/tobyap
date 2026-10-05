@@ -6,6 +6,27 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-10-05 — ClienteA1 ⇄ Kommo: NO tocar el mapeo de ad_code
+
+- Llegó un R1 pidiendo cambiar `ad_code` de 571786 a 578214 porque 571786 se llama `ttad_name`. **Se rechazó con evidencia.** Sobre 750 leads: 571786 tiene nuestros tokens (`PBQN9P6G`…) en 710; 578214 (`ad_code`) está vacío en los 750. El nombre engaña, el mapeo funciona. Cambiarlo cortaba la recuperación de token del webhook y la escritura de red de seguridad.
+- 578214 lo creó nuestro propio `heal` (crea el campo por nombre canónico si no lo encuentra) y quedó huérfano.
+- **Bug corregido en `lib/heal.ts`:** mapeaba por nombre y PISABA el mapeo existente. Un deploy/heal de ClienteA1 habría movido `ad_code` a 578214 y roto la atribución en silencio. Ahora respeta el mapeo ya puesto y avisa en `warnings`.
+- `kommoPipelineId` queda en `null` a propósito. "Embudo de ventas" (14024347) ya es `is_main`, así que fijarlo no cambia dónde nacen los leads; solo dejaría de procesar "Clientes Regulares" (14024499), donde vive "Atencion Manual", el tramo del inbox WhatsApp.
+- El resto del mapeo del R1 coincide con lo que ya teníamos: CBU 572532, TITULAR 572534, fbclid 571762, utm_campaign 571748, utm_source 571750, utm_content 571744, `status_cargo` 108246647, `status_revisar_imagen` 108246643. Sin cambios de datos.
+
+## Bitácora 2026-10-04 — Inbox WhatsApp: cuidado de la línea y chapitas
+
+- Línea de ClienteA1 vinculada (`connected`, `authenticated`). El botón del panel ya no manda `connect` si la sesión está sana: WhatsApp castiga el re-linkeo en ráfaga. Con la línea vinculada el panel consulta estado cada 30s; solo acelera a 3.5s cuando falta el QR.
+- `wa-in` acepta únicamente conversaciones de a uno: descarta ids de más de 15 dígitos (grupos `@g.us`) y los estados. Entra texto e imagen; sale solo texto por `/send`. No se piden contactos, ni historial, ni presencia.
+- No hay sincronización de chats viejos: un dispositivo vinculado solo recibe lo nuevo. El inbox arranca vacío por diseño.
+- Inbox: chapita `W` verde (WhatsApp) y `L` ámbar (chat web). En WhatsApp se oculta el selector de estado y las acciones de flujo; queda responder, Precaución, Estafa y Archivar.
+- Webhook probado en vivo con firma válida: creó la sesión `5eb72e7129533dd84d749469` (número de prueba `5491100000001`). Borrable desde el panel.
+
+## Bitácora 2026-10-04 — ClienteA1: el ad viejo entra al livechat
+
+- El BM del ad se perdió y Meta pidió método de pago. Los ads quedan en pausa. La URL de pauta no se cambia: `https://go.fichaslibres.online/l/ClienteA1/ganamos?ccpp=A5&campaign=C1`.
+- Esa landing no tenía destino (sin número publi activo) y mostraba "No disponible". Se le puso `chatSlug=ClienteA1`. El clic sigue disparando el pixel y ahora entra a `https://chat.fichaslibres.online/chat/ClienteA1` con `ccpp=A5` y `campaign=C1`. Logo y marca Ganamos se conservan. Sin deploy: solo config de la landing.
+
 ## Bitácora 2026-10-04 — Inbox WhatsApp: columnas, token sin tenant
 
 - Prod ya tiene `chat_sessions.channel` y en `tenants`: `blaster_base_url`, `blaster_session_id`, `blaster_token`, `wa_inbound_secret`. Todas vacías. El código que las lee sigue en la rama `feat/tob/wa-inbox` (otro checkout), no en el deploy actual.

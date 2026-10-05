@@ -65,7 +65,20 @@ export async function healClient(slug: string): Promise<HealReport> {
     for (const f of cj?._embedded?.custom_fields ?? []) byField[String(f.name).toLowerCase()] = f.id;
     rep.fieldsCreated = toCreate.map((f) => f.name);
   }
-  for (const f of fieldsWanted) if (byField[f.name.toLowerCase()]) cf[f.key] = byField[f.name.toLowerCase()];
+  // Solo mapeamos lo que falta. Un mapeo ya puesto NO se pisa aunque exista un
+  // campo con el nombre canónico: hay clientes viejos cuyo ad_code vive en un
+  // campo con otro nombre y con miles de tokens adentro (ClienteA1 → ttad_name).
+  // Repisarlo cortaba la atribución en silencio.
+  for (const f of fieldsWanted) {
+    const found = byField[f.name.toLowerCase()];
+    if (!found) continue;
+    const current = cf[f.key];
+    if (typeof current === 'number' && current !== found) {
+      rep.warnings.push(`${f.key}: se respeta el mapeo actual ${current}; existe además el campo "${f.name}" (${found})`);
+      continue;
+    }
+    cf[f.key] = found;
+  }
 
   // 2) ETAPAS del pipeline trackeado
   if (t.kommoPipelineId) {
