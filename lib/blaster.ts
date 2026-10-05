@@ -58,6 +58,15 @@ export interface BlasterState {
   jid?: string | null;
   lastError?: string | null;
   qr?: string | null;
+  device?: string | null;
+  connectionStatus?: string | null;
+  authenticationStatus?: string | null;
+  lastCausalEvent?: string | null;
+  sessionHealth?: string | null;
+}
+
+function strOrNull(v: unknown): string | null {
+  return typeof v === 'string' && v.trim() ? v : null;
 }
 
 export async function blasterState(cfg: BlasterConfig): Promise<BlasterState | null> {
@@ -67,9 +76,14 @@ export async function blasterState(cfg: BlasterConfig): Promise<BlasterState | n
     const d = (await r.json().catch(() => ({}))) as Record<string, unknown>;
     return {
       status: typeof d.status === 'string' ? d.status : 'unknown',
-      jid: typeof d.jid === 'string' ? d.jid : null,
-      lastError: typeof d.lastError === 'string' ? d.lastError : null,
-      qr: typeof d.qr === 'string' ? d.qr : null,
+      jid: strOrNull(d.jid),
+      lastError: strOrNull(d.lastError),
+      qr: strOrNull(d.qr),
+      device: strOrNull(d.device),
+      connectionStatus: strOrNull(d.connectionStatus),
+      authenticationStatus: strOrNull(d.authenticationStatus),
+      lastCausalEvent: strOrNull(d.lastCausalEvent),
+      sessionHealth: strOrNull(d.sessionHealth),
     };
   } catch {
     return null;

@@ -29,7 +29,19 @@ export async function GET(req: NextRequest) {
 
   const state = await blasterState(cfg);
   const payload = state
-    ? { ok: true, enabled: true, status: state.status, jid: state.jid ?? null, lastError: state.lastError ?? null, qr: state.qr ?? null }
+    ? {
+        ok: true,
+        enabled: true,
+        status: state.status,
+        jid: state.jid ?? null,
+        lastError: state.lastError ?? null,
+        qr: state.qr ?? null,
+        device: state.device ?? null,
+        connectionStatus: state.connectionStatus ?? null,
+        authenticationStatus: state.authenticationStatus ?? null,
+        lastCausalEvent: state.lastCausalEvent ?? null,
+        sessionHealth: state.sessionHealth ?? null,
+      }
     : { ok: true, enabled: true, status: 'unknown', jid: null, lastError: 'sin respuesta de Blaster', qr: null };
   CACHE.set(session.tenantId, { at: Date.now(), payload });
   return NextResponse.json(payload);

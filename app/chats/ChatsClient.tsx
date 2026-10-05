@@ -1144,7 +1144,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
               const color = ok ? '#22c55e' : warn ? '#f59e0b' : '#ef4444';
               const txt = ok ? 'Conectado' : st === 'qr' ? 'Falta vincular' : warn ? 'Conectando' : 'Caído';
               return (
-                <a href="/wa-connect" title={waState.lastError ?? 'WhatsApp Connect'} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '.35rem', fontSize: '.68rem', color, whiteSpace: 'nowrap', minWidth: 0, textDecoration: 'none' }}>
+                <a href="/wa-connect" title={waState.lastError ?? 'WhatsApp'} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '.35rem', fontSize: '.68rem', color, whiteSpace: 'nowrap', minWidth: 0, textDecoration: 'none' }}>
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}`, flexShrink: 0 }} />
                   {txt}
                   {!ok && <span style={{ padding: '.12rem .45rem', fontSize: '.66rem', fontWeight: 700, borderRadius: 6, border: `1px solid ${color}`, flexShrink: 0 }}>Vincular</span>}

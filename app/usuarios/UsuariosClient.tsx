@@ -12,7 +12,7 @@ type User = {
 };
 
 const ROLES = [
-  { value: 'operador', label: 'Operador', desc: 'Solo Chats web (responder + fichas)' },
+  { value: 'operador', label: 'Operador', desc: 'Solo Chats (responder + fichas)' },
   { value: 'supervisor', label: 'Supervisor', desc: 'Todo menos Configuración y Usuarios' },
   { value: 'admin', label: 'Admin', desc: 'Acceso total' },
 ];
@@ -216,7 +216,7 @@ export function UsuariosClient({ currentUserId }: { currentUserId: string }) {
             <div style={{ fontSize: '.75rem', color: 'var(--muted)', fontWeight: 600 }}>Permisos iniciales</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '.5rem' }}>
               {[
-                { label: 'Chats web', roles: ['operador', 'supervisor', 'admin'] },
+                { label: 'Chats', roles: ['operador', 'supervisor', 'admin'] },
                 { label: 'Cargar / Retirar fichas', roles: ['operador', 'supervisor', 'admin'] },
                 { label: 'Reportes', roles: ['supervisor', 'admin'] },
                 { label: 'Embudo', roles: ['supervisor', 'admin'] },

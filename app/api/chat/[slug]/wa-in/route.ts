@@ -5,6 +5,7 @@ import { db } from '@/db';
 import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { appendChatMessages } from '@/lib/chat/mutations';
+import { notifyOperators } from '@/lib/panel/operatorPush';
 
 export const dynamic = 'force-dynamic';
 
@@ -139,6 +140,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         ...(liveMatch ? { fromLivechat: true } : {}),
       },
     });
+    const snippet = msg.text || (msg.image ? '📷 imagen' : '');
+    void notifyOperators(tenant, 'message', {
+      sessionKey: existing.sessionKey,
+      name: existing.name || phone,
+      text: snippet,
+      channel: 'whatsapp',
+    });
     return NextResponse.json({ ok: true, sessionKey: existing.sessionKey });
   }
 
@@ -158,6 +166,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     },
     messages: [msg],
     updatedAt: new Date(),
+  });
+  const snippet = msg.text || (msg.image ? '📷 imagen' : '');
+  void notifyOperators(tenant, 'new_chat', {
+    sessionKey,
+    name: phone,
+    text: snippet,
+    channel: 'whatsapp',
   });
   return NextResponse.json({ ok: true, sessionKey, created: true });
 }

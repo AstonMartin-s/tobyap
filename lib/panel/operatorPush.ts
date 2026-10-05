@@ -46,7 +46,7 @@ const EVENT_COPY: Record<OperatorPushEvent, { title: string; body: string }> = {
 export async function notifyOperators(
   tenant: ResolvedTenant,
   event: OperatorPushEvent,
-  opts: { sessionKey?: string; name?: string | null; text?: string | null } = {},
+  opts: { sessionKey?: string; name?: string | null; text?: string | null; channel?: 'whatsapp' | 'livechat' } = {},
 ): Promise<void> {
   if (!pushEnabled()) return;
   let subs: Awaited<ReturnType<typeof loadSubs>>;
@@ -60,12 +60,18 @@ export async function notifyOperators(
   const copy = EVENT_COPY[event];
   const who = (opts.name ?? '').trim();
   const snippet = (opts.text ?? '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  const fromWa = opts.channel === 'whatsapp';
+  const title = fromWa
+    ? (event === 'new_chat' ? 'WhatsApp nuevo' : 'WhatsApp')
+    : copy.title;
   const body =
     event === 'message' && snippet
       ? (who ? `${who}: ${snippet}` : snippet)
-      : who
-        ? `${copy.body.replace(/\.$/, '')} (${who}).`
-        : copy.body;
+      : event === 'new_chat' && snippet
+        ? (who ? `${who}: ${snippet}` : snippet)
+        : who
+          ? `${copy.body.replace(/\.$/, '')} (${who}).`
+          : copy.body;
   const url = opts.sessionKey ? `/chats?s=${encodeURIComponent(opts.sessionKey)}` : '/chats';
   const tag = `tobyap-panel-${event}-${Date.now()}`;
 
@@ -73,7 +79,7 @@ export async function notifyOperators(
   let okCount = 0;
   await Promise.all(
     subs.map(async (row) => {
-      const res = await sendWebPush(row.subscription, { title: copy.title, body, url, tag });
+      const res = await sendWebPush(row.subscription, { title, body, url, tag });
       if (res.ok) okCount += 1;
       if (res.gone) dead.push(row.endpoint);
       else if (!res.ok) console.warn('[op-push] send fail', { slug: tenant.slug, event, status: res.status, error: res.error });
