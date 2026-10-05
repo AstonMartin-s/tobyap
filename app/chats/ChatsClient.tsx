@@ -1180,8 +1180,11 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                 </div>
                 <div style={{ display: 'flex', gap: '.35rem', alignItems: 'center', margin: '.28rem 0' }}>
                   {(i.channel ?? 'livechat') === 'whatsapp'
-                    ? <span title="Conversación de WhatsApp" style={{ fontSize: '.6rem', fontWeight: 700, color: '#fff', background: '#25D366', padding: '.05rem .4rem', borderRadius: 5 }}>WhatsApp</span>
-                    : <span style={{ fontSize: '.62rem', fontWeight: 700, color: '#fff', background: si.color, padding: '.05rem .4rem', borderRadius: 5 }}>{si.label}</span>}
+                    ? <span title="Entró por WhatsApp" style={{ width: 15, height: 15, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '.6rem', fontWeight: 800, color: '#fff', background: '#25D366', borderRadius: 4 }}>W</span>
+                    : <>
+                        <span title="Entró por el chat web" style={{ width: 15, height: 15, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '.6rem', fontWeight: 800, color: '#111', background: '#f5b014', borderRadius: 4 }}>L</span>
+                        <span style={{ fontSize: '.62rem', fontWeight: 700, color: '#fff', background: si.color, padding: '.05rem .4rem', borderRadius: 5 }}>{si.label}</span>
+                      </>}
                   {i.fromLivechat && <span title="Ya tuvo una conversación en el chat web" style={{ fontSize: '.6rem', fontWeight: 700, color: '#fff', background: '#0ea5e9', padding: '.05rem .4rem', borderRadius: 5 }}>ya cargó</span>}
                   {i.estafa && <span title="Marcado como estafa" style={{ fontSize: '.68rem', fontWeight: 800, color: '#fff', background: '#e11d48', padding: '.12rem .45rem', borderRadius: 5, display: 'inline-flex', alignItems: 'center', gap: '.25rem', letterSpacing: '.02em' }}>{ICONS.estafa} Estafa</span>}
                   {i.precaucion && <span title="Marcado como precaución" style={{ fontSize: '.68rem', fontWeight: 800, color: '#111', background: '#f59e0b', padding: '.12rem .45rem', borderRadius: 5, display: 'inline-flex', alignItems: 'center', gap: '.25rem', letterSpacing: '.02em' }}>{ICONS.precaucion} Precaución</span>}
@@ -1282,7 +1285,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                       >Cambiar nombre</button>
                     )}
                     {detail.username && <span title="Usuario del portal" style={{ fontSize: '.78rem', fontWeight: 700, color: 'var(--accent,#7c5cff)', whiteSpace: 'nowrap', background: 'rgba(124, 92, 255, 0.1)', padding: '0.1rem 0.4rem', borderRadius: 4 }}>@{detail.username}</span>}
-                    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }} title="Cambiar estado">
+                    <div style={{ position: 'relative', display: (selectedItem?.channel ?? 'livechat') === 'whatsapp' ? 'none' : 'inline-flex', alignItems: 'center' }} title="Cambiar estado">
                       <select
                         value={detail.step ?? ''}
                         disabled={busy}
@@ -1298,9 +1301,10 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                   {/* Contexto de Campaña / Bono */}
                   {(() => {
                     const c = items.find(i => i.sessionKey === sel)?.campaign;
+                    const wa = (selectedItem?.channel ?? 'livechat') === 'whatsapp';
                     return (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', fontSize: '.68rem', marginTop: 1 }}>
-                        <span style={{ color: '#e8a050', fontWeight: 750, textTransform: 'uppercase', letterSpacing: '.05em' }}>Livechat</span>
+                        <span style={{ color: wa ? '#25D366' : '#e8a050', fontWeight: 750, textTransform: 'uppercase', letterSpacing: '.05em' }}>{wa ? 'WhatsApp' : 'Livechat'}</span>
                         {c && (
                           <>
                             <span style={{ color: 'var(--border-2)' }}>|</span>

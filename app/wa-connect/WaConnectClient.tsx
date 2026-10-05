@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-type WaState = { enabled: boolean; status: string; lastError: string | null; qr: string | null };
+type WaState = { enabled: boolean; status: string; lastError: string | null; qr: string | null; phone: string | null };
+
+// El jid viene como `5491112345678:12@s.whatsapp.net`.
+function phoneFromJid(jid: unknown): string | null {
+  if (typeof jid !== 'string' || !jid) return null;
+  const digits = jid.split('@')[0].split(':')[0].replace(/\D/g, '');
+  return digits ? `+${digits}` : null;
+}
 
 const LABELS: Record<string, { txt: string; color: string }> = {
   connected: { txt: 'Conectado', color: '#22c55e' },
@@ -27,15 +34,16 @@ export function WaConnectClient() {
       if (!aliveRef.current) return;
       setLoaded(true);
       if (d?.enabled) {
-        setState({ enabled: true, status: String(d.status ?? 'unknown'), lastError: d.lastError ?? null, qr: typeof d.qr === 'string' ? d.qr : null });
+        setState({ enabled: true, status: String(d.status ?? 'unknown'), lastError: d.lastError ?? null, qr: typeof d.qr === 'string' ? d.qr : null, phone: phoneFromJid(d.jid) });
       } else {
-        setState({ enabled: false, status: 'unknown', lastError: null, qr: null });
+        setState({ enabled: false, status: 'unknown', lastError: null, qr: null, phone: null });
       }
     } catch { /* ignora */ }
   }, []);
 
-  // Refresco rápido mientras no está conectado (el QR rota ~20s). Cuando conecta,
-  // bajamos la frecuencia.
+  // Refresco rápido mientras no está conectado (el QR rota ~20s). Con la línea
+  // vinculada pasamos a un latido lento: no hay nada que mirar y no queremos
+  // ruido sobre la sesión.
   useEffect(() => {
     aliveRef.current = true;
     pull(true);
@@ -44,7 +52,7 @@ export function WaConnectClient() {
 
   useEffect(() => {
     const connected = state?.status === 'connected';
-    const ms = connected ? 15000 : 3500;
+    const ms = connected ? 30000 : 3500;
     const t = setInterval(() => pull(true), ms);
     return () => clearInterval(t);
   }, [state?.status, pull]);
@@ -87,13 +95,20 @@ export function WaConnectClient() {
       </div>
 
       {connected ? (
-        <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
+        <div style={{ textAlign: 'center', padding: '1.2rem 0 .4rem' }}>
           <div style={{ fontSize: '2.4rem', lineHeight: 1 }}>✅</div>
-          <p style={{ fontWeight: 600, marginBottom: '.3rem' }}>El número está vinculado.</p>
-          <p style={{ color: 'var(--muted)', fontSize: '.85rem' }}>Los mensajes entrantes aparecen en Chats web, pestaña WhatsApp.</p>
-          <button type="button" disabled={busy} onClick={connect} style={{ marginTop: '1rem', padding: '.4rem .9rem', fontSize: '.8rem', fontWeight: 600, borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--muted)', cursor: 'pointer' }}>
-            Revincular (nuevo QR)
-          </button>
+          <p style={{ fontWeight: 600, margin: '.5rem 0 .2rem' }}>
+            {state?.phone ? `${state.phone} está vinculado.` : 'El número está vinculado.'}
+          </p>
+          <p style={{ color: 'var(--muted)', fontSize: '.85rem', margin: 0 }}>
+            Lo que te escriban entra en Chats web, pestaña WhatsApp.
+          </p>
+          <ul style={{ textAlign: 'left', color: 'var(--muted)', fontSize: '.8rem', lineHeight: 1.6, margin: '1.1rem 0 0', paddingLeft: '1.1rem' }}>
+            <li>No cierres la sesión desde el teléfono ni saques el dispositivo vinculado.</li>
+            <li>El teléfono tiene que prender y entrar a internet cada tanto.</li>
+            <li>Solo llegan las conversaciones de a uno. Grupos y estados no entran.</li>
+            <li>Llegan los mensajes nuevos. Lo anterior a la vinculación no se trae.</li>
+          </ul>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.9rem' }}>

@@ -65,6 +65,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const at = atSec > 0 ? (atSec < 1e12 ? atSec * 1000 : atSec) : Date.now();
   const phone = (fromRaw ?? '').replace(/\D/g, '');
   if (!phone) return NextResponse.json({ ok: true, ignored: 'phone' });
+  // Solo conversaciones 1 a 1. Un grupo (`...@g.us`) llega como id de 18 dígitos
+  // o `creador-timestamp`; los estados (`status@broadcast`) ya caen en 'phone'.
+  // E.164 tope 15 dígitos, así que todo lo más largo no es una persona.
+  if (phone.length > 15 || phone.length < 8) {
+    return NextResponse.json({ ok: true, ignored: 'no-individual' });
+  }
   if (type === 'text' && !text && !mediaB64) return NextResponse.json({ ok: true, ignored: 'empty' });
 
   const [existing] = await db
