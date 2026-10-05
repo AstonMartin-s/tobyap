@@ -56,6 +56,17 @@ function isPdfMsg(m: Msg): boolean {
   return mime.includes('pdf') || name.endsWith('.pdf');
 }
 
+function mediaKind(m: Msg): 'pdf' | 'video' | 'audio' | 'file' | 'image' {
+  const mime = (m.mime || '').toLowerCase();
+  const name = (m.name || '').toLowerCase();
+  if (mime.includes('pdf') || name.endsWith('.pdf')) return 'pdf';
+  if (mime.startsWith('video/') || /\.(mp4|webm|mov)$/.test(name)) return 'video';
+  if (mime.startsWith('audio/') || /\.(ogg|opus|mp3|m4a|wav)$/.test(name)) return 'audio';
+  if (mime.startsWith('image/') || /\.(jpe?g|png|gif|webp)$/.test(name)) return 'image';
+  if (mime || name) return 'file';
+  return 'image';
+}
+
 // Nombres IGUALES al embudo de Kommo (para que el operario no traduzca).
 const STEP: Record<string, { label: string; color: string }> = {
   form: { label: 'Formulario', color: '#64748b' },
@@ -1443,12 +1454,16 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                       borderBottomLeftRadius: mine ? 16 : 4,
                     }}>
                       {m.image ? (
-                        isPdfMsg(m) ? (
-                          <a href={m.image} target="_blank" rel="noreferrer" title="Abrir PDF"
+                        mediaKind(m) === 'pdf' || (mediaKind(m) === 'file' && !mine) ? (
+                          <a href={m.image} target="_blank" rel="noreferrer" title="Abrir archivo"
                             style={{ display: 'inline-flex', alignItems: 'center', gap: '.45rem', padding: '.45rem .65rem', fontSize: '.82rem', fontWeight: 700, color: '#7c5cff', border: '1px solid rgba(124,92,255,.4)', borderRadius: 10, background: 'rgba(124,92,255,.08)', textDecoration: 'none' }}>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                            {m.name || 'Comprobante PDF'}
+                            {m.name || (isPdfMsg(m) ? 'Comprobante PDF' : 'Archivo')}
                           </a>
+                        ) : mediaKind(m) === 'video' && !mine ? (
+                          <video src={m.image} controls style={{ maxWidth: 240, maxHeight: 240, borderRadius: 10, display: 'block' }} />
+                        ) : mediaKind(m) === 'audio' && !mine ? (
+                          <audio src={m.image} controls style={{ maxWidth: 240, display: 'block' }} />
                         ) : mine ? (
                           // Imagen de referencia del bot/operador (ej. portal). Si el
                           // archivo falta, se oculta (igual que en el chat del cliente)
@@ -1477,6 +1492,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
                           </a>
                         )
                       ) : m.text}
+                      {m.image && m.text ? <div style={{ marginTop: '.35rem', whiteSpace: 'pre-wrap' }}>{m.text}</div> : null}
                     </div>
                   </div>
                 );

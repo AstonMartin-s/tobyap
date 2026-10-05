@@ -28,12 +28,25 @@ function verifySignature(secret: string, rawBody: string, header: string | null)
   }
 }
 
+const MEDIA_TYPES = new Set(['image', 'sticker', 'video', 'audio', 'document']);
+
 function mimeFromB64(b64: string): string {
   if (b64.startsWith('/9j/')) return 'image/jpeg';
   if (b64.startsWith('iVBOR')) return 'image/png';
   if (b64.startsWith('R0lG')) return 'image/gif';
   if (b64.startsWith('UklGR')) return 'image/webp';
   return 'image/jpeg';
+}
+
+function mimeFor(type: string, declared: string, b64: string, filename: string): string {
+  const clean = declared.toLowerCase().split(';')[0].trim();
+  if (clean) return clean;
+  if (type === 'sticker') return 'image/webp';
+  if (type === 'image') return mimeFromB64(b64);
+  if (type === 'video') return 'video/mp4';
+  if (type === 'audio') return 'audio/ogg';
+  if (filename.toLowerCase().endsWith('.pdf')) return 'application/pdf';
+  return 'application/octet-stream';
 }
 
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
@@ -58,9 +71,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   const messageId = typeof body.message_id === 'string' ? body.message_id : '';
   const fromRaw = typeof body.from === 'string' ? body.from : '';
-  const type = body.type === 'image' ? 'image' : 'text';
+  const rawType = typeof body.type === 'string' ? body.type : 'text';
+  const type = MEDIA_TYPES.has(rawType) ? rawType : 'text';
   const text = typeof body.text === 'string' ? body.text : '';
   const mediaB64 = typeof body.media_base64 === 'string' ? body.media_base64 : '';
+  const declaredMime = typeof body.mime === 'string' ? body.mime : '';
+  const filename = typeof body.filename === 'string'
+    ? body.filename
+    : (typeof body.fileName === 'string' ? body.fileName : '');
   const atSec = typeof body.at === 'number' ? body.at : 0;
   const at = atSec > 0 ? (atSec < 1e12 ? atSec * 1000 : atSec) : Date.now();
   const phone = (fromRaw ?? '').replace(/\D/g, '');
@@ -71,7 +89,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (phone.length > 15 || phone.length < 8) {
     return NextResponse.json({ ok: true, ignored: 'no-individual' });
   }
-  if (type === 'text' && !text && !mediaB64) return NextResponse.json({ ok: true, ignored: 'empty' });
+  if (type === 'text' && !text) return NextResponse.json({ ok: true, ignored: 'empty' });
+  // Sin bytes no se guarda un globo vacío: la foto que llega sin archivo confunde.
+  if (type !== 'text' && !mediaB64) return NextResponse.json({ ok: true, ignored: 'no-media' });
 
   const [existing] = await db
     .select()
@@ -94,9 +114,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     ))
     .limit(1);
 
-  const msg: { from: 'user'; text?: string; image?: string; at: number } = { from: 'user', at };
-  if (type === 'image' && mediaB64) {
-    msg.image = mediaB64.startsWith('data:') ? mediaB64 : `data:${mimeFromB64(mediaB64)};base64,${mediaB64}`;
+  const msg: { from: 'user'; text?: string; image?: string; mime?: string; name?: string; at: number } = { from: 'user', at };
+  if (type !== 'text') {
+    const mime = mimeFor(type, declaredMime, mediaB64, filename);
+    msg.image = mediaB64.startsWith('data:') ? mediaB64 : `data:${mime};base64,${mediaB64}`;
+    msg.mime = mime;
+    if (filename) msg.name = filename.slice(0, 180);
     if (text) msg.text = text;
   } else {
     msg.text = text;
