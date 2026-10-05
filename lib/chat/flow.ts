@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/db';
-import { clientSettings } from '@/db/schema';
+import { chatSessions, clientSettings } from '@/db/schema';
+import { buildGanamosUsername, buildPhoneUsername } from '@/lib/chat/manualUsername';
 import { createPortalAccount, buildPortalName } from '@/lib/pagoda';
 import { createPlayerWithRetry, buildPlayerUsername, randomPlayerPassword } from '@/lib/partner-api';
 import { createUser as kingCreateUser, KingApiError } from '@/lib/king-api';
@@ -246,16 +247,25 @@ export async function accountStep(
 // SUGERIMOS username/password y dejamos la sesión EN ESPERA ('account_pending')
 // hasta que el operador confirme desde el panel. No revelamos credenciales
 // todavía. El username sugerido = <nombre_limpio> + últimos 4 dígitos del tel.
+// ClienteA1 usa otro molde: nombre + 777/888/222/123 + "g".
 export function buildManualUsername(name?: string | null, phone?: string): string {
-  const clean = (name ?? '')
-    .normalize('NFD')
-    .replace(/[^a-zA-Z0-9]/g, '')
-    .toLowerCase()
-    .slice(0, 12);
-  const digits = (phone ?? '').replace(/\D/g, '');
-  const last4 = digits.slice(-4);
-  const base = clean.length >= 2 ? clean : `user${digits.slice(-6)}`;
-  return `${base}${last4}`.slice(0, 18);
+  return buildPhoneUsername(name, phone);
+}
+
+async function takenUsernames(tenantId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ data: chatSessions.data })
+    .from(chatSessions)
+    .where(eq(chatSessions.tenantId, tenantId));
+  const taken = new Set<string>();
+  for (const r of rows) {
+    const d = (r.data ?? {}) as Record<string, unknown>;
+    for (const k of ['username', 'suggestedUsername', 'portalName'] as const) {
+      const v = typeof d[k] === 'string' ? d[k].trim().toLowerCase() : '';
+      if (v) taken.add(v);
+    }
+  }
+  return taken;
 }
 
 async function accountStepManual(
@@ -283,7 +293,9 @@ async function accountStepManual(
   // Ya estábamos esperando confirmación: no rotamos la sugerencia.
   const keepUser = typeof prev.suggestedUsername === 'string' ? prev.suggestedUsername.trim() : '';
   const keepPass = typeof prev.suggestedPassword === 'string' ? prev.suggestedPassword : '';
-  const suggestedUsername = keepUser || buildManualUsername(session.name, session.phone);
+  const suggestedUsername = keepUser || (tenant.slug === 'ClienteA1'
+    ? buildGanamosUsername(session.name, session.phone, await takenUsernames(tenant.id))
+    : buildManualUsername(session.name, session.phone));
   const fixedPass = cfg.fixedSuggestedPassword?.trim() || '';
   const suggestedPassword = fixedPass || keepPass || randomPlayerPassword();
   const cajero = await assignCajeroData(tenant.id);

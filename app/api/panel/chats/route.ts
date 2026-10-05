@@ -195,6 +195,8 @@ export async function GET(req: NextRequest) {
     items,
     stats: statRows,
     tenantProvider: tenantForProvider?.provider ?? 'pagoda',
+    // ClienteA1 sugiere nombre+777g. El resto del alta manual sigue con los últimos 4 del teléfono.
+    manualUserStyle: session.slug === 'ClienteA1' ? 'codeg' : 'phone4',
     fichasEnabled: tenantForProvider ? tenantForProvider.features.fichas : true,
   });
 }
@@ -366,7 +368,8 @@ export async function POST(req: NextRequest) {
     // No pisar el paso si el cliente YA avanzó (ElGanador: demo → CBU → carga →
     // recién ahí Luis entrega el usuario). Solo empujamos a 'credenciales' si
     // todavía está en la bienvenida o esperando el alta.
-    const preCreds = ['welcome', 'account_pending', 'form', '', null, undefined].includes(s.step as string);
+    // 'error' entra: es el alta que falló (Pagoda) y el operador la cierra a mano.
+    const preCreds = ['welcome', 'account_pending', 'form', 'error', '', null, undefined].includes(s.step as string);
     await appendChatMessages(s.id, botMsgs, {
       ...(preCreds ? { step: 'credenciales' } : {}),
       dataMerge: { username, password, loginUrl: null, portalName: username, existing: false, manualPending: false },

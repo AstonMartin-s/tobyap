@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent } from 'react';
 import { TZ_AR } from '@/lib/datetime/ar';
 import { DEFAULT_PANEL_QUICK, type PanelQuickTexts } from '@/lib/chat/templates';
+import { buildGanamosUsername, buildPhoneUsername } from '@/lib/chat/manualUsername';
 import OperationsPanel from './OperationsPanel';
 import ManualAccountPanel from './ManualAccountPanel';
 
@@ -199,6 +200,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const skipNameSave = useRef(false);
   const [stats, setStats] = useState<Array<{ step: string | null; createdAt: string | null; estafa?: boolean; precaucion?: boolean; pushOn?: boolean }>>([]);
   const [tenantProvider, setTenantProvider] = useState<string>('pagoda');
+  const [manualUserStyle, setManualUserStyle] = useState<'phone4' | 'codeg'>('phone4');
   const [fichasEnabled, setFichasEnabled] = useState<boolean>(true);
   const [opsOpen, setOpsOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
@@ -215,14 +217,14 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const manualWaiting = detail?.step === 'account_pending';
   const showManualPanel =
     tenantProvider === 'manual' && !!sel && !!detail && !['closed', 'no_cargo'].includes(detail.step ?? '');
-  // Sugerencia por defecto del usuario: <nombre limpio> + últimos 4 del teléfono.
+  // Sugerencia por defecto. ClienteA1: nombre + 777/888/222/123 + g. El resto: últimos 4 del teléfono.
   const manualSuggestedUser = (() => {
     const fromData = String(detail?.data?.suggestedUsername ?? detail?.username ?? '').trim();
     if (fromData) return fromData;
-    const clean = (detail?.name ?? '').normalize('NFD').replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 12);
-    const digits = (detail?.phone ?? '').replace(/\D/g, '');
-    const base = clean.length >= 2 ? clean : `user${digits.slice(-6)}`;
-    return `${base}${digits.slice(-4)}`.slice(0, 18);
+    const phone = detail?.phone ?? undefined;
+    return manualUserStyle === 'codeg'
+      ? buildGanamosUsername(detail?.name, phone)
+      : buildPhoneUsername(detail?.name, phone);
   })();
   const manualSuggestedPass = String(detail?.data?.suggestedPassword ?? '').trim();
   // Ancho de la lista (barra divisora arrastrable, estilo Black Dragon).
@@ -511,6 +513,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
       pushOn: s.pushOn === true || s.pushOn === 't' || s.pushOn === 'true',
     })));
     if (r.tenantProvider) setTenantProvider(r.tenantProvider);
+    if (r.manualUserStyle === 'codeg' || r.manualUserStyle === 'phone4') setManualUserStyle(r.manualUserStyle);
     if (typeof r.fichasEnabled === 'boolean') setFichasEnabled(r.fichasEnabled);
   }, [showOpPushBanner]);
 

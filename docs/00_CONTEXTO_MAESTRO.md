@@ -6,6 +6,12 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-10-05 — ClienteA1: alta manual y línea de prueba
+
+- La creación de usuario NO era manual: `provider=pagoda` llamaba a la API y, al fallar, el chat decía "Uy, tuve un problemita…". Se pasa a `provider=manual` (mismo esquema que GoldenC: el operador crea la cuenta y confirma en el panel). El usuario sugerido es el nombre del formulario + `777`/`888`/`222`/`123` + `g` (`test888g`). Si ese usuario ya existe, rota al siguiente código. GoldenC y ElGanador siguen con nombre + últimos 4 del teléfono.
+- El paso `error` ahora acepta la confirmación manual y avanza a credenciales, así el chat que ya mostró el error se puede cerrar desde el panel.
+- WhatsApp: la sesión `s1791164614376mzkn` quedó en `waiting_reconnect` con el vínculo viejo (el número personal) y no emitía QR. Se abrió una sesión tracker nueva `s1791224703431r347` (mismo forward, mismo secreto) y el tenant apunta ahí. El QR ya salió. La sesión vieja no se borra: queda abandonada del lado de Blaster.
+
 ## Bitácora 2026-10-05 — ClienteA1 ⇄ Kommo: NO tocar el mapeo de ad_code
 
 - Llegó un R1 pidiendo cambiar `ad_code` de 571786 a 578214 porque 571786 se llama `ttad_name`. **Se rechazó con evidencia.** Sobre 750 leads: 571786 tiene nuestros tokens (`PBQN9P6G`…) en 710; 578214 (`ad_code`) está vacío en los 750. El nombre engaña, el mapeo funciona. Cambiarlo cortaba la recuperación de token del webhook y la escritura de red de seguridad.
