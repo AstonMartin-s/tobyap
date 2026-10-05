@@ -2,6 +2,16 @@
 
 const GANAMOS_CODES = ['777', '888', '222', '123'] as const;
 
+/** Contraseña fácil de dictar: 3 letras iguales + 3 números iguales. Ej: aaa777.
+ *  Sin i, l, o, 0 ni 1, que se confunden al leer. */
+export function easyPlayerPassword(): string {
+  const letters = 'abcdefghjkmnpqrstuvwxyz';
+  const digits = '23456789';
+  const l = letters[Math.floor(Math.random() * letters.length)];
+  const d = digits[Math.floor(Math.random() * digits.length)];
+  return `${l}${l}${l}${d}${d}${d}`;
+}
+
 export function cleanManualBase(name?: string | null, phone?: string): string {
   const clean = (name ?? '')
     .normalize('NFD')

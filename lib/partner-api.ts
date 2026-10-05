@@ -1,4 +1,5 @@
 import type { ResolvedTenant } from '@/lib/types';
+import { easyPlayerPassword } from '@/lib/chat/manualUsername';
 
 // ---------------------------------------------------------------------------
 // Partner API (KingPlay / bblack) — alta de jugador server-to-server.
@@ -132,12 +133,7 @@ export function buildPlayerUsername(name?: string | null, phone?: string, attemp
 // Cumple el mínimo de 6 chars de la plataforma. Con 6 chars el password es corto
 // pero cada usuario tiene su username propio, así que las repeticiones no importan.
 export function randomPlayerPassword(): string {
-  const letters = 'abcdefghjkmnpqrstuvwxyz'; // sin i, l, o (ambiguas al leer)
-  const digits = '23456789'; // sin 0 (o) ni 1 (i/l)
-  const pick = (s: string) => s[Math.floor(Math.random() * s.length)];
-  const l = pick(letters);
-  const d = pick(digits);
-  return l.repeat(3) + d.repeat(3); // ej: "aaa777"
+  return easyPlayerPassword();
 }
 
 // Crea el jugador reintentando con otro username si el elegido ya existe.

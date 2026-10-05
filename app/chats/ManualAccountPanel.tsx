@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { easyPlayerPassword } from '@/lib/chat/manualUsername';
 
 // Panel de CREACIÓN MANUAL de usuario (provider='manual': goldenC/ElGanador).
 // Se monta SOLO cuando el tenant es manual y la sesión está en 'account_pending'.
@@ -18,9 +19,8 @@ export default function ManualAccountPanel({
   suggestedPassword: string;
   onDone?: () => void;
 }) {
-  const randomPass = () => Math.random().toString(36).slice(2, 4) + Math.random().toString(36).slice(2, 4) + Math.floor(100 + Math.random() * 900);
   const [username, setUsername] = useState(suggestedUsername);
-  const [password, setPassword] = useState(suggestedPassword || randomPass());
+  const [password, setPassword] = useState(suggestedPassword || easyPlayerPassword());
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
@@ -28,7 +28,7 @@ export default function ManualAccountPanel({
   // Reset al cambiar de chat / sugerencia.
   useEffect(() => {
     setUsername(suggestedUsername);
-    setPassword(suggestedPassword || randomPass());
+    setPassword(suggestedPassword || easyPlayerPassword());
     setConfirming(false);
     setMsg(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps

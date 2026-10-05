@@ -6,6 +6,16 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-10-05 — ClienteA1: el chat no va a Green
+
+- El chat tenía los defaults de King: portal `greenbet.uno/login` y soporte `wa.link/jugandoconking`. ClienteA1 no es de Green. El CBU guardado es otro (no coincide con el de King).
+- Los bots de su Kommo (WELCOME, CREO_USUARIO, CBU, CARGO…) no entregan el texto por la API: el detalle es solo metadata y `/api/v2/salesbot` responde 403. El portal que ya estaba rastreado es `https://ganamosbet.net` (responde 200, también `/login`).
+- Quedó apuntado: todos los slots de portal a `https://ganamosbet.net/login`.
+- El WhatsApp post carga no está en la API de Kommo. Por ahora el botón "Ir a WhatsApp" apunta a la línea de prueba que termina en 882 (`https://wa.me/5491176242882`), la misma que quedó vinculada. El portal sigue en `https://ganamosbet.net/login`.
+- Inbox: la sesión `s1791224703431r347` está `connected`, autenticada, sin QR y sin error; el JID cierra en 882. Un entrante firmado creó la sesión `9fd1826995a7893ed591629a` (teléfono de prueba `5491199900882`). El duplicado no se repite, un id de grupo se descarta y una firma mala responde 401.
+- El "Hola" real (17:07 ART, desde el otro celular) llegó a WuzAPI y Blaster respondió 200, pero no hubo POST a `wa-in`. WuzAPI manda el evento adentro de `jsonData` (string) y Blaster lee `type` en la raíz, así que lo descarta. El chat venía como `@lid`; el teléfono real está en `SenderAlt`. Se reinyectó a mano: sesión `54ae63211af29286d304fe88`. El arreglo del unwrap es de Blaster.
+- En el panel, "Crear usuario" se cierra con ✕ y vuelve desde la pestaña USUARIO. Solo aparece en livechat cuando tocaron "Quiero mi cuenta". En WhatsApp, solo si escribieron que quieren usuario o cuenta. La contraseña sugerida es 3 letras iguales + 3 números iguales (`aaa777`), sin i, l, o, 0 ni 1.
+
 ## Bitácora 2026-10-05 — ClienteA1: alta manual y línea de prueba
 
 - La creación de usuario NO era manual: `provider=pagoda` llamaba a la API y, al fallar, el chat decía "Uy, tuve un problemita…". Se pasa a `provider=manual` (mismo esquema que GoldenC: el operador crea la cuenta y confirma en el panel). El usuario sugerido es el nombre del formulario + `777`/`888`/`222`/`123` + `g` (`test888g`). Si ese usuario ya existe, rota al siguiente código. GoldenC y ElGanador siguen con nombre + últimos 4 del teléfono.

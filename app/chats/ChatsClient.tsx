@@ -8,6 +8,9 @@ import { buildGanamosUsername, buildPhoneUsername } from '@/lib/chat/manualUsern
 import OperationsPanel from './OperationsPanel';
 import ManualAccountPanel from './ManualAccountPanel';
 
+// Piden usuario o cuenta. No alcanza un "hola".
+const ASKS_ACCOUNT_RE = /(quiero|necesito|dame|pasame|crea|haceme|abr[ií]me).{0,30}(usuario|cuenta)|crear (un )?usuario|abrir cuenta|usuario y contrase/i;
+
 // VAPID base64url → Uint8Array (para suscribir push del operador). Igual que el widget.
 function urlB64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -178,7 +181,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [showKpis, setShowKpis] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [sel, setSel] = useState<string | null>(null);
-  const [detail, setDetail] = useState<{ messages: Msg[]; phone: string | null; name: string | null; username: string | null; step: string | null; kommoLeadId: number | null; data: Record<string, unknown> } | null>(null);
+  const [detail, setDetail] = useState<{ messages: Msg[]; phone: string | null; name: string | null; username: string | null; step: string | null; channel: string | null; kommoLeadId: number | null; data: Record<string, unknown> } | null>(null);
   const [busy, setBusy] = useState(false);
   const [custom, setCustom] = useState('');
   type ChatFilter = 'inbox' | 'revisar' | 'no_leidos' | 'activos' | 'acreditados' | 'no_cargo' | 'archivadas' | 'estafa' | 'precaucion' | 'avisos' | 'sin_avisos';
@@ -209,14 +212,13 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [assignedWa, setAssignedWa] = useState<string | null>(null);
   const [assignedWaName, setAssignedWaName] = useState<string | null>(null);
   const showOpsPanel = fichasEnabled && (tenantProvider === 'partner_api' || tenantProvider === 'king' || tenantProvider === 'kingcash') && !!sel && !!detail?.username;
-  // Panel de creación MANUAL (goldenC/ElGanador): disponible en cualquier paso
-  // activo para que el operador entregue el usuario CUANDO QUIERA (ElGanador: el
-  // cliente arranca con demo → CBU, y Luis libera el usuario real al confirmar la
-  // carga, sin que el cliente lo pida). En 'account_pending' se auto-abre porque
-  // el cliente está esperando (flujo goldenC).
-  const manualWaiting = detail?.step === 'account_pending';
-  const showManualPanel =
-    tenantProvider === 'manual' && !!sel && !!detail && !['closed', 'no_cargo'].includes(detail.step ?? '');
+  // Crear usuario solo cuando lo pidieron. Livechat: tocaron "Quiero mi cuenta"
+  // (paso account_pending). WhatsApp: escribieron que quieren usuario o cuenta.
+  // Un "hola" de inbox no abre el panel.
+  const isWaChat = (detail?.channel ?? 'livechat') === 'whatsapp';
+  const waAskedAccount = isWaChat && (detail?.messages ?? []).some((m) => m.from === 'user' && ASKS_ACCOUNT_RE.test(m.text ?? ''));
+  const manualWaiting = !isWaChat && detail?.step === 'account_pending';
+  const showManualPanel = tenantProvider === 'manual' && !!sel && !!detail && (manualWaiting || waAskedAccount);
   // Sugerencia por defecto. ClienteA1: nombre + 777/888/222/123 + g. El resto: últimos 4 del teléfono.
   const manualSuggestedUser = (() => {
     const fromData = String(detail?.data?.suggestedUsername ?? detail?.username ?? '').trim();
@@ -289,8 +291,8 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     else delete document.body.dataset.chatOpen;
     return () => { delete document.body.dataset.chatOpen; };
   }, [chatFullscreen]);
-  // Desktop: rail fijo. Mobile: hoja inferior (si no, 340px se come el chat).
-  const dockManual = showManualPanel && !isMobile;
+  // Desktop: drawer que se puede cerrar (pestaña en el borde). Mobile: hoja inferior.
+  const manualAvailable = showManualPanel && !isMobile;
   const sheetManual = showManualPanel && isMobile && manualOpen;
   const [soundOn, setSoundOn] = useState(true);
   const soundRef = useRef(true);
@@ -542,7 +544,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     }).then((x) => x.json()).catch(() => null);
     if (r?.ok) {
       const s = r.session;
-      setDetail({ messages: (s.messages ?? []) as Msg[], phone: s.phone, name: s.name, username: (s.data?.username as string) ?? null, step: s.step, kommoLeadId: s.kommoLeadId, data: (s.data ?? {}) as Record<string, unknown> });
+      setDetail({ messages: (s.messages ?? []) as Msg[], phone: s.phone, name: s.name, username: (s.data?.username as string) ?? null, step: s.step, channel: (s.channel as string) ?? 'livechat', kommoLeadId: s.kommoLeadId, data: (s.data ?? {}) as Record<string, unknown> });
       setAssignedWa((s.data?.assignedWa as string) ?? null);
       setAssignedWaName((s.data?.assignedWaName as string) ?? null);
     }
@@ -633,9 +635,9 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     if (sel) loadDetail(sel);
   }, [sel, loadDetail]);
   useEffect(() => { setOpsOpen(false); setCargoOpen(false); setCargoAmount(''); }, [sel]); // el drawer de fichas arranca cerrado en cada chat
-  // Solo auto-abrimos (mobile) cuando el cliente está ESPERANDO el alta
-  // (account_pending). En el resto de pasos el operador lo abre a demanda.
-  useEffect(() => { if (manualWaiting) setManualOpen(true); }, [manualWaiting, sel]);
+  // Se abre solo cuando corresponde sugerir el alta. Al cambiar de chat, se cierra
+  // si ese chat no pidió usuario.
+  useEffect(() => { setManualOpen(showManualPanel); }, [showManualPanel, sel]);
   useEffect(() => {
     if (!sel) return;
     const t = setInterval(() => loadDetail(sel), 6000);
@@ -1418,7 +1420,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
 
             <div ref={bodyRef}
               onScroll={(e) => { const el = e.currentTarget; atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}
-              style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '.8rem .85rem' : '1.1rem 1.2rem', paddingRight: dockManual ? '356px' : (showOpsPanel && !opsOpen && !isMobile ? '3.2rem' : (isMobile ? '.85rem' : '1.2rem')), transition: 'padding-right .2s ease', display: 'flex', flexDirection: 'column', gap: '.7rem', minHeight: 0, backgroundColor: 'var(--bg, rgba(0,0,0,.18))', backgroundImage: 'radial-gradient(circle, rgba(124, 92, 255, 0.15) 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
+              style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '.8rem .85rem' : '1.1rem 1.2rem', paddingRight: manualAvailable && manualOpen ? '356px' : ((manualAvailable || (showOpsPanel && !opsOpen)) && !isMobile ? '3.2rem' : (isMobile ? '.85rem' : '1.2rem')), transition: 'padding-right .2s ease', display: 'flex', flexDirection: 'column', gap: '.7rem', minHeight: 0, backgroundColor: 'var(--bg, rgba(0,0,0,.18))', backgroundImage: 'radial-gradient(circle, rgba(124, 92, 255, 0.15) 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
               {detail.messages.slice(0, visibleMsgCount).map((m, idx) => {
                 // Vista de operador: el LEAD (cliente) va a la izquierda, NOSOTROS
                 // (bot/operador) a la derecha — estilo Black Dragon.
@@ -1592,29 +1594,45 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
           </>
         )}
 
-        {/* PANEL de creación MANUAL. Desktop: rail fijo. Mobile: hoja inferior
-            (el rail de 340px dejaba el chat ilegible). */}
-        {dockManual && detail && sel && (
-          <div style={{
-            position: 'absolute', top: 0, right: 0, bottom: 0, width: 340, maxWidth: '85%',
-            zIndex: 9, background: 'var(--card, #14151b)', borderLeft: '1px solid var(--border)',
-            boxShadow: '-10px 0 30px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column', minHeight: 0,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', padding: '.7rem .9rem', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-              <span style={{ fontSize: '.8rem', fontWeight: 800, color: 'var(--accent,#7c5cff)', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
-                Crear usuario
-              </span>
+        {/* PANEL de creación MANUAL. Desktop: drawer que se cierra. Mobile: hoja inferior. */}
+        {manualAvailable && detail && sel && (
+          <>
+            <button type="button" onClick={() => setManualOpen(true)} title="Crear usuario"
+              style={{
+                position: 'absolute', top: '42%', right: 0, transform: `translateY(-50%) translateX(${manualOpen ? '120%' : '0'})`,
+                zIndex: 8, transition: 'transform .28s cubic-bezier(.4,0,.2,1)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.35rem',
+                padding: '.7rem .45rem', border: '1px solid var(--accent)', borderRight: 'none',
+                borderRadius: '10px 0 0 10px', background: 'var(--accent-soft, rgba(124,92,255,.12))',
+                color: 'var(--accent,#7c5cff)', cursor: 'pointer', fontWeight: 700, fontSize: '.68rem',
+              }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+              <span style={{ writingMode: 'vertical-rl', letterSpacing: '.05em' }}>USUARIO</span>
+            </button>
+            <div style={{
+              position: 'absolute', top: 0, right: 0, bottom: 0, width: 340, maxWidth: '85%',
+              transform: manualOpen ? 'translateX(0)' : 'translateX(100%)',
+              transition: 'transform .28s cubic-bezier(.4,0,.2,1)', zIndex: 9,
+              background: 'var(--card, #14151b)', borderLeft: '1px solid var(--border)',
+              boxShadow: '-10px 0 30px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column', minHeight: 0,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.4rem', padding: '.7rem .9rem', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                <span style={{ fontSize: '.8rem', fontWeight: 800, color: 'var(--accent,#7c5cff)', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+                  Crear usuario
+                </span>
+                <button type="button" onClick={() => setManualOpen(false)} title="Minimizar" style={{ border: 'none', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1, padding: '.1rem .3rem' }}>✕</button>
+              </div>
+              <div style={{ padding: '.8rem', overflowY: 'auto', minHeight: 0, flex: 1 }}>
+                <ManualAccountPanel
+                  sessionKey={sel}
+                  suggestedUsername={manualSuggestedUser}
+                  suggestedPassword={manualSuggestedPass}
+                  onDone={() => sel && loadDetail(sel)}
+                />
+              </div>
             </div>
-            <div style={{ padding: '.8rem', overflowY: 'auto', minHeight: 0, flex: 1 }}>
-              <ManualAccountPanel
-                sessionKey={sel}
-                suggestedUsername={manualSuggestedUser}
-                suggestedPassword={manualSuggestedPass}
-                onDone={() => sel && loadDetail(sel)}
-              />
-            </div>
-          </div>
+          </>
         )}
         {sheetManual && detail && sel && (
           <>
