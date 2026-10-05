@@ -433,6 +433,9 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [channelTab, setChannelTab] = useState<'all' | 'whatsapp' | 'livechat'>('all');
   const [waState, setWaState] = useState<{ status: string; lastError: string | null; qr: string | null } | null>(null);
   const [waReconnecting, setWaReconnecting] = useState(false);
+  const [waQrOpen, setWaQrOpen] = useState(false);
+  const [waBox, setWaBox] = useState({ top: 72, left: 16 });
+  const waAnchorRef = useRef<HTMLButtonElement>(null);
   const isTienda = niche === 'tienda';
   const bodyRef = useRef<HTMLDivElement>(null);
   // Autoscroll SOLO si el operador ya está al fondo (o abrió otro chat). Si está
@@ -612,7 +615,18 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     return () => { alive = false; clearInterval(t); };
   }, [hasWa]);
 
+  const placeWaBox = () => {
+    const r = waAnchorRef.current?.getBoundingClientRect();
+    const width = 232;
+    if (!r) return;
+    const left = Math.min(Math.max(8, r.left), window.innerWidth - width - 8);
+    const top = Math.min(r.bottom + 6, window.innerHeight - 340);
+    setWaBox({ top, left });
+  };
+
   const reconnectWa = async () => {
+    placeWaBox();
+    setWaQrOpen(true);
     setWaReconnecting(true);
     try {
       await fetch('/api/panel/wa-reconnect', { method: 'POST' });
@@ -625,6 +639,10 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
       setWaReconnecting(false);
     }
   };
+
+  useEffect(() => {
+    if (waState?.status === 'connected') setWaQrOpen(false);
+  }, [waState?.status]);
 
   useEffect(() => { loadList(); const t = setInterval(loadList, 8000); return () => clearInterval(t); }, [loadList]);
   // Si llegamos desde el Embudo con ?s=<sessionKey>, abrimos ese chat.
@@ -1104,13 +1122,13 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
             onChange={(e) => setQ(e.target.value)} style={{ width: '100%', fontSize: '.8rem', padding: '.4rem .6rem' }} />
         </div>
         {hasWa && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', padding: '0 .6rem .5rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', padding: '0 .6rem .45rem', flexWrap: 'nowrap' }}>
             {(['all', 'whatsapp', 'livechat'] as const).map((ct) => {
               const on = channelTab === ct;
               const label = ct === 'all' ? 'Todos' : ct === 'whatsapp' ? 'WhatsApp' : 'Livechat';
               return (
                 <button key={ct} type="button" onClick={() => setChannelTab(ct)}
-                  style={{ padding: '.24rem .6rem', fontSize: '.72rem', fontWeight: on ? 700 : 500, borderRadius: 7, cursor: 'pointer', border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`, background: on ? 'var(--accent-soft)' : 'transparent', color: on ? 'var(--accent)' : 'var(--muted)' }}>
+                  style={{ padding: '.24rem .6rem', fontSize: '.72rem', fontWeight: on ? 700 : 500, borderRadius: 7, cursor: 'pointer', border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`, background: on ? 'var(--accent-soft)' : 'transparent', color: on ? 'var(--accent)' : 'var(--muted)', flexShrink: 0 }}>
                   {label}
                 </button>
               );
@@ -1121,26 +1139,45 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
               const qr = st === 'qr';
               const warn = qr || st === 'reconnecting' || st === 'connecting' || st === 'waiting_reconnect' || st === 'unknown';
               const color = ok ? '#22c55e' : warn ? '#f59e0b' : '#ef4444';
-              const txt = ok ? 'WhatsApp: conectado' : qr ? 'WhatsApp: escaneá el QR' : warn ? 'WhatsApp: reconectando' : 'WhatsApp: caído';
-              const src = waState.qr
-                ? (waState.qr.startsWith('data:') ? waState.qr : `data:image/png;base64,${waState.qr}`)
-                : null;
+              const txt = ok ? 'Conectado' : qr ? 'QR listo' : warn ? 'Conectando' : 'Caído';
               return (
-                <span title={waState.lastError ?? ''} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '.35rem', fontSize: '.68rem', color, flexWrap: 'wrap' }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}` }} />
+                <span title={waState.lastError ?? ''} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '.35rem', fontSize: '.68rem', color, whiteSpace: 'nowrap', minWidth: 0 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}`, flexShrink: 0 }} />
                   {txt}
                   {!ok && (
-                    <button type="button" disabled={waReconnecting} onClick={reconnectWa}
-                      style={{ marginLeft: '.3rem', padding: '.12rem .45rem', fontSize: '.66rem', fontWeight: 700, borderRadius: 6, border: `1px solid ${color}`, background: 'transparent', color, cursor: 'pointer' }}>
-                      {waReconnecting ? '…' : qr ? 'Nuevo QR' : 'Conectar'}
+                    <button ref={waAnchorRef} type="button" disabled={waReconnecting} onClick={() => { if (qr && waState.qr) { placeWaBox(); setWaQrOpen(true); } else reconnectWa(); }}
+                      style={{ padding: '.12rem .45rem', fontSize: '.66rem', fontWeight: 700, borderRadius: 6, border: `1px solid ${color}`, background: 'transparent', color, cursor: 'pointer', flexShrink: 0 }}>
+                      {waReconnecting ? '…' : qr ? 'Ver QR' : 'Conectar'}
                     </button>
                   )}
-                  {src && <img alt="QR de WhatsApp" src={src} style={{ width: 148, height: 148, background: '#fff', borderRadius: 8, marginLeft: '.4rem' }} />}
                 </span>
               );
             })()}
           </div>
         )}
+        {hasWa && waQrOpen && (() => {
+          const src = waState?.qr
+            ? (waState.qr.startsWith('data:') ? waState.qr : `data:image/png;base64,${waState.qr}`)
+            : null;
+          return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setWaQrOpen(false)}>
+              <div onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', top: waBox.top, left: waBox.left, width: 232, padding: '.7rem', borderRadius: 12, background: 'var(--card, #16181f)', border: '1px solid var(--border)', boxShadow: '0 16px 40px rgba(0,0,0,.45)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.55rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '.4rem' }}>
+                  <strong style={{ fontSize: '.78rem', flex: 1 }}>Vincular WhatsApp</strong>
+                  <button type="button" onClick={() => setWaQrOpen(false)} style={{ border: 'none', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}>✕</button>
+                </div>
+                {src
+                  ? <img alt="QR de WhatsApp" src={src} style={{ width: 196, height: 196, background: '#fff', borderRadius: 8 }} />
+                  : <div style={{ width: 196, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: '.75rem' }}>{waReconnecting ? 'Generando el QR…' : 'Todavía no hay QR'}</div>}
+                <span style={{ fontSize: '.68rem', color: 'var(--muted)', textAlign: 'center' }}>Escanealo con el teléfono del inbox.</span>
+                <button type="button" disabled={waReconnecting} onClick={reconnectWa}
+                  style={{ padding: '.28rem .7rem', fontSize: '.72rem', fontWeight: 700, borderRadius: 7, border: '1px solid #f59e0b', background: 'transparent', color: '#f59e0b', cursor: 'pointer' }}>
+                  {waReconnecting ? '…' : 'Nuevo QR'}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
         <div style={{ display: 'flex', gap: '.3rem', padding: '0 .6rem .6rem', borderBottom: '1px solid var(--border)', flexShrink: 0, flexWrap: 'wrap' }}>
           {(
             [
