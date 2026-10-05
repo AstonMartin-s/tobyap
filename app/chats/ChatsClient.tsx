@@ -433,9 +433,6 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [channelTab, setChannelTab] = useState<'all' | 'whatsapp' | 'livechat'>('all');
   const [waState, setWaState] = useState<{ status: string; lastError: string | null; qr: string | null } | null>(null);
   const [waReconnecting, setWaReconnecting] = useState(false);
-  const [waQrOpen, setWaQrOpen] = useState(false);
-  const [waBox, setWaBox] = useState({ top: 72, left: 16 });
-  const waAnchorRef = useRef<HTMLButtonElement>(null);
   const isTienda = niche === 'tienda';
   const bodyRef = useRef<HTMLDivElement>(null);
   // Autoscroll SOLO si el operador ya está al fondo (o abrió otro chat). Si está
@@ -614,35 +611,6 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     const t = setInterval(() => pull(), 20000);
     return () => { alive = false; clearInterval(t); };
   }, [hasWa]);
-
-  const placeWaBox = () => {
-    const r = waAnchorRef.current?.getBoundingClientRect();
-    const width = 232;
-    if (!r) return;
-    const left = Math.min(Math.max(8, r.left), window.innerWidth - width - 8);
-    const top = Math.min(r.bottom + 6, window.innerHeight - 340);
-    setWaBox({ top, left });
-  };
-
-  const reconnectWa = async () => {
-    placeWaBox();
-    setWaQrOpen(true);
-    setWaReconnecting(true);
-    try {
-      await fetch('/api/panel/wa-reconnect', { method: 'POST' });
-      setTimeout(() => {
-        fetch('/api/panel/wa-status?fresh=1').then((r) => r.json()).then((d) => {
-          if (d?.enabled) setWaState({ status: String(d.status ?? 'unknown'), lastError: d.lastError ?? null, qr: typeof d.qr === 'string' ? d.qr : null });
-        }).catch(() => {});
-      }, 2500);
-    } finally {
-      setWaReconnecting(false);
-    }
-  };
-
-  useEffect(() => {
-    if (waState?.status === 'connected') setWaQrOpen(false);
-  }, [waState?.status]);
 
   useEffect(() => { loadList(); const t = setInterval(loadList, 8000); return () => clearInterval(t); }, [loadList]);
   // Si llegamos desde el Embudo con ?s=<sessionKey>, abrimos ese chat.
@@ -1136,48 +1104,19 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
             {waState && (() => {
               const st = waState.status;
               const ok = st === 'connected';
-              const qr = st === 'qr';
-              const warn = qr || st === 'reconnecting' || st === 'connecting' || st === 'waiting_reconnect' || st === 'unknown';
+              const warn = st === 'qr' || st === 'reconnecting' || st === 'connecting' || st === 'waiting_reconnect' || st === 'unknown';
               const color = ok ? '#22c55e' : warn ? '#f59e0b' : '#ef4444';
-              const txt = ok ? 'Conectado' : qr ? 'QR listo' : warn ? 'Conectando' : 'Caído';
+              const txt = ok ? 'Conectado' : st === 'qr' ? 'Falta vincular' : warn ? 'Conectando' : 'Caído';
               return (
-                <span title={waState.lastError ?? ''} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '.35rem', fontSize: '.68rem', color, whiteSpace: 'nowrap', minWidth: 0 }}>
+                <a href="/wa-connect" title={waState.lastError ?? 'WhatsApp Connect'} style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '.35rem', fontSize: '.68rem', color, whiteSpace: 'nowrap', minWidth: 0, textDecoration: 'none' }}>
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}`, flexShrink: 0 }} />
                   {txt}
-                  {!ok && (
-                    <button ref={waAnchorRef} type="button" disabled={waReconnecting} onClick={() => { if (qr && waState.qr) { placeWaBox(); setWaQrOpen(true); } else reconnectWa(); }}
-                      style={{ padding: '.12rem .45rem', fontSize: '.66rem', fontWeight: 700, borderRadius: 6, border: `1px solid ${color}`, background: 'transparent', color, cursor: 'pointer', flexShrink: 0 }}>
-                      {waReconnecting ? '…' : qr ? 'Ver QR' : 'Conectar'}
-                    </button>
-                  )}
-                </span>
+                  {!ok && <span style={{ padding: '.12rem .45rem', fontSize: '.66rem', fontWeight: 700, borderRadius: 6, border: `1px solid ${color}`, flexShrink: 0 }}>Vincular</span>}
+                </a>
               );
             })()}
           </div>
         )}
-        {hasWa && waQrOpen && (() => {
-          const src = waState?.qr
-            ? (waState.qr.startsWith('data:') ? waState.qr : `data:image/png;base64,${waState.qr}`)
-            : null;
-          return (
-            <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setWaQrOpen(false)}>
-              <div onClick={(e) => e.stopPropagation()} style={{ position: 'fixed', top: waBox.top, left: waBox.left, width: 232, padding: '.7rem', borderRadius: 12, background: 'var(--card, #16181f)', border: '1px solid var(--border)', boxShadow: '0 16px 40px rgba(0,0,0,.45)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.55rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '.4rem' }}>
-                  <strong style={{ fontSize: '.78rem', flex: 1 }}>Vincular WhatsApp</strong>
-                  <button type="button" onClick={() => setWaQrOpen(false)} style={{ border: 'none', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}>✕</button>
-                </div>
-                {src
-                  ? <img alt="QR de WhatsApp" src={src} style={{ width: 196, height: 196, background: '#fff', borderRadius: 8 }} />
-                  : <div style={{ width: 196, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: '.75rem' }}>{waReconnecting ? 'Generando el QR…' : 'Todavía no hay QR'}</div>}
-                <span style={{ fontSize: '.68rem', color: 'var(--muted)', textAlign: 'center' }}>Escanealo con el teléfono del inbox.</span>
-                <button type="button" disabled={waReconnecting} onClick={reconnectWa}
-                  style={{ padding: '.28rem .7rem', fontSize: '.72rem', fontWeight: 700, borderRadius: 7, border: '1px solid #f59e0b', background: 'transparent', color: '#f59e0b', cursor: 'pointer' }}>
-                  {waReconnecting ? '…' : 'Nuevo QR'}
-                </button>
-              </div>
-            </div>
-          );
-        })()}
         <div style={{ display: 'flex', gap: '.3rem', padding: '0 .6rem .6rem', borderBottom: '1px solid var(--border)', flexShrink: 0, flexWrap: 'wrap' }}>
           {(
             [

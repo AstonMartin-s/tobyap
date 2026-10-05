@@ -67,6 +67,11 @@ const I = {
       <line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" />
     </svg>
   ),
+  whatsapp: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-4-1L3 20l1-5.5a8.5 8.5 0 0 1 16.99-3z" /><path d="M8.5 9c0 3 2.5 5.5 5.5 5.5" />
+    </svg>
+  ),
   close: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -85,6 +90,7 @@ export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?:
 
   // Solapas opcionales por cliente (default: todas on hasta que cargue).
   const [feat, setFeat] = useState<Features>(ALL_ON);
+  const [hasWa, setHasWa] = useState(false);
   // Nicho: cacheado en localStorage para que en navegaciones cliente el menú
   // arranque con el valor correcto (evita el flash "Producto"→"Embudo").
   const [niche, setNiche] = useState<'circo' | 'tienda'>(() => {
@@ -99,6 +105,7 @@ export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?:
       .then((d) => {
         if (!alive) return;
         if (d?.features) setFeat(d.features);
+        if (d?.whatsapp === true) setHasWa(true);
         if (d?.niche === 'tienda' || d?.niche === 'circo') {
           setNiche(d.niche);
           try { localStorage.setItem('tk_niche', d.niche); } catch { /* ignore */ }
@@ -191,6 +198,7 @@ export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?:
           <>
             {feat.reportes && (pr === 'supervisor' || pr === 'admin') && NavLink('/reportes', 'Reportes', I.report)}
             {NavLink('/chats', 'Chats web', I.chat)}
+            {hasWa && NavLink('/wa-connect', 'WhatsApp Connect', I.whatsapp)}
             {/* Tienda: Producto (matriz) + Ajustes chat (identidad). Circo: Embudo (Kommo) + Ajustes chat. */}
             {isTienda
               ? (
