@@ -1,13 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getTenantBySlug } from '@/lib/tenants';
-import { blasterConfig, blasterState } from '@/lib/blaster';
+import { blasterConfig, blasterLineIds, blasterState, phoneFromJid, waMeLink, MAX_BLASTER_LINES } from '@/lib/blaster';
 
 export const dynamic = 'force-dynamic';
 
 type Cached = { at: number; payload: Record<string, unknown> };
 const CACHE = new Map<string, Cached>();
 const TTL_MS = 15000;
+
+function linePayload(sessionId: string, state: Awaited<ReturnType<typeof blasterState>>) {
+  const jid = state?.jid ?? null;
+  return {
+    sessionId,
+    status: state?.status ?? 'unknown',
+    jid,
+    phone: phoneFromJid(jid),
+    link: waMeLink(jid),
+    lastError: state?.lastError ?? null,
+    qr: state?.qr ?? null,
+    device: state?.device ?? null,
+    connectionStatus: state?.connectionStatus ?? null,
+    authenticationStatus: state?.authenticationStatus ?? null,
+    lastCausalEvent: state?.lastCausalEvent ?? null,
+    sessionHealth: state?.sessionHealth ?? null,
+  };
+}
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -20,29 +38,36 @@ export async function GET(req: NextRequest) {
   }
 
   const tenant = await getTenantBySlug(session.slug);
-  const cfg = tenant ? blasterConfig(tenant) : null;
-  if (!cfg) {
-    const payload = { ok: true, enabled: false };
+  const ids = tenant ? blasterLineIds(tenant) : [];
+  if (!tenant || ids.length === 0) {
+    const payload = { ok: true, enabled: false, max: MAX_BLASTER_LINES, lines: [] };
     CACHE.set(session.tenantId, { at: Date.now(), payload });
     return NextResponse.json(payload);
   }
 
-  const state = await blasterState(cfg);
-  const payload = state
-    ? {
-        ok: true,
-        enabled: true,
-        status: state.status,
-        jid: state.jid ?? null,
-        lastError: state.lastError ?? null,
-        qr: state.qr ?? null,
-        device: state.device ?? null,
-        connectionStatus: state.connectionStatus ?? null,
-        authenticationStatus: state.authenticationStatus ?? null,
-        lastCausalEvent: state.lastCausalEvent ?? null,
-        sessionHealth: state.sessionHealth ?? null,
-      }
-    : { ok: true, enabled: true, status: 'unknown', jid: null, lastError: 'sin respuesta de Blaster', qr: null };
+  const lines = await Promise.all(ids.map(async (id) => {
+    const cfg = blasterConfig(tenant, id);
+    const state = cfg ? await blasterState(cfg) : null;
+    return linePayload(id, state);
+  }));
+
+  const first = lines[0];
+  const payload = {
+    ok: true,
+    enabled: true,
+    max: MAX_BLASTER_LINES,
+    lines,
+    // Compat con el header (primera línea).
+    status: first?.status ?? 'unknown',
+    jid: first?.jid ?? null,
+    lastError: first?.lastError ?? null,
+    qr: first?.qr ?? null,
+    device: first?.device ?? null,
+    connectionStatus: first?.connectionStatus ?? null,
+    authenticationStatus: first?.authenticationStatus ?? null,
+    lastCausalEvent: first?.lastCausalEvent ?? null,
+    sessionHealth: first?.sessionHealth ?? null,
+  };
   CACHE.set(session.tenantId, { at: Date.now(), payload });
   return NextResponse.json(payload);
 }

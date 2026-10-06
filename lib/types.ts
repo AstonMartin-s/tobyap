@@ -44,6 +44,7 @@ export interface ResolvedTenant {
   // Inbox WhatsApp no-API (Blaster). null si el tenant no tiene el canal.
   blasterBaseUrl: string | null;
   blasterSessionId: string | null;
+  blasterSessionIds: string[];
   blasterToken: string | null;
   waInboundSecret: string | null;
 
@@ -181,6 +182,7 @@ export interface CreateTenantInput {
   affiliateWebhookSecret?: string; // cifrado
   blasterBaseUrl?: string;
   blasterSessionId?: string;
+  blasterSessionIds?: string[];
   blasterToken?: string; // cifrado
   waInboundSecret?: string; // cifrado
 

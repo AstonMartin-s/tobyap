@@ -2,24 +2,19 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-type WaState = {
-  enabled: boolean;
+type WaLine = {
+  sessionId: string;
   status: string;
-  lastError: string | null;
-  qr: string | null;
   phone: string | null;
+  link: string | null;
   device: string | null;
   connectionStatus: string | null;
   authenticationStatus: string | null;
   lastCausalEvent: string | null;
   sessionHealth: string | null;
+  lastError: string | null;
+  qr: string | null;
 };
-
-function phoneFromJid(jid: unknown): string | null {
-  if (typeof jid !== 'string' || !jid) return null;
-  const digits = jid.split('@')[0].split(':')[0].replace(/\D/g, '');
-  return digits ? `+${digits}` : null;
-}
 
 const STATUS_LABEL: Record<string, { txt: string; color: string }> = {
   connected: { txt: 'Conectado', color: '#22c55e' },
@@ -47,15 +42,12 @@ const SOCK_LABEL: Record<string, string> = {
   disconnected: 'Cortado',
 };
 
-// Única señal fehaciente de cuidar el número: authenticationStatus=revoked.
-// La disparan LoggedOut, StreamReplaced, TemporaryBan, ClientOutdated y PairError.
-// Disconnected / KeepAliveTimeout / ConnectFailure / StreamError NO son aviso.
-function careNote(state: WaState | null): string | null {
-  if (!state || state.authenticationStatus !== 'revoked') return null;
-  const cause = state.lastCausalEvent?.trim();
+function careNote(line: WaLine): string | null {
+  if (line.authenticationStatus !== 'revoked') return null;
+  const cause = line.lastCausalEvent?.trim();
   return cause
-    ? `El vínculo de este número quedó revocado (${cause}).`
-    : 'El vínculo de este número quedó revocado.';
+    ? `El vínculo de ${line.phone ?? 'un número'} quedó revocado (${cause}).`
+    : `El vínculo de ${line.phone ?? 'un número'} quedó revocado.`;
 }
 
 const WaLogo = ({ size = 28 }: { size?: number }) => (
@@ -65,8 +57,14 @@ const WaLogo = ({ size = 28 }: { size?: number }) => (
 );
 
 export function WaConnectClient() {
-  const [state, setState] = useState<WaState | null>(null);
+  const [enabled, setEnabled] = useState(false);
+  const [lines, setLines] = useState<WaLine[]>([]);
+  const [max, setMax] = useState(5);
+  const [sel, setSel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const aliveRef = useRef(true);
 
@@ -75,25 +73,15 @@ export function WaConnectClient() {
       const d = await fetch(`/api/panel/wa-status${fresh ? '?fresh=1' : ''}`).then((r) => r.json());
       if (!aliveRef.current) return;
       setLoaded(true);
-      if (d?.enabled) {
-        setState({
-          enabled: true,
-          status: String(d.status ?? 'unknown'),
-          lastError: d.lastError ?? null,
-          qr: typeof d.qr === 'string' ? d.qr : null,
-          phone: phoneFromJid(d.jid),
-          device: typeof d.device === 'string' ? d.device : null,
-          connectionStatus: typeof d.connectionStatus === 'string' ? d.connectionStatus : null,
-          authenticationStatus: typeof d.authenticationStatus === 'string' ? d.authenticationStatus : null,
-          lastCausalEvent: typeof d.lastCausalEvent === 'string' ? d.lastCausalEvent : null,
-          sessionHealth: typeof d.sessionHealth === 'string' ? d.sessionHealth : null,
-        });
-      } else {
-        setState({
-          enabled: false, status: 'unknown', lastError: null, qr: null, phone: null,
-          device: null, connectionStatus: null, authenticationStatus: null, lastCausalEvent: null, sessionHealth: null,
-        });
-      }
+      setEnabled(!!d?.enabled);
+      setMax(typeof d?.max === 'number' ? d.max : 5);
+      const next: WaLine[] = Array.isArray(d?.lines) ? d.lines : [];
+      setLines(next);
+      setSel((prev) => {
+        if (prev && next.some((l) => l.sessionId === prev)) return prev;
+        const waiting = next.find((l) => l.status !== 'connected');
+        return waiting?.sessionId ?? next[0]?.sessionId ?? null;
+      });
     } catch { /* ignora */ }
   }, []);
 
@@ -103,17 +91,25 @@ export function WaConnectClient() {
     return () => { aliveRef.current = false; };
   }, [pull]);
 
+  const allOn = lines.length > 0 && lines.every((l) => l.status === 'connected');
   useEffect(() => {
-    const connected = state?.status === 'connected';
-    const ms = connected ? 30000 : 3500;
+    const ms = allOn ? 30000 : 3500;
     const t = setInterval(() => pull(true), ms);
     return () => clearInterval(t);
-  }, [state?.status, pull]);
+  }, [allOn, pull]);
 
-  const connect = async () => {
+  const selected = lines.find((l) => l.sessionId === sel) ?? null;
+
+  const connect = async (sessionId: string) => {
     setBusy(true);
+    setErr(null);
     try {
-      await fetch('/api/panel/wa-reconnect', { method: 'POST' });
+      const r = await fetch('/api/panel/wa-reconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      }).then((x) => x.json()).catch(() => null);
+      if (r && r.ok === false) setErr(r.error ?? 'no se pudo generar el QR');
       setTimeout(() => pull(true), 1500);
       setTimeout(() => pull(true), 4000);
     } finally {
@@ -121,14 +117,38 @@ export function WaConnectClient() {
     }
   };
 
-  const meta = STATUS_LABEL[state?.status ?? 'unknown'] ?? STATUS_LABEL.unknown;
-  const connected = state?.status === 'connected';
-  const care = careNote(state);
-  const qrSrc = state?.qr
-    ? (state.qr.startsWith('data:') ? state.qr : `data:image/png;base64,${state.qr}`)
-    : null;
+  const addLine = async () => {
+    setAdding(true);
+    setErr(null);
+    try {
+      const r = await fetch('/api/panel/wa-add', { method: 'POST' }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) { setErr(r?.error ?? 'no se pudo agregar'); return; }
+      if (typeof r.sessionId === 'string') setSel(r.sessionId);
+      await pull(true);
+    } finally {
+      setAdding(false);
+    }
+  };
 
-  if (loaded && state && !state.enabled) {
+  const copyLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(url);
+      setTimeout(() => setCopied((c) => (c === url ? null : c)), 1600);
+    } catch { /* ignore */ }
+  };
+
+  const headerMeta = allOn
+    ? STATUS_LABEL.connected
+    : (STATUS_LABEL[selected?.status ?? 'unknown'] ?? STATUS_LABEL.unknown);
+  const cares = lines.map(careNote).filter((x): x is string => !!x);
+  const qrSrc = selected?.qr
+    ? (selected.qr.startsWith('data:') ? selected.qr : `data:image/png;base64,${selected.qr}`)
+    : null;
+  const selectedOn = selected?.status === 'connected';
+  const canAdd = enabled && lines.length < max;
+
+  if (loaded && !enabled) {
     return (
       <div className="card" style={{ maxWidth: 720, margin: '1.4rem auto', padding: '1.6rem', textAlign: 'center' }}>
         <WaLogo size={36} />
@@ -142,7 +162,7 @@ export function WaConnectClient() {
   const th = { ...cell, color: 'var(--muted)', fontWeight: 700, fontSize: '.68rem', letterSpacing: '.04em', textTransform: 'uppercase' as const };
 
   return (
-    <div style={{ maxWidth: 880, margin: '1.2rem auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div style={{ maxWidth: 1080, margin: '1.2rem auto', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div className="card" style={{ padding: '1.15rem 1.3rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.7rem' }}>
           <WaLogo size={32} />
@@ -152,28 +172,42 @@ export function WaConnectClient() {
               Lo que te escriban entra en Chats, pestaña WhatsApp.
             </p>
           </div>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', fontSize: '.82rem', fontWeight: 700, color: meta.color }}>
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: meta.color, boxShadow: `0 0 8px ${meta.color}` }} />
-            {meta.txt}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', fontSize: '.82rem', fontWeight: 700, color: headerMeta.color }}>
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: headerMeta.color, boxShadow: `0 0 8px ${headerMeta.color}` }} />
+            {lines.length ? `${lines.filter((l) => l.status === 'connected').length}/${lines.length} vinculadas` : headerMeta.txt}
           </span>
         </div>
       </div>
 
-      {care && (
-        <div className="card" style={{ padding: '.85rem 1.1rem', border: '1px solid rgba(239,68,68,.45)', background: 'rgba(239,68,68,.08)', color: '#fca5a5', fontSize: '.82rem', fontWeight: 600 }}>
-          {care}
+      {cares.map((c) => (
+        <div key={c} className="card" style={{ padding: '.85rem 1.1rem', border: '1px solid rgba(239,68,68,.45)', background: 'rgba(239,68,68,.08)', color: '#fca5a5', fontSize: '.82rem', fontWeight: 600 }}>
+          {c}
         </div>
+      ))}
+
+      {err && (
+        <div className="card" style={{ padding: '.75rem 1.1rem', color: '#fca5a5', fontSize: '.82rem', fontWeight: 600 }}>{err}</div>
       )}
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.85rem 1.1rem', borderBottom: '1px solid var(--border)' }}>
           <div>
             <div style={{ fontWeight: 800, fontSize: '.88rem' }}>Líneas</div>
-            <div style={{ color: 'var(--muted)', fontSize: '.72rem', marginTop: 2 }}>Por ahora una. Más adelante se pueden sumar otras.</div>
+            <div style={{ color: 'var(--muted)', fontSize: '.72rem', marginTop: 2 }}>Hasta {max} números. El link abre el chat de ese número.</div>
           </div>
-          <button type="button" disabled title="Todavía no se pueden sumar más líneas"
-            style={{ padding: '.38rem .75rem', fontSize: '.75rem', fontWeight: 700, borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--muted)', cursor: 'not-allowed' }}>
-            + Agregar número
+          <button
+            type="button"
+            disabled={!canAdd || adding}
+            title={canAdd ? 'Sumar otra línea' : `Tope de ${max}`}
+            onClick={addLine}
+            style={{
+              padding: '.38rem .75rem', fontSize: '.75rem', fontWeight: 700, borderRadius: 8,
+              border: '1px solid var(--border)',
+              background: canAdd ? '#25D366' : 'transparent',
+              color: canAdd ? '#fff' : 'var(--muted)',
+              cursor: canAdd ? 'pointer' : 'not-allowed',
+            }}>
+            {adding ? '…' : '+ Agregar número'}
           </button>
         </div>
         <div style={{ overflowX: 'auto' }}>
@@ -186,31 +220,62 @@ export function WaConnectClient() {
                 <th style={th}>Socket</th>
                 <th style={th}>Salud</th>
                 <th style={th}>Aviso</th>
+                <th style={{ ...th, textAlign: 'right' }}>Link</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td style={cell}>
-                  <div style={{ fontWeight: 700 }}>{state?.phone ?? '—'}</div>
-                  {state?.device ? <div style={{ color: 'var(--muted)', fontSize: '.68rem', marginTop: 2 }}>{state.device}</div> : null}
-                </td>
-                <td style={{ ...cell, color: meta.color, fontWeight: 700 }}>{meta.txt}</td>
-                <td style={cell}>{state?.authenticationStatus ? (AUTH_LABEL[state.authenticationStatus] ?? state.authenticationStatus) : '—'}</td>
-                <td style={cell}>{state?.connectionStatus ? (SOCK_LABEL[state.connectionStatus] ?? state.connectionStatus) : '—'}</td>
-                <td style={cell}>{state?.sessionHealth ?? '—'}</td>
-                <td style={{ ...cell, color: 'var(--muted)', maxWidth: 220 }}>
-                  {state?.lastError || state?.lastCausalEvent || '—'}
-                </td>
-              </tr>
+              {lines.map((line) => {
+                const meta = STATUS_LABEL[line.status] ?? STATUS_LABEL.unknown;
+                const active = line.sessionId === sel;
+                return (
+                  <tr
+                    key={line.sessionId}
+                    onClick={() => setSel(line.sessionId)}
+                    style={{ cursor: 'pointer', background: active ? 'rgba(37,211,102,.08)' : undefined }}>
+                    <td style={cell}>
+                      <div style={{ fontWeight: 700 }}>{line.phone ?? 'Pendiente de vincular'}</div>
+                      {line.device ? <div style={{ color: 'var(--muted)', fontSize: '.68rem', marginTop: 2 }}>{line.device}</div> : null}
+                    </td>
+                    <td style={{ ...cell, color: meta.color, fontWeight: 700 }}>{meta.txt}</td>
+                    <td style={cell}>{line.authenticationStatus ? (AUTH_LABEL[line.authenticationStatus] ?? line.authenticationStatus) : '—'}</td>
+                    <td style={cell}>{line.connectionStatus ? (SOCK_LABEL[line.connectionStatus] ?? line.connectionStatus) : '—'}</td>
+                    <td style={cell}>{line.sessionHealth ?? '—'}</td>
+                    <td style={{ ...cell, color: 'var(--muted)', maxWidth: 180 }}>
+                      {line.lastError || line.lastCausalEvent || '—'}
+                    </td>
+                    <td style={{ ...cell, textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                      {line.link ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '.45rem' }}>
+                          <span style={{ color: 'var(--muted)', fontSize: '.68rem', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }} title={line.link}>
+                            {line.link.replace(/^https:\/\//, '')}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => copyLink(line.link!)}
+                            title={line.link}
+                            style={{
+                              padding: '.28rem .55rem', fontSize: '.72rem', fontWeight: 700, borderRadius: 7,
+                              border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer',
+                            }}>
+                            {copied === line.link ? 'Copiado' : 'Copiar'}
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--muted)' }}>—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
 
-      {connected ? (
+      {selectedOn ? (
         <div className="card" style={{ padding: '1.1rem 1.2rem' }}>
           <p style={{ fontWeight: 600, margin: '0 0 .45rem' }}>
-            {state?.phone ? `${state.phone} está vinculado.` : 'El número está vinculado.'}
+            {selected?.phone ? `${selected.phone} está vinculado.` : 'El número está vinculado.'}
           </p>
           <ul style={{ color: 'var(--muted)', fontSize: '.8rem', lineHeight: 1.6, margin: 0, paddingLeft: '1.1rem' }}>
             <li>No cierres la sesión desde el teléfono ni saques el dispositivo vinculado.</li>
@@ -219,7 +284,7 @@ export function WaConnectClient() {
             <li>Llegan los mensajes nuevos. Lo anterior a la vinculación no se trae.</li>
           </ul>
         </div>
-      ) : (
+      ) : selected ? (
         <div className="card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.9rem' }}>
           <div style={{ width: 256, height: 256, display: 'flex', alignItems: 'center', justifyContent: 'center', background: qrSrc ? '#fff' : 'var(--bg-2, rgba(255,255,255,.03))', borderRadius: 14, border: '1px solid var(--border)' }}>
             {qrSrc
@@ -227,15 +292,15 @@ export function WaConnectClient() {
               : <span style={{ color: 'var(--muted)', fontSize: '.82rem', textAlign: 'center', padding: '0 1rem' }}>{busy ? 'Generando el QR…' : 'Tocá Conectar para generar el código'}</span>}
           </div>
           <ol style={{ color: 'var(--muted)', fontSize: '.82rem', lineHeight: 1.5, margin: 0, paddingLeft: '1.1rem', alignSelf: 'stretch' }}>
-            <li>Abrí WhatsApp en el teléfono del inbox.</li>
+            <li>Abrí WhatsApp en el teléfono de esta línea.</li>
             <li>Ajustes → Dispositivos vinculados → Vincular un dispositivo.</li>
             <li>Escaneá este código. Si da error, generá uno nuevo: caduca a los segundos.</li>
           </ol>
-          <button type="button" disabled={busy} onClick={connect} style={{ padding: '.5rem 1.1rem', fontSize: '.85rem', fontWeight: 700, borderRadius: 9, border: 'none', background: '#25D366', color: '#fff', cursor: 'pointer' }}>
+          <button type="button" disabled={busy} onClick={() => connect(selected.sessionId)} style={{ padding: '.5rem 1.1rem', fontSize: '.85rem', fontWeight: 700, borderRadius: 9, border: 'none', background: '#25D366', color: '#fff', cursor: 'pointer' }}>
             {busy ? '…' : qrSrc ? 'Generar nuevo QR' : 'Conectar'}
           </button>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

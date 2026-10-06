@@ -131,6 +131,7 @@ export const tenants = pgTable('tenants', {
   // Inbox de WhatsApp no-API vía Blaster. Solo los tenants con esto tienen el canal.
   blasterBaseUrl: text('blaster_base_url'),
   blasterSessionId: text('blaster_session_id'),
+  blasterSessionIds: jsonb('blaster_session_ids').$type<string[]>().default([]),
   blasterToken: text('blaster_token'), // cifrado — token de máquina
   waInboundSecret: text('wa_inbound_secret'), // cifrado — HMAC del webhook wa-in
 

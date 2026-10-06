@@ -53,6 +53,7 @@ function tenantValues(input: CreateTenantInput) {
     affiliateWebhookSecret: encryptOptional(input.affiliateWebhookSecret),
     blasterBaseUrl: input.blasterBaseUrl ?? null,
     blasterSessionId: input.blasterSessionId ?? null,
+    blasterSessionIds: input.blasterSessionIds ?? [],
     blasterToken: encryptOptional(input.blasterToken),
     waInboundSecret: encryptOptional(input.waInboundSecret),
   };
@@ -232,6 +233,7 @@ export interface UpdateTenantPatch {
   affiliateWebhookSecret?: string;
   blasterBaseUrl?: string;
   blasterSessionId?: string;
+  blasterSessionIds?: string[];
   blasterToken?: string;
   waInboundSecret?: string;
 }
@@ -307,6 +309,7 @@ export async function updateTenantFields(slug: string, patch: UpdateTenantPatch)
   if (patch.affiliateWebhookSecret) set.affiliateWebhookSecret = encrypt(patch.affiliateWebhookSecret);
   if (patch.blasterBaseUrl !== undefined) set.blasterBaseUrl = patch.blasterBaseUrl;
   if (patch.blasterSessionId !== undefined) set.blasterSessionId = patch.blasterSessionId;
+  if (patch.blasterSessionIds !== undefined) set.blasterSessionIds = patch.blasterSessionIds;
   if (patch.blasterToken) set.blasterToken = encrypt(patch.blasterToken);
   if (patch.waInboundSecret) set.waInboundSecret = encrypt(patch.waInboundSecret);
 
@@ -369,6 +372,9 @@ function resolve(row: TenantRow): ResolvedTenant {
     affiliateWebhookSecret: decryptOptional(row.affiliateWebhookSecret),
     blasterBaseUrl: row.blasterBaseUrl ?? null,
     blasterSessionId: row.blasterSessionId ?? null,
+    blasterSessionIds: Array.isArray(row.blasterSessionIds)
+      ? row.blasterSessionIds.filter((s): s is string => typeof s === 'string' && !!s.trim())
+      : [],
     blasterToken: decryptOptional(row.blasterToken),
     waInboundSecret: decryptOptional(row.waInboundSecret),
     customFields: cf,

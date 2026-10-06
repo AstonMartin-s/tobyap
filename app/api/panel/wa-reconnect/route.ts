@@ -1,16 +1,17 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { getTenantBySlug } from '@/lib/tenants';
 import { blasterConfig, blasterConnect, blasterState } from '@/lib/blaster';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'no autenticado' }, { status: 401 });
 
   const tenant = await getTenantBySlug(session.slug);
-  const cfg = tenant ? blasterConfig(tenant) : null;
+  const body = (await req.json().catch(() => ({}))) as { sessionId?: string };
+  const cfg = tenant ? blasterConfig(tenant, typeof body.sessionId === 'string' ? body.sessionId : undefined) : null;
   if (!cfg) return NextResponse.json({ error: 'canal WhatsApp no configurado' }, { status: 409 });
 
   // Cuidar la línea: con el vínculo sano no se toca nada. WhatsApp penaliza el
@@ -22,5 +23,5 @@ export async function POST() {
 
   const r = await blasterConnect(cfg);
   if (!r.ok) return NextResponse.json({ error: `no se pudo reconectar: ${r.error ?? 'error'}` }, { status: 502 });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, sessionId: cfg.sessionId });
 }

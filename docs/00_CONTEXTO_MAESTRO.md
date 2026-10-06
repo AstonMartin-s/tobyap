@@ -25,6 +25,8 @@
 - Entró un lead real por WhatsApp: `5493541656358` ("Tenés fichine?", 18:14), sesión `2669e64b8f309979b9e4100b`. No es prueba.
 - En el panel, "Crear usuario" se cierra con ✕ y vuelve desde la pestaña USUARIO. Solo aparece en livechat cuando tocaron "Quiero mi cuenta". En WhatsApp, solo si escribieron que quieren usuario o cuenta. La contraseña sugerida es 3 letras iguales + 3 números iguales (`aaa777`), sin i, l, o, 0 ni 1.
 - ClienteA1: el usuario sugerido es solo el nombre + `777`/`888`/`222`/`123` + `g` (`macaceno777g`). Ya no se pegan 6 dígitos del teléfono (`user533967777g`). Si no hay nombre, `jugador777g`. GoldenC / ElGanador no cambian.
+- Inbox de ClienteA1 vaciado a pedido (6 `chat_sessions`) para grabar un testeo de cero. No se tocó leads / atribución / identidad.
+- WhatsApp: hasta 5 líneas (POST `/api/sessions/tracker`). En la tabla, columna Link a la derecha con `https://wa.me/{número}` para copiar. La línea actual sigue siendo la primera.
 
 ## Bitácora 2026-10-05 — ClienteA1: alta manual y línea de prueba
 
