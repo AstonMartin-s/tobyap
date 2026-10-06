@@ -9,7 +9,6 @@ import {
   lastNDaysRangeAR,
   type Channel,
 } from '@/lib/reports';
-import { Nav } from '../_components/Nav';
 import { DailyAdsCharts } from './DailyAdsCharts';
 import { DailyAdsTable } from './DailyAdsTable';
 import { InfluencerSpend } from './InfluencerSpend';
@@ -86,9 +85,7 @@ export default async function ReportesPage({
   const saldoFinal = daily.length ? daily[0].saldo : 0;
 
   return (
-    <>
-      <Nav slug={session.slug} role={session.role} panelRole={session.panelRole} />
-      <main className="shell">
+    <main className="shell">
         <div className="page-head">
           <div className="page-head__text">
             <h1>Reportes</h1>
@@ -231,7 +228,6 @@ export default async function ReportesPage({
           </div>
         </div>
 
-      </main>
-    </>
+    </main>
   );
 }

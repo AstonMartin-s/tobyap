@@ -82,38 +82,89 @@ const I = {
 type Features = { reportes: boolean; embudo: boolean; livechat: boolean; fichas: boolean };
 const ALL_ON: Features = { reportes: true, embudo: true, livechat: true, fichas: true };
 
-export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?: string; panelRole?: string }) {
+function readCache<T>(key: string, fallback: T, parse: (raw: string) => T | null): T {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return parse(raw) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function Nav({
+  slug,
+  role = 'client',
+  panelRole,
+  whatsapp,
+  features,
+  niche: nicheProp,
+}: {
+  slug: string;
+  role?: string;
+  panelRole?: string;
+  whatsapp?: boolean;
+  features?: Features;
+  niche?: 'circo' | 'tienda';
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const isAdmin = role === 'admin';
   const pr = panelRole ?? 'admin'; // legacy sessions without panelRole = full access
 
-  // Solapas opcionales por cliente (default: todas on hasta que cargue).
-  const [feat, setFeat] = useState<Features>(ALL_ON);
-  const [hasWa, setHasWa] = useState(false);
-  // Nicho: cacheado en localStorage para que en navegaciones cliente el menú
-  // arranque con el valor correcto (evita el flash "Producto"→"Embudo").
-  const [niche, setNiche] = useState<'circo' | 'tienda'>(() => {
-    if (typeof window === 'undefined') return 'circo';
-    try { return localStorage.getItem('tk_niche') === 'tienda' ? 'tienda' : 'circo'; } catch { return 'circo'; }
-  });
+  // Solapas del server (layout) o cache local: si no, al remount WhatsApp
+  // arranca oculto y la lista salta (Chats → Embudo → WhatsApp otra vez).
+  const [feat, setFeat] = useState<Features>(
+    () => features ?? readCache('tk_feat', ALL_ON, (raw) => {
+      const d = JSON.parse(raw) as Features;
+      if (typeof d?.reportes !== 'boolean') return null;
+      return d;
+    }),
+  );
+  const [hasWa, setHasWa] = useState(
+    () => whatsapp ?? readCache('tk_has_wa', false, (raw) => (raw === '1' ? true : raw === '0' ? false : null)),
+  );
+  const [niche, setNiche] = useState<'circo' | 'tienda'>(
+    () => nicheProp ?? readCache('tk_niche', 'circo', (raw) => (raw === 'tienda' || raw === 'circo' ? raw : null)),
+  );
   useEffect(() => {
-    if (isAdmin) return; // el panel admin global no usa solapas por cliente
+    if (typeof whatsapp === 'boolean') {
+      setHasWa(whatsapp);
+      try { localStorage.setItem('tk_has_wa', whatsapp ? '1' : '0'); } catch { /* ignore */ }
+    }
+    if (features) {
+      setFeat(features);
+      try { localStorage.setItem('tk_feat', JSON.stringify(features)); } catch { /* ignore */ }
+    }
+    if (nicheProp === 'tienda' || nicheProp === 'circo') {
+      setNiche(nicheProp);
+      try { localStorage.setItem('tk_niche', nicheProp); } catch { /* ignore */ }
+    }
+  }, [whatsapp, features, nicheProp]);
+  useEffect(() => {
+    if (isAdmin) return;
+    if (typeof whatsapp === 'boolean' && features && nicheProp) return;
     let alive = true;
     fetch('/api/panel/features', { cache: 'no-store' })
       .then((r) => r.json())
       .then((d) => {
         if (!alive) return;
-        if (d?.features) setFeat(d.features);
-        if (d?.whatsapp === true) setHasWa(true);
+        if (d?.features) {
+          setFeat(d.features);
+          try { localStorage.setItem('tk_feat', JSON.stringify(d.features)); } catch { /* ignore */ }
+        }
+        const wa = d?.whatsapp === true;
+        setHasWa(wa);
+        try { localStorage.setItem('tk_has_wa', wa ? '1' : '0'); } catch { /* ignore */ }
         if (d?.niche === 'tienda' || d?.niche === 'circo') {
           setNiche(d.niche);
           try { localStorage.setItem('tk_niche', d.niche); } catch { /* ignore */ }
         }
       })
-      .catch(() => { /* mantiene ALL_ON */ });
+      .catch(() => { /* mantiene cache / defaults */ });
     return () => { alive = false; };
-  }, [isAdmin]);
+  }, [isAdmin, whatsapp, features, nicheProp]);
   const isTienda = niche === 'tienda';
 
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -133,13 +184,14 @@ export function Nav({ slug, role = 'client', panelRole }: { slug: string; role?:
     router.push('/login');
   }
 
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(
+    () => readCache('sidebar', false, (raw) => (raw === 'collapsed' ? true : raw === 'expanded' ? false : null)),
+  );
   const [mobileOpen, setMobileOpen] = useState(false);
   useEffect(() => {
-    const c = (() => { try { return localStorage.getItem('sidebar') === 'collapsed'; } catch { return false; } })();
-    setCollapsed(c);
-    if (c) document.documentElement.dataset.sidebar = 'collapsed';
-  }, []);
+    if (collapsed) document.documentElement.dataset.sidebar = 'collapsed';
+    else delete document.documentElement.dataset.sidebar;
+  }, [collapsed]);
   useEffect(() => { setMobileOpen(false); }, [pathname]);
   function toggleCollapse() {
     const next = !collapsed;

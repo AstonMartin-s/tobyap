@@ -16,7 +16,7 @@ import {
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { Nav } from '../../_components/Nav';
 import { DailyReportClient } from '../DailyReportClient';
-import { DailyAdsCharts } from '../../reportes/DailyAdsCharts';
+import { DailyAdsCharts } from '@/app/(panel)/reportes/DailyAdsCharts';
 
 export const dynamic = 'force-dynamic';
 

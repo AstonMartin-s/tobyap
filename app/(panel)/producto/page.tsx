@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSession, canAccess } from '@/lib/session';
 import { getTenantBySlug } from '@/lib/tenants';
-import { Nav } from '../_components/Nav';
 import { ProductoClient } from './ProductoClient';
 
 export const dynamic = 'force-dynamic';
@@ -17,11 +16,8 @@ export default async function ProductoPage() {
   if (!tenant || tenant.niche !== 'tienda') redirect('/chats');
 
   return (
-    <>
-      <Nav slug={session.slug} role={session.role} panelRole={session.panelRole} />
-      <main className="shell shell--wide" style={{ paddingTop: '1.2rem' }}>
-        <ProductoClient />
-      </main>
-    </>
+    <main className="shell shell--wide" style={{ paddingTop: '1.2rem' }}>
+      <ProductoClient />
+    </main>
   );
 }
