@@ -1,5 +1,13 @@
 // Cliente HTTP hacia Blaster (WhatsApp no-API). Un tenant tiene canal solo si
 // tiene blasterBaseUrl + blasterSessionId + blasterToken.
+//
+// Estado: GET /api/sessions/:id/state → SessionState (status, jid, device,
+// connectionStatus, authenticationStatus, sessionHealth, lastError,
+// lastCausalEvent, qr solo con contenido si status=qr). lineReputation no viene.
+// Cuidado del número: authenticationStatus=revoked (LoggedOut, StreamReplaced,
+// TemporaryBan, ClientOutdated, PairError). sessionHealth=reconnecting no es aviso.
+// Más líneas (aún no): POST /api/sessions/tracker {label?, forwardUrl, forwardSecret}
+// → {id, state}; guardar el id en el tenant. GET /api/sessions oculta trackers.
 import type { ResolvedTenant } from '@/lib/types';
 
 export interface BlasterConfig {

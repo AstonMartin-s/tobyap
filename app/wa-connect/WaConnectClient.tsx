@@ -47,22 +47,15 @@ const SOCK_LABEL: Record<string, string> = {
   disconnected: 'Cortado',
 };
 
-const HEALTH_LABEL: Record<string, string> = {
-  stable: 'Estable',
-  reconnecting: 'Reconectando',
-  requires_qr: 'Pide QR',
-  error: 'Error',
-};
-
-// Solo eventos que Blaster marca como causa de vínculo caído / ban.
+// Única señal fehaciente de cuidar el número: authenticationStatus=revoked.
+// La disparan LoggedOut, StreamReplaced, TemporaryBan, ClientOutdated y PairError.
+// Disconnected / KeepAliveTimeout / ConnectFailure / StreamError NO son aviso.
 function careNote(state: WaState | null): string | null {
-  if (!state) return null;
-  const blob = `${state.authenticationStatus ?? ''} ${state.lastCausalEvent ?? ''} ${state.lastError ?? ''}`;
-  if (/\brevoked\b/i.test(blob)) return 'El vínculo de este dispositivo quedó revocado.';
-  if (/TemporaryBan/i.test(blob)) return 'WhatsApp reportó TemporaryBan en esta línea.';
-  if (/LoggedOut/i.test(blob)) return 'WhatsApp cerró la sesión (LoggedOut).';
-  if (/StreamReplaced/i.test(blob)) return 'WhatsApp reemplazó el stream (otro dispositivo o re-vínculo).';
-  return null;
+  if (!state || state.authenticationStatus !== 'revoked') return null;
+  const cause = state.lastCausalEvent?.trim();
+  return cause
+    ? `El vínculo de este número quedó revocado (${cause}).`
+    : 'El vínculo de este número quedó revocado.';
 }
 
 const WaLogo = ({ size = 28 }: { size?: number }) => (
@@ -204,7 +197,7 @@ export function WaConnectClient() {
                 <td style={{ ...cell, color: meta.color, fontWeight: 700 }}>{meta.txt}</td>
                 <td style={cell}>{state?.authenticationStatus ? (AUTH_LABEL[state.authenticationStatus] ?? state.authenticationStatus) : '—'}</td>
                 <td style={cell}>{state?.connectionStatus ? (SOCK_LABEL[state.connectionStatus] ?? state.connectionStatus) : '—'}</td>
-                <td style={cell}>{state?.sessionHealth ? (HEALTH_LABEL[state.sessionHealth] ?? state.sessionHealth) : '—'}</td>
+                <td style={cell}>{state?.sessionHealth ?? '—'}</td>
                 <td style={{ ...cell, color: 'var(--muted)', maxWidth: 220 }}>
                   {state?.lastError || state?.lastCausalEvent || '—'}
                 </td>
