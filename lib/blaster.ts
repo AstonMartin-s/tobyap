@@ -147,6 +147,18 @@ export async function blasterConnect(cfg: BlasterConfig): Promise<{ ok: boolean;
   }
 }
 
+// Desvincula el dispositivo. POST /:id/logout (token de máquina, igual que connect).
+// No usa relink: eso hace wipe del user de WuzAPI.
+export async function blasterLogout(cfg: BlasterConfig): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const r = await call(cfg, `/api/sessions/${encodeURIComponent(cfg.sessionId)}/logout`, { method: 'POST' }, 12000);
+    if (!r.ok) return { ok: false, error: `blaster ${r.status}` };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
 export async function blasterCreateTracker(
   auth: BlasterAuth,
   body: { label?: string; forwardUrl: string; forwardSecret: string },

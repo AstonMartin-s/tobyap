@@ -27,6 +27,7 @@
 - ClienteA1: el usuario sugerido es solo el nombre + `777`/`888`/`222`/`123` + `g` (`macaceno777g`). Ya no se pegan 6 dígitos del teléfono (`user533967777g`). Si no hay nombre, `jugador777g`. GoldenC / ElGanador no cambian.
 - Inbox de ClienteA1 vaciado a pedido (6 `chat_sessions`) para grabar un testeo de cero. No se tocó leads / atribución / identidad.
 - WhatsApp: hasta 5 líneas (POST `/api/sessions/tracker`). En la tabla, columna Link a la derecha con `https://wa.me/{número}` para copiar. La línea actual sigue siendo la primera.
+- Desconectar llama `POST /api/sessions/:id/logout` con token de máquina. Blaster lo abrió (api `a0aa8286`, commit `104b9f7`, MSG-BLA-20261006-TOB-INBOX-7). Logout desvincula y no borra la sesión; `authenticationStatus=revoked` hasta el próximo `connect`. `relink` no se usa (borra el user de WuzAPI).
 
 ## Bitácora 2026-10-05 — ClienteA1: alta manual y línea de prueba
 

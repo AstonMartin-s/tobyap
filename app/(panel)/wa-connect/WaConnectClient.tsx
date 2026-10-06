@@ -63,6 +63,7 @@ export function WaConnectClient() {
   const [sel, setSel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [dropping, setDropping] = useState<string | null>(null);
   const [waitingQr, setWaitingQr] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -134,6 +135,24 @@ export function WaConnectClient() {
       setTimeout(() => pull(true), 3500);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const disconnect = async (sessionId: string, phone: string | null) => {
+    const who = phone ?? 'esta línea';
+    if (!window.confirm(`¿Desconectar ${who}? El teléfono se desvincula y después hay que escanear un QR nuevo.`)) return;
+    setDropping(sessionId);
+    setErr(null);
+    try {
+      const r = await fetch('/api/panel/wa-disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      }).then((x) => x.json()).catch(() => null);
+      if (!r?.ok) { setErr(r?.error ?? 'no se pudo desconectar'); return; }
+      await pull(true);
+    } finally {
+      setDropping(null);
     }
   };
 
@@ -243,6 +262,7 @@ export function WaConnectClient() {
                 <th style={th}>Salud</th>
                 <th style={th}>Aviso</th>
                 <th style={{ ...th, textAlign: 'right' }}>Link</th>
+                <th style={{ ...th, textAlign: 'right' }}>Acción</th>
               </tr>
             </thead>
             <tbody>
@@ -294,6 +314,19 @@ export function WaConnectClient() {
                         <span style={{ color: 'var(--muted)' }}>—</span>
                       )}
                     </td>
+                    <td style={{ ...cell, textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        disabled={dropping === line.sessionId || (loadingQr && sel === line.sessionId)}
+                        onClick={() => disconnect(line.sessionId, line.phone)}
+                        style={{
+                          padding: '.28rem .55rem', fontSize: '.72rem', fontWeight: 700, borderRadius: 7,
+                          border: '1px solid rgba(239,68,68,.45)', background: 'transparent', color: '#fca5a5',
+                          cursor: dropping === line.sessionId ? 'wait' : 'pointer',
+                        }}>
+                        {dropping === line.sessionId ? 'Cargando…' : 'Desconectar'}
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -313,6 +346,13 @@ export function WaConnectClient() {
             <li>Solo llegan las conversaciones de a uno. Grupos y estados no entran.</li>
             <li>Llegan los mensajes nuevos. Lo anterior a la vinculación no se trae.</li>
           </ul>
+          <button
+            type="button"
+            disabled={dropping === selected.sessionId}
+            onClick={() => disconnect(selected.sessionId, selected.phone)}
+            style={{ marginTop: '.85rem', padding: '.45rem .9rem', fontSize: '.8rem', fontWeight: 700, borderRadius: 8, border: '1px solid rgba(239,68,68,.45)', background: 'transparent', color: '#fca5a5', cursor: 'pointer' }}>
+            {dropping === selected.sessionId ? 'Cargando…' : 'Desconectar esta línea'}
+          </button>
         </div>
       ) : selected ? (
         <div className="card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.9rem' }}>
