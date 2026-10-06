@@ -63,6 +63,7 @@ export function WaConnectClient() {
   const [sel, setSel] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [waitingQr, setWaitingQr] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -93,15 +94,31 @@ export function WaConnectClient() {
 
   const allOn = lines.length > 0 && lines.every((l) => l.status === 'connected');
   useEffect(() => {
-    const ms = allOn ? 30000 : 3500;
+    const ms = allOn ? 30000 : waitingQr ? 1500 : 3500;
     const t = setInterval(() => pull(true), ms);
     return () => clearInterval(t);
-  }, [allOn, pull]);
+  }, [allOn, waitingQr, pull]);
 
   const selected = lines.find((l) => l.sessionId === sel) ?? null;
+  const qrSrc = selected?.qr
+    ? (selected.qr.startsWith('data:') ? selected.qr : `data:image/png;base64,${selected.qr}`)
+    : null;
+  const pendingStatuses = new Set(['connecting', 'qr', 'reconnecting', 'waiting_reconnect']);
+  const linePending = !!selected && selected.status !== 'connected' && (
+    pendingStatuses.has(selected.status)
+    || selected.sessionHealth === 'requires_qr'
+    || selected.authenticationStatus === 'pairing'
+  );
+  const loadingQr = !qrSrc && (waitingQr || busy || adding || linePending);
+
+  useEffect(() => {
+    if (qrSrc || selected?.status === 'connected') setWaitingQr(false);
+  }, [qrSrc, selected?.status]);
 
   const connect = async (sessionId: string) => {
+    if (loadingQr) return;
     setBusy(true);
+    setWaitingQr(true);
     setErr(null);
     try {
       const r = await fetch('/api/panel/wa-reconnect', {
@@ -109,9 +126,12 @@ export function WaConnectClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId }),
       }).then((x) => x.json()).catch(() => null);
-      if (r && r.ok === false) setErr(r.error ?? 'no se pudo generar el QR');
-      setTimeout(() => pull(true), 1500);
-      setTimeout(() => pull(true), 4000);
+      if (r && r.ok === false) {
+        setErr(r.error ?? 'no se pudo generar el QR');
+        setWaitingQr(false);
+      }
+      setTimeout(() => pull(true), 1200);
+      setTimeout(() => pull(true), 3500);
     } finally {
       setBusy(false);
     }
@@ -119,10 +139,15 @@ export function WaConnectClient() {
 
   const addLine = async () => {
     setAdding(true);
+    setWaitingQr(true);
     setErr(null);
     try {
       const r = await fetch('/api/panel/wa-add', { method: 'POST' }).then((x) => x.json()).catch(() => null);
-      if (!r?.ok) { setErr(r?.error ?? 'no se pudo agregar'); return; }
+      if (!r?.ok) {
+        setErr(r?.error ?? 'no se pudo agregar');
+        setWaitingQr(false);
+        return;
+      }
       if (typeof r.sessionId === 'string') setSel(r.sessionId);
       await pull(true);
     } finally {
@@ -142,11 +167,8 @@ export function WaConnectClient() {
     ? STATUS_LABEL.connected
     : (STATUS_LABEL[selected?.status ?? 'unknown'] ?? STATUS_LABEL.unknown);
   const cares = lines.map(careNote).filter((x): x is string => !!x);
-  const qrSrc = selected?.qr
-    ? (selected.qr.startsWith('data:') ? selected.qr : `data:image/png;base64,${selected.qr}`)
-    : null;
   const selectedOn = selected?.status === 'connected';
-  const canAdd = enabled && lines.length < max;
+  const canAdd = enabled && lines.length < max && !adding;
 
   if (loaded && !enabled) {
     return (
@@ -207,7 +229,7 @@ export function WaConnectClient() {
               color: canAdd ? '#fff' : 'var(--muted)',
               cursor: canAdd ? 'pointer' : 'not-allowed',
             }}>
-            {adding ? '…' : '+ Agregar número'}
+            {adding ? 'Cargando…' : '+ Agregar número'}
           </button>
         </div>
         <div style={{ overflowX: 'auto' }}>
@@ -225,7 +247,15 @@ export function WaConnectClient() {
             </thead>
             <tbody>
               {lines.map((line) => {
-                const meta = STATUS_LABEL[line.status] ?? STATUS_LABEL.unknown;
+                const waitingThis = !line.qr && line.status !== 'connected' && (
+                  (sel === line.sessionId && (waitingQr || busy || adding))
+                  || pendingStatuses.has(line.status)
+                  || line.sessionHealth === 'requires_qr'
+                  || line.authenticationStatus === 'pairing'
+                );
+                const meta = waitingThis && !line.qr
+                  ? { txt: 'Cargando…', color: '#f59e0b' }
+                  : (STATUS_LABEL[line.status] ?? STATUS_LABEL.unknown);
                 const active = line.sessionId === sel;
                 return (
                   <tr
@@ -286,19 +316,34 @@ export function WaConnectClient() {
         </div>
       ) : selected ? (
         <div className="card" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.9rem' }}>
-          <div style={{ width: 256, height: 256, display: 'flex', alignItems: 'center', justifyContent: 'center', background: qrSrc ? '#fff' : 'var(--bg-2, rgba(255,255,255,.03))', borderRadius: 14, border: '1px solid var(--border)' }}>
+          <div style={{ width: 256, height: 256, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '.55rem', background: qrSrc ? '#fff' : 'var(--bg-2, rgba(255,255,255,.03))', borderRadius: 14, border: '1px solid var(--border)' }}>
             {qrSrc
               ? <img alt="QR de WhatsApp" src={qrSrc} style={{ width: 236, height: 236 }} />
-              : <span style={{ color: 'var(--muted)', fontSize: '.82rem', textAlign: 'center', padding: '0 1rem' }}>{busy ? 'Generando el QR…' : 'Tocá Conectar para generar el código'}</span>}
+              : (
+                <>
+                  <span style={{ color: loadingQr ? '#f59e0b' : 'var(--muted)', fontSize: '.88rem', fontWeight: 700, textAlign: 'center', padding: '0 1rem' }}>
+                    {loadingQr ? 'Cargando…' : 'Todavía no hay código'}
+                  </span>
+                  {loadingQr && (
+                    <span style={{ color: 'var(--muted)', fontSize: '.75rem', textAlign: 'center', padding: '0 1.2rem', lineHeight: 1.4 }}>
+                      Esperá el QR. No toques Conectar: si lo reiniciás, WhatsApp puede cortar la línea.
+                    </span>
+                  )}
+                </>
+              )}
           </div>
           <ol style={{ color: 'var(--muted)', fontSize: '.82rem', lineHeight: 1.5, margin: 0, paddingLeft: '1.1rem', alignSelf: 'stretch' }}>
             <li>Abrí WhatsApp en el teléfono de esta línea.</li>
             <li>Ajustes → Dispositivos vinculados → Vincular un dispositivo.</li>
             <li>Escaneá este código. Si da error, generá uno nuevo: caduca a los segundos.</li>
           </ol>
-          <button type="button" disabled={busy} onClick={() => connect(selected.sessionId)} style={{ padding: '.5rem 1.1rem', fontSize: '.85rem', fontWeight: 700, borderRadius: 9, border: 'none', background: '#25D366', color: '#fff', cursor: 'pointer' }}>
-            {busy ? '…' : qrSrc ? 'Generar nuevo QR' : 'Conectar'}
-          </button>
+          {loadingQr ? (
+            <div style={{ padding: '.5rem 1.1rem', fontSize: '.85rem', fontWeight: 700, color: '#f59e0b' }}>Cargando…</div>
+          ) : (
+            <button type="button" disabled={busy} onClick={() => connect(selected.sessionId)} style={{ padding: '.5rem 1.1rem', fontSize: '.85rem', fontWeight: 700, borderRadius: 9, border: 'none', background: '#25D366', color: '#fff', cursor: 'pointer' }}>
+              {qrSrc ? 'Generar nuevo QR' : 'Conectar'}
+            </button>
+          )}
         </div>
       ) : null}
     </div>
