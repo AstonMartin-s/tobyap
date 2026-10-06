@@ -18,8 +18,19 @@ export function cleanManualBase(name?: string | null, phone?: string): string {
     .replace(/[^a-zA-Z0-9]/g, '')
     .toLowerCase()
     .slice(0, 12);
+  if (clean.length >= 2) return clean;
   const digits = (phone ?? '').replace(/\D/g, '');
-  return clean.length >= 2 ? clean : `user${digits.slice(-6)}`;
+  return digits ? `user${digits.slice(-6)}` : 'jugador';
+}
+
+/** ClienteA1: solo letras del nombre. Sin dígitos del teléfono. */
+function ganamosNameBase(name?: string | null): string {
+  const clean = (name ?? '')
+    .normalize('NFD')
+    .replace(/[^a-zA-Z]/g, '')
+    .toLowerCase()
+    .slice(0, 12);
+  return clean.length >= 2 ? clean : 'jugador';
 }
 
 /** GoldenC / ElGanador: nombre limpio + últimos 4 del teléfono. */
@@ -29,19 +40,15 @@ export function buildPhoneUsername(name?: string | null, phone?: string): string
 }
 
 /**
- * ClienteA1 (Ganamos): nombre + un código de 3 (777/888/222/123) + "g".
- * El código sale del teléfono para que la misma persona reciba siempre el
- * mismo, y rota al siguiente si ese usuario ya está tomado.
+ * ClienteA1 (Ganamos): solo el nombre + 777/888/222/123 + "g".
+ * Sin dígitos del teléfono. Empieza en 777; si está tomado, rota.
  */
-export function buildGanamosUsername(name?: string | null, phone?: string, taken?: Iterable<string>): string {
-  const base = cleanManualBase(name, phone);
-  const digits = (phone ?? '').replace(/\D/g, '');
-  const start = Number(digits.slice(-2) || '0') % GANAMOS_CODES.length;
+export function buildGanamosUsername(name?: string | null, _phone?: string, taken?: Iterable<string>): string {
+  const base = ganamosNameBase(name);
   const used = new Set(Array.from(taken ?? [], (s) => String(s).toLowerCase()));
-  for (let i = 0; i < GANAMOS_CODES.length; i++) {
-    const u = `${base}${GANAMOS_CODES[(start + i) % GANAMOS_CODES.length]}g`.slice(0, 18);
+  for (const code of GANAMOS_CODES) {
+    const u = `${base}${code}g`.slice(0, 18);
     if (!used.has(u)) return u;
   }
-  const extra = digits.slice(-1) || '9';
-  return `${base}${GANAMOS_CODES[start]}${extra}g`.slice(0, 18);
+  return `${base}${GANAMOS_CODES[0]}9g`.slice(0, 18);
 }

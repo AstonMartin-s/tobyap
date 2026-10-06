@@ -247,7 +247,7 @@ export async function accountStep(
 // SUGERIMOS username/password y dejamos la sesión EN ESPERA ('account_pending')
 // hasta que el operador confirme desde el panel. No revelamos credenciales
 // todavía. El username sugerido = <nombre_limpio> + últimos 4 dígitos del tel.
-// ClienteA1 usa otro molde: nombre + 777/888/222/123 + "g".
+// ClienteA1 usa otro molde: solo el nombre + 777/888/222/123 + "g" (sin teléfono).
 export function buildManualUsername(name?: string | null, phone?: string): string {
   return buildPhoneUsername(name, phone);
 }

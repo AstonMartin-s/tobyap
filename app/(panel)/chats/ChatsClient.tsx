@@ -233,7 +233,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const waAskedAccount = isWaChat && (detail?.messages ?? []).some((m) => m.from === 'user' && ASKS_ACCOUNT_RE.test(m.text ?? ''));
   const manualWaiting = !isWaChat && detail?.step === 'account_pending';
   const showManualPanel = tenantProvider === 'manual' && !!sel && !!detail && (manualWaiting || waAskedAccount);
-  // Sugerencia por defecto. ClienteA1: nombre + 777/888/222/123 + g. El resto: últimos 4 del teléfono.
+  // Sugerencia. ClienteA1: solo el nombre + 777/888/222/123 + g. El resto: últimos 4 del teléfono.
   const manualSuggestedUser = (() => {
     const fromData = String(detail?.data?.suggestedUsername ?? detail?.username ?? '').trim();
     if (fromData) return fromData;

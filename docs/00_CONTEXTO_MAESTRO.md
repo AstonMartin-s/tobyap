@@ -24,6 +24,7 @@
 - El menú del panel cliente vive en `app/(panel)/layout.tsx` (no en cada page). Antes, al cambiar de solapa, Nav se desmontaba, `hasWa` arrancaba en false y WhatsApp desaparecía un instante. Ahora la lista queda quieta; las flags (whatsapp/features/niche) las manda el server.
 - Entró un lead real por WhatsApp: `5493541656358` ("Tenés fichine?", 18:14), sesión `2669e64b8f309979b9e4100b`. No es prueba.
 - En el panel, "Crear usuario" se cierra con ✕ y vuelve desde la pestaña USUARIO. Solo aparece en livechat cuando tocaron "Quiero mi cuenta". En WhatsApp, solo si escribieron que quieren usuario o cuenta. La contraseña sugerida es 3 letras iguales + 3 números iguales (`aaa777`), sin i, l, o, 0 ni 1.
+- ClienteA1: el usuario sugerido es solo el nombre + `777`/`888`/`222`/`123` + `g` (`macaceno777g`). Ya no se pegan 6 dígitos del teléfono (`user533967777g`). Si no hay nombre, `jugador777g`. GoldenC / ElGanador no cambian.
 
 ## Bitácora 2026-10-05 — ClienteA1: alta manual y línea de prueba
 

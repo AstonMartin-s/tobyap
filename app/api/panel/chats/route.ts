@@ -196,7 +196,7 @@ export async function GET(req: NextRequest) {
     items,
     stats: statRows,
     tenantProvider: tenantForProvider?.provider ?? 'pagoda',
-    // ClienteA1 sugiere nombre+777g. El resto del alta manual sigue con los últimos 4 del teléfono.
+    // ClienteA1: nombre + 777g (sin dígitos del teléfono). El resto: últimos 4 del teléfono.
     manualUserStyle: session.slug === 'ClienteA1' ? 'codeg' : 'phone4',
     fichasEnabled: tenantForProvider ? tenantForProvider.features.fichas : true,
   });
