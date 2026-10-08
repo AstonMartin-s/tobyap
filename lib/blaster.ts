@@ -1,5 +1,5 @@
-// Cliente HTTP hacia Blaster (WhatsApp no-API). Un tenant tiene canal solo si
-// tiene blasterBaseUrl + blasterToken + al menos un session id.
+// Cliente HTTP hacia Blaster (WhatsApp no-API). El canal existe si hay
+// blasterBaseUrl + blasterToken. El session id se guarda recién al vincular.
 //
 // Estado: GET /api/sessions/:id/state → SessionState (status, jid, device,
 // connectionStatus, authenticationStatus, sessionHealth, lastError,
@@ -38,23 +38,54 @@ export function blasterLineIds(tenant: ResolvedTenant): string[] {
   return [...new Set(all)].slice(0, MAX_BLASTER_LINES);
 }
 
-export function blasterConfig(tenant: ResolvedTenant, sessionId?: string): BlasterConfig | null {
+export function blasterConfig(tenant: ResolvedTenant, sessionId?: string, allowUnknown = false): BlasterConfig | null {
   const auth = blasterAuth(tenant);
   const ids = blasterLineIds(tenant);
   const id = (sessionId ?? ids[0] ?? '').trim();
   if (!auth || !id) return null;
-  if (sessionId && !ids.includes(sessionId)) return null;
+  if (sessionId && !allowUnknown && !ids.includes(sessionId)) return null;
   return { baseUrl: auth.baseUrl, token: auth.token, sessionId: id };
 }
 
 export function hasWhatsappChannel(tenant: ResolvedTenant): boolean {
-  return blasterConfig(tenant) !== null;
+  return blasterAuth(tenant) !== null;
+}
+
+export function packLineIds(ids: string[]): { blasterSessionId: string; blasterSessionIds: string[] } {
+  const uniq = [...new Set(ids.map((s) => s.trim()).filter(Boolean))].slice(0, MAX_BLASTER_LINES);
+  return { blasterSessionId: uniq[0] ?? '', blasterSessionIds: uniq.slice(1) };
+}
+
+export function lineIsLinked(status?: string | null, phone?: string | null): boolean {
+  return status === 'connected' || !!(phone && phone.replace(/\D/g, '').length >= 10);
+}
+
+// Residuo: Blaster respondió y la línea no está vinculada (sin número).
+// Si el estado no llegó (red), no se toca: un corte breve no puede borrar la línea.
+export function lineIsResidue(status: string | null | undefined, phone: string | null | undefined, known: boolean): boolean {
+  if (!known) return false;
+  return !lineIsLinked(status, phone);
+}
+
+const lastPhones = new Map<string, string>();
+
+export function rememberLinePhone(sessionId: string, phone?: string | null): void {
+  const digits = (phone ?? '').replace(/\D/g, '');
+  if (sessionId && digits.length >= 10) lastPhones.set(sessionId, `+${digits}`);
+}
+
+export function rememberedPhone(sessionId: string): string | null {
+  return lastPhones.get(sessionId) ?? null;
+}
+
+export function forgetLinePhone(sessionId: string): void {
+  lastPhones.delete(sessionId);
 }
 
 export function waMeLink(jidOrPhone?: string | null): string | null {
   if (!jidOrPhone) return null;
   const digits = jidOrPhone.split('@')[0].split(':')[0].replace(/\D/g, '');
-  return digits.length >= 8 ? `https://wa.me/${digits}` : null;
+  return digits.length >= 10 ? `https://wa.me/${digits}` : null;
 }
 
 export function phoneFromJid(jid?: string | null): string | null {

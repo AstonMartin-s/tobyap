@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
 
   const tenant = await getTenantBySlug(session.slug);
   const body = (await req.json().catch(() => ({}))) as { sessionId?: string };
-  const cfg = tenant ? blasterConfig(tenant, typeof body.sessionId === 'string' ? body.sessionId : undefined) : null;
+  const cfg = tenant ? blasterConfig(tenant, typeof body.sessionId === 'string' ? body.sessionId : undefined, true) : null;
   if (!cfg) return NextResponse.json({ error: 'canal WhatsApp no configurado' }, { status: 409 });
 
   // Cuidar la línea: con el vínculo sano no se toca nada. WhatsApp penaliza el

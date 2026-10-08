@@ -6,6 +6,34 @@
 **Prod:** Railway `tobyap-production.up.railway.app` · clientes activos (King + otros)
 **Alcance:** tracking Meta + chat Adaptador B + panel ops. Operario humano siempre. No es GATE+CRM.
 
+## Bitácora 2026-10-06 — Tablero publicista: CRM Main en prod
+
+- CRM Main avisó (MSG-CRM-20261006-6): `GET /campana/:codigo?t=token` en prod, solo lectura. `campaign_id` = slug de resolve. Agent y clics omitidos. Circuito P aparcado. PAM = depósito. Resolve sin cambio. Sin endpoint de visitas.
+- Métricas: registros = `user_created`; FTD / cargas / plata = `deposit.accepted`; cortes hoy / ayer / 7 / 30 / total.
+- El operador copia el link en el panel CRM (Estadísticas → Negocio). Token no se pega en chat.
+- Slugs con leads hoy: `SP3` (7) y `reactivacion-2026-06-28` (22). `C1`/`CC1` aparecen cuando entren leads nuevos con ese campaign.
+- Ref CRM: `6f0fcfd`. Nada que codear en TOBYAP.
+
+## Bitácora 2026-10-06 — Tablero publicista: OK a CRM Main
+
+- CRM Main (MSG-CRM-20261006-4, respuesta a MSG-TOB-20261005-1) puede armar `GET /campana/:codigo?t=token` de solo lectura. No implementa hasta OK.
+- Confirmado desde TOBYAP: `campaign` sí viaja en `GET /api/v1/resolve` (`?code=` y `?phone=`). CRM lo copia a `lead.campaign_id` en lead nuevo. `agent` no existe en atribuciones ni en resolve (0/827 es el estado esperado; Circuito P aparcado).
+- Clics/visitas viven solo en `meta_events` del tracker (reportes admin). No hay feed agregado hacia el CRM. El tablero **omite clics**. Meta CAPI sigue saliendo de TOBYAP. PAM sigue siendo la fuente del depósito.
+- OK dado: CRM Main implementa el link por `campaign_id` (y `agent` cuando exista). Sin contrato nuevo de resolve. Sin endpoint de clics.
+
+## Bitácora 2026-10-08 — WhatsApp: el residuo se borra
+
+- ClienteA1 tenía 2 líneas sin número (desconectada + nunca vinculada). El panel las mostraba como Cargando / revocado. Se sacaron de la cuenta.
+- Al consultar el estado, una línea que Blaster confirma sin vínculo se desloguea y se borra. Si Blaster no responde, no se toca.
+- Desconectar desvincula y saca la fila. No queda "Pendiente de vincular".
+
+## Bitácora 2026-10-06 — WhatsApp: no guardar sin vincular
+
+- El bug de "Cargando…" eterno: `Agregar número` guardaba el tracker al toque. Sin escanear el QR la línea quedaba `revoked` + `requires_qr`, el panel la trataba como "sigue cargando" y mostraba el recuadro del QR siempre. Se vieron 2 extras fantasma en ClienteA1.
+- Ya no se persiste hasta que esté vinculada (`wa-commit`). `wa-add` crea tracker + pide QR y lo deja en borrador. El recuadro del QR solo aparece después de Agregar. Si no se escanea, Cancelar hace logout y no queda fila.
+- Acción: **Desconectar** hace logout y saca la fila. No queda "Pendiente de vincular".
+- El 06/10 se limpiaron 2 extras nunca vinculadas y quedó la de prueba (882). El 08/10 esa también estaba desconectada y sin número: se sacó. La cuenta quedó sin líneas guardadas.
+
 ## Bitácora 2026-10-05 — ClienteA1: el chat no va a Green
 
 - El chat tenía los defaults de King: portal `greenbet.uno/login` y soporte `wa.link/jugandoconking`. ClienteA1 no es de Green. El CBU guardado es otro (no coincide con el de King).
