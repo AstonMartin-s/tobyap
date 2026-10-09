@@ -326,6 +326,8 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const [opPushAvail, setOpPushAvail] = useState(false); // el server habilita push manual
   const [opPushOn, setOpPushOn] = useState(false); // ya suscripto en este dispositivo
   const [opPushIosGuide, setOpPushIosGuide] = useState(false);
+  const [homeGuide, setHomeGuide] = useState(false);
+  const [homeOn, setHomeOn] = useState(false);
   const [opPushBanner, setOpPushBanner] = useState<{ title: string; body: string } | null>(null);
   const opPushBannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showOpPushBanner = useCallback((title: string, body: string) => {
@@ -343,8 +345,9 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/panel-sw.js', { scope: '/chats' }).catch(() => {});
     }
+    if (isStandalone()) setHomeOn(true);
     const onPrompt = (e: Event) => { e.preventDefault(); setDeferredPrompt(e as unknown as { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }); };
-    const onInstalled = () => setDeferredPrompt(null);
+    const onInstalled = () => { setDeferredPrompt(null); setHomeOn(true); };
     window.addEventListener('beforeinstallprompt', onPrompt);
     window.addEventListener('appinstalled', onInstalled);
     (async () => {
@@ -395,6 +398,21 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     return () => navigator.serviceWorker.removeEventListener('message', onMsg);
   }, [showOpPushBanner]);
 
+  async function addPanelHome() {
+    if (isStandalone()) { setHomeOn(true); setToast('Ya está en el inicio'); return; }
+    if (isIos()) { setHomeGuide(true); return; }
+    if (deferredPrompt) {
+      try {
+        await deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice.catch(() => ({ outcome: 'dismissed' }));
+        setDeferredPrompt(null);
+        if (choice.outcome === 'accepted') setHomeOn(true);
+      } catch { /* canceló */ }
+      return;
+    }
+    setToast('Menú ⋮ → Agregar a pantalla de inicio');
+  }
+
   // Suscribe este dispositivo al push del operador. En iOS exige PWA instalada.
   async function enableOperatorPush(silent = false) {
     try {
@@ -405,13 +423,6 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
       // En iOS el push exige PWA instalada. En modo silencioso (auto-reparación)
       // no interrumpimos con la guía: solo salimos.
       if (isIos() && !isStandalone()) { if (!silent) setOpPushIosGuide(true); return; }
-      if (!silent && deferredPrompt) {
-        try {
-          await deferredPrompt.prompt();
-          await deferredPrompt.userChoice.catch(() => ({ outcome: 'dismissed' }));
-          setDeferredPrompt(null);
-        } catch { /* el usuario canceló el install — igual seguimos con el push */ }
-      }
       const kd = await fetch('/api/panel/push').then((x) => x.json()).catch(() => null);
       if (!kd?.ok || !kd.publicKey) { if (!silent) setToast('El push no está configurado'); return; }
       if ('Notification' in window && Notification.permission === 'default') {
@@ -1051,12 +1062,19 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
         )}
         {opPushAvail && (
           <button onClick={() => enableOperatorPush(false)} aria-label="Activar notificaciones de fondo"
-            title={opPushOn ? 'Notificaciones de fondo activadas' : 'Activar notificaciones + instalar acceso directo'}
+            title={opPushOn ? 'Notificaciones de fondo activadas' : 'Activar notificaciones'}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem', height: 30, padding: '0 .5rem', borderRadius: 8, border: `1px solid ${opPushOn ? 'var(--accent)' : 'var(--border)'}`, background: opPushOn ? 'var(--accent-soft)' : 'transparent', color: opPushOn ? 'var(--accent)' : 'var(--muted)', cursor: 'pointer', fontSize: '.68rem', fontWeight: 700 }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
-            {opPushOn ? 'Notif ✓' : (isMobile ? 'Activar notif' : 'Activar notif + acceso')}
+            {opPushOn ? 'Notif ✓' : 'Activar notif'}
+          </button>
+        )}
+        {!homeOn && (
+          <button type="button" onClick={() => void addPanelHome()} aria-label="Agregar al escritorio"
+            title="Agregar el panel al inicio"
+            style={{ display: 'inline-flex', alignItems: 'center', height: 30, padding: '0 .55rem', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '.68rem', fontWeight: 700 }}>
+            Al escritorio
           </button>
         )}
         <button onClick={toggleSound} aria-label="Sonido de atención"
@@ -1706,6 +1724,23 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
         )}
       </div>
     </div>
+
+      {homeGuide && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => setHomeGuide(false)}>
+          <div className="card" style={{ width: 'min(380px, 100%)', padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '.7rem' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontWeight: 800, fontSize: '1rem' }}>Agregar al inicio</div>
+            <ol style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '.88rem', lineHeight: 1.5 }}>
+              <li>Tocá <b>Compartir</b> (el cuadrado con la flecha) en Safari.</li>
+              <li>Elegí <b>Agregar a inicio</b>.</li>
+              <li>Tocá <b>Agregar</b>.</li>
+            </ol>
+            <button type="button" onClick={() => setHomeGuide(false)}
+              style={{ padding: '.5rem', borderRadius: 8, border: 'none', background: 'var(--accent,#7c5cff)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Listo</button>
+          </div>
+        </div>
+      )}
 
       {opPushIosGuide && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}

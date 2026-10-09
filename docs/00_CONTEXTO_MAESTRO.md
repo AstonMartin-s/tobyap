@@ -21,6 +21,13 @@
 - Clics/visitas viven solo en `meta_events` del tracker (reportes admin). No hay feed agregado hacia el CRM. El tablero **omite clics**. Meta CAPI sigue saliendo de TOBYAP. PAM sigue siendo la fuente del depósito.
 - OK dado: CRM Main implementa el link por `campaign_id` (y `agent` cuando exista). Sin contrato nuevo de resolve. Sin endpoint de clics.
 
+## Bitácora 2026-10-09 — ClienteA1: soporte y post carga al número vinculado
+
+- Post carga, pedido de soporte y el botón "Ir a WhatsApp" salen a `https://wa.me/5491136995053`. Antes iban a la línea de prueba 882.
+- Quedó como único cajero activo. `postAccreditCajera` prendido. Sin deploy: es config del tenant.
+- La clave sugerida del alta manual queda fija en `aaa777`. Antes rotaba (`ddd333`, etc.).
+- Al lado de activar notificaciones hay **Al escritorio**. En Android abre el instalador del sistema. En iPhone muestra Compartir → Agregar a inicio → Agregar. Mismo botón en el chat del cliente y en el panel.
+
 ## Bitácora 2026-10-08 — WhatsApp: el residuo se borra
 
 - ClienteA1 tenía 2 líneas sin número (desconectada + nunca vinculada). El panel las mostraba como Cargando / revocado. Se sacaron de la cuenta.

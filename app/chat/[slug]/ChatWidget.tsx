@@ -84,6 +84,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   const [appNotif, setAppNotif] = useState(false); // paso 2 completado
   const [nudge, setNudge] = useState(0); // recordatorios del gate
   const [iosGuided, setIosGuided] = useState(false); // en iOS ya mostramos la guía
+  const [homeGuide, setHomeGuide] = useState(false);
   const [canSkip15, setCanSkip15] = useState(false); // habilita "enviar igual" tras 20s
   const [secsLeft, setSecsLeft] = useState(20); // cuenta regresiva visible
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -538,6 +539,21 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     }
   }
 
+  // Al escritorio: Android abre el instalador del sistema. iPhone muestra los pasos
+  // (Apple no deja instalar por código).
+  async function addToHome() {
+    if (isStandalone()) { setAppInstall(true); return; }
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const r = await deferredPrompt.userChoice.catch(() => ({ outcome: 'dismissed' }));
+      setDeferredPrompt(null);
+      if (r.outcome === 'accepted') setAppInstall(true);
+      return;
+    }
+    if (isIos()) { setHomeGuide(true); return; }
+    setMsgs((p) => [...p, { from: 'bot', text: 'En Android: menú ⋮ arriba a la derecha → *Agregar a pantalla de inicio*.' }]);
+  }
+
   // Instalar la app: dispara el instalador NATIVO (Android/Chrome). En iOS/otros,
   // guía paso a paso (Apple no permite instalar por código).
   async function installApp() {
@@ -655,25 +671,39 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
                 <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
               )}
             </button>
-            {!skipsAppStep(slug) && (
+            {!appInstall && (
             <button
-              onClick={installApp}
-              disabled={appInstall}
-              title={appInstall ? 'App instalada' : 'Descargar app'}
-              aria-label="Descargar app"
-              className={appInstall ? '' : 'dl-attn'}
-              style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: appInstall ? 'default' : 'pointer', background: appInstall ? 'rgba(255,255,255,.28)' : '#f59e0b', color: '#fff' }}
+              type="button"
+              onClick={() => void addToHome()}
+              title="Agregar al escritorio"
+              aria-label="Agregar al escritorio"
+              style={{ height: 34, padding: '0 10px', borderRadius: 17, border: 'none', cursor: 'pointer', background: '#fff', color: header, fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap' }}
             >
-              {appInstall ? (
-                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-              ) : (
-                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-              )}
+              Al escritorio
             </button>
             )}
           </div>
         )}
       </div>
+
+      {homeGuide && (
+        <div
+          role="dialog"
+          aria-label="Agregar al inicio en iPhone"
+          onClick={() => setHomeGuide(false)}
+          style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 50, display: 'grid', placeItems: 'center', padding: 16 }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', color: '#111827', borderRadius: 14, padding: 18, width: '100%', maxWidth: 340, boxShadow: '0 10px 40px rgba(0,0,0,.3)' }}>
+            <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 8 }}>Agregar al inicio</div>
+            <ol style={{ margin: 0, paddingLeft: 18, fontSize: 15, lineHeight: 1.5 }}>
+              <li>Tocá <b>Compartir</b> (el cuadrado con la flecha ↑, abajo).</li>
+              <li>Elegí <b>Agregar a inicio</b>.</li>
+              <li>Tocá <b>Agregar</b>.</li>
+            </ol>
+            <button type="button" onClick={() => setHomeGuide(false)} style={{ marginTop: 14, width: '100%', background: C.send, color: '#fff', border: 'none', borderRadius: 10, padding: '11px 14px', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>Listo</button>
+          </div>
+        </div>
+      )}
 
       {pushBanner && (
         <div
@@ -776,9 +806,14 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
             ) : (
               <button onClick={installApp} style={{ background: '#fff', color: C.send, border: `1px solid ${C.send}`, borderRadius: 12, padding: '11px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer', minWidth: 230, textAlign: 'center' }}>Paso 1: Instalar app</button>
             )}
-            {!appNotif && (
-              <button onClick={enableNotifs} style={{ background: '#fff', color: C.send, border: `1px solid ${C.send}`, borderRadius: 12, padding: '11px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer', minWidth: 230, textAlign: 'center' }}>Paso 2: Activar notificaciones</button>
-            )}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              {!appInstall && (
+                <button type="button" onClick={() => void addToHome()} style={{ background: '#fff', color: C.send, border: `1px solid ${C.send}`, borderRadius: 12, padding: '11px 14px', fontSize: 14, fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}>Al escritorio</button>
+              )}
+              {!appNotif && (
+                <button onClick={enableNotifs} style={{ background: '#fff', color: C.send, border: `1px solid ${C.send}`, borderRadius: 12, padding: '11px 14px', fontSize: 14, fontWeight: 600, cursor: 'pointer', textAlign: 'center' }}>Activar notificaciones</button>
+              )}
+            </div>
             {(() => {
               const done = appNotif ? appInstall : (appInstall && appNotif);
               const canSend = done || canSkip15;
