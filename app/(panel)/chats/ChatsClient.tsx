@@ -42,6 +42,8 @@ type Item = {
   waVerified: boolean | null;
   hasComprobante: boolean;
   msgCount: number;
+  userMsgCount?: number;
+  lastUserText?: string;
   lastText: string;
   lastFrom: 'bot' | 'user' | null;
   lastAt: string | null;
@@ -310,7 +312,7 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const sheetManual = showManualPanel && isMobile && manualOpen;
   const [soundOn, setSoundOn] = useState(true);
   const soundRef = useRef(true);
-  const prevInbound = useRef<Map<string, { msgCount: number; unreadCount: number; lastAt: string | null; lastFrom: Item['lastFrom'] }> | null>(null);
+  const prevInbound = useRef<Map<string, { msgCount: number; userMsgCount: number; unreadCount: number; lastAt: string | null; lastFrom: Item['lastFrom'] }> | null>(null);
   useEffect(() => {
     const v = (() => { try { return localStorage.getItem('chatSoundOn') !== '0'; } catch { return true; } })();
     setSoundOn(v); soundRef.current = v;
@@ -496,10 +498,13 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     const r = await fetch('/api/panel/chats').then((x) => x.json()).catch(() => null);
     if (!r?.ok) return;
     const its: Item[] = r.items;
-    // Cada inbound del cliente (mensaje/imagen) suena. No solo la 1ª atención:
-    // si el chat ya estaba en "no leído" y escribe de nuevo, también pita.
+    const alertsOnly = r.livechatAlertsOnly === true;
+    // Cada mensaje del cliente suena, aunque el bot ya haya contestado y el
+    // chat figure como leído. Un cambio de estado solo (sin texto nuevo) no pita.
+    // ClienteA1 (livechatAlertsOnly): el WhatsApp no suena ni avisa.
     const inboundNow = new Map(its.map((i) => [i.sessionKey, {
       msgCount: i.msgCount,
+      userMsgCount: i.userMsgCount ?? 0,
       unreadCount: i.unreadCount ?? (i.unread ? 1 : 0),
       lastAt: i.lastAt,
       lastFrom: i.lastFrom,
@@ -507,20 +512,22 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
     if (prevInbound.current && soundRef.current) {
       const hits: Item[] = [];
       for (const i of its) {
-        if (i.blocked || i.lastFrom !== 'user') continue;
+        if (i.blocked) continue;
+        if (alertsOnly && (i.channel ?? 'livechat') === 'whatsapp') continue;
         const prev = prevInbound.current.get(i.sessionKey);
-        const unreadNow = i.unreadCount ?? (i.unread ? 1 : 0);
-        if (!prev) { hits.push(i); continue; }
-        if (i.msgCount > prev.msgCount || unreadNow > prev.unreadCount || (!!i.lastAt && i.lastAt !== prev.lastAt)) {
-          hits.push(i);
+        const userNow = i.userMsgCount ?? 0;
+        if (!prev) {
+          if (i.lastFrom === 'user') hits.push(i);
+          continue;
         }
+        if (userNow > prev.userMsgCount) hits.push(i);
       }
       if (hits.length > 0) {
         playChime();
         const first = hits[0];
         const title = first.name || first.phone || 'TrackerIO · Chats';
         const body = hits.length === 1
-          ? (first.lastText || 'Mensaje nuevo')
+          ? (first.lastUserText || first.lastText || 'Mensaje nuevo')
           : `${hits.length} mensajes nuevos`;
         showOpPushBanner(title, body);
         if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {

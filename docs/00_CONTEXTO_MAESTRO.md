@@ -21,6 +21,11 @@
 - Clics/visitas viven solo en `meta_events` del tracker (reportes admin). No hay feed agregado hacia el CRM. El tablero **omite clics**. Meta CAPI sigue saliendo de TOBYAP. PAM sigue siendo la fuente del depósito.
 - OK dado: CRM Main implementa el link por `campaign_id` (y `agent` cuando exista). Sin contrato nuevo de resolve. Sin endpoint de clics.
 
+## Bitácora 2026-10-09 — ClienteA1: aviso y sonido solo livechat
+
+- El WhatsApp de la línea es publi. En ClienteA1 no suena ni llega push de fondo por esos chats.
+- El livechat avisa en cada mensaje del cliente (texto o imagen), aunque el bot ya haya contestado. Un cambio de estado sin mensaje nuevo no reemplaza ese aviso. El resto de tenants usa la misma regla de mensaje. La lista de WhatsApp sigue visible, sin alerta.
+
 ## Bitácora 2026-10-09 — ClienteA1: soporte y post carga al número vinculado
 
 - Post carga, pedido de soporte y el botón "Ir a WhatsApp" salen a `https://wa.me/5491136995053`. Antes iban a la línea de prueba 882.

@@ -154,6 +154,13 @@ export async function GET(req: NextRequest) {
         if (msgs[i].from === 'user') { last = msgs[i]; break; }
       }
     }
+    let userMsgCount = 0;
+    let lastUserText = '';
+    for (const m of msgs) {
+      if (m.from !== 'user') continue;
+      userMsgCount += 1;
+      lastUserText = (m.text ?? '').trim() || (m.image ? '📷 imagen' : lastUserText);
+    }
     const lastMsg = msgs[msgs.length - 1];
     const lastAtMs = lastMsg?.at;
     const lastAt = lastAtMs
@@ -181,6 +188,8 @@ export async function GET(req: NextRequest) {
       waVerified: s.waVerified,
       hasComprobante: msgs.some((m) => m.from === 'user' && m.image),
       msgCount: msgs.length,
+      userMsgCount,
+      lastUserText,
       lastText: last?.text ?? (last?.image ? '📷 imagen' : ''),
       lastFrom: last?.from ?? null,
       lastAt,
@@ -199,6 +208,8 @@ export async function GET(req: NextRequest) {
     // ClienteA1: nombre + 777g (sin dígitos del teléfono). El resto: últimos 4 del teléfono.
     manualUserStyle: session.slug === 'ClienteA1' ? 'codeg' : 'phone4',
     fichasEnabled: tenantForProvider ? tenantForProvider.features.fichas : true,
+    // ClienteA1: sonido y aviso del panel solo por livechat. El WhatsApp no pita.
+    livechatAlertsOnly: session.slug === 'ClienteA1',
   });
 }
 

@@ -49,6 +49,9 @@ export async function notifyOperators(
   opts: { sessionKey?: string; name?: string | null; text?: string | null; channel?: 'whatsapp' | 'livechat' } = {},
 ): Promise<void> {
   if (!pushEnabled()) return;
+  // ClienteA1: el WhatsApp de la línea es publi. El aviso de fondo solo sale
+  // del livechat (ahí es donde hay que cargar).
+  if (tenant.slug === 'ClienteA1' && opts.channel === 'whatsapp') return;
   let subs: Awaited<ReturnType<typeof loadSubs>>;
   try {
     subs = await loadSubs(tenant.id);
