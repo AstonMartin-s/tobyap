@@ -3,6 +3,7 @@ import ChatWidget from './ChatWidget';
 import { getTenantBySlug } from '@/lib/tenants';
 import { loadChatBrand } from '@/lib/chat/loadBrand';
 import { DEFAULT_HEADER } from '@/lib/chat/brand';
+import { appPublicUrl } from '@/lib/blaster';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,11 +20,23 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const brand = tenant
     ? await loadChatBrand(tenant.id, tenant.slug, tenant.name)
     : { brandName: 'Soporte', primaryColor: DEFAULT_HEADER, avatarUrl: null };
+  const title = `${brand.brandName} — Atención al cliente`;
+  const description = `Chateá con el equipo de ${brand.brandName}. Te ayudamos a activar tu cuenta y resolver tus consultas al instante.`;
   return {
-    title: `${brand.brandName} — Soporte`,
+    metadataBase: new URL(appPublicUrl()),
+    title,
+    description,
     manifest: `/api/chat/${params.slug}/manifest`,
     appleWebApp: { capable: true, statusBarStyle: 'black', title: brand.brandName },
     icons: { apple: '/chat-apple-180.png', icon: '/chat-icon-192.png' },
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      siteName: brand.brandName,
+      ...(brand.avatarUrl ? { images: [{ url: brand.avatarUrl }] } : {}),
+    },
+    twitter: { card: 'summary', title, description },
   };
 }
 

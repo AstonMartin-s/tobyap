@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans', display: 'swa
 
 export const metadata: Metadata = {
   title: 'TrackerIO',
-  description: 'Tracking de conversiones · Kommo → Meta',
+  description: 'Plataforma de atención y gestión de clientes.',
 };
 
 export const viewport: Viewport = {
