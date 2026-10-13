@@ -93,7 +93,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   const lastPushAt = useRef(0);
   const autoPromptedRef = useRef(false); // instalador nativo auto-disparado — solo 1 vez
   const [skin, setSkin] = useState<{ brand: string; primaryColor?: string; avatarUrl?: string | null; gate?: { title: string; note: string; confirm: string } }>({ brand, primaryColor, avatarUrl });
-  const [waBtn, setWaBtn] = useState<{ enabled: boolean; url: string }>({ enabled: false, url: '' });
+  const [waBtn, setWaBtn] = useState<{ enabled: boolean; url: string; direct?: boolean }>({ enabled: false, url: '' });
   const [niche, setNiche] = useState<'circo' | 'tienda'>('circo');
   const [assignedWa, setAssignedWa] = useState<string | null>(null); // cajero sticky
   const [waUnlocked, setWaUnlocked] = useState(false); // cargo hecho o "Ya tengo usuario"
@@ -604,8 +604,12 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     ? `https://wa.me/${assignedWa.replace(/\D/g, '')}?text=${encodeURIComponent(CAJERO_MSG)}`
     : waBtn.url;
 
+  // waBtn.direct (opt-in por tenant): el botón abre WhatsApp directo, sin el gate
+  // de "creá tu usuario primero". Para clientes que derivan directo (ej. luck).
+  const waOpen = waBtn.direct === true || waUnlocked || step === 'done';
+
   function handleWaBtn() {
-    if ((waUnlocked || step === 'done') && effectiveWaUrl) {
+    if (waOpen && effectiveWaUrl) {
       window.open(effectiveWaUrl, '_blank');
       return;
     }
@@ -631,7 +635,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
           <div style={{ fontSize: 12, opacity: 0.85 }}>{typing ? 'escribiendo…' : 'en línea'}</div>
         </div>
         {phase === 'chat' && waBtn.enabled && waBtn.url && (
-          (waUnlocked || step === 'done') && effectiveWaUrl ? (
+          waOpen && effectiveWaUrl ? (
             <a
               href={effectiveWaUrl}
               target="_blank"
@@ -902,7 +906,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
         </div>
       )}
 
-      {waBtnToast && !(waUnlocked || step === 'done') && (
+      {waBtnToast && !waOpen && (
         <div style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)',
           display: 'grid', placeItems: 'center', zIndex: 100,

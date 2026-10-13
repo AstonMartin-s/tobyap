@@ -13,12 +13,15 @@ export async function GET(_req: NextRequest, { params }: { params: { slug: strin
   if (!tenant) return NextResponse.json({ error: 'tenant desconocido' }, { status: 404 });
   const brand = await loadChatBrand(tenant.id, tenant.slug, tenant.name);
 
-  let waBtn: { enabled: boolean; url: string } = { enabled: true, url: resolveHeaderWaUrl(tenant.slug, null) };
+  let waBtn: { enabled: boolean; url: string; direct?: boolean } = { enabled: true, url: resolveHeaderWaUrl(tenant.slug, null) };
   try {
     const [row] = await db.select({ chatConfig: clientSettings.chatConfig }).from(clientSettings).where(eq(clientSettings.tenantId, tenant.id)).limit(1);
     const cc = row?.chatConfig as Record<string, unknown> | null;
     waBtn.url = resolveHeaderWaUrl(tenant.slug, cc);
     if (cc?.waBtnEnabled === false) waBtn.enabled = false;
+    // Opt-in por tenant: el botón "Ir a WhatsApp" abre directo, sin gate de
+    // "creá tu usuario primero" (ej. luck deriva directo al número).
+    if (cc?.waBtnDirect === true) waBtn.direct = true;
   } catch { /* defaults */ }
 
   return NextResponse.json({ ok: true, brand, waBtn, niche: tenant.niche }, { headers: { 'Cache-Control': 'no-store' } });
