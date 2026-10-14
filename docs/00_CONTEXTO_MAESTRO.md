@@ -1,5 +1,16 @@
 # TOBYAP — Contexto maestro (bitácora viva)
 
+## Bitácora 2026-10-13 — CRM: CCPP en el SalesBot de mooneyatkinson
+
+- Pedido MSG-CRM-20261013-6, solo lectura. No se editó el bot ni se crearon campos.
+- MSG-CRM-20261013-8: campo de lead CCPP, texto, id 1231586.
+- MSG-CRM-20261013-9: un solo lead de prueba en ZZ_TEST_BM / BASE DE DATOS, nombre TEST CCPP. Campo 1231586 = B1, tomado de send_list. No se tocaron los leads de Envio de plantilla SPnumero3. Bot sin publicar.
+- MSG-CRM-20261013-10: los 52 leads en Spam Numero 3 / Base de datos (106401855) quedaron con 1231586 = M3, leído de send_list (52 teléfonos distintos, sin desvío). Muestra de Envio de plantilla SPnumero3 (106401859) sigue vacía. Bot sin publicar.
+- MSG-CRM-20261013-11: el CRM publica el «Si quiero» con {{lead.cf.1231586}}. TOBYAP sube el llenado automático al entrar a Base de datos (106401855) o a Envio de plantilla (106401859). No reescribe a quien ya estaba en el paso.
+- Prueba manual 2026-10-13: lead 26524664 (Ezequiel Fava, fuera de Spam Numero 3) tenía 1231586 vacío. Se escribió W50 a pedido, para probar la variable del bot. La lista de ese teléfono sigue en B1.
+- Asignación por etiqueta, misma fecha: CCPP 1231586 desde send_list a los leads con Lista 3, Lista4–Lista11, Lista 12, ListaValorMedio1 o ListaValorMedioDormido1. Se saltan ClienteS1 y Piliking (ninguno de este grupo las tenía). 6.785 escritos, 52 ya coincidían, 6 sin teléfono en la lista (campo vacío). No existe Lista 1. Lista 2 no tiene leads. Bot sin publicar.
+- Cierre a CRM: MSG-TOB-20261013-11.
+
 > Fuente de verdad operativa junto a `docs/00_PLAN_MEJORAS_2026-08-19.md`.
 > No pegar secretos. Actualizar al cerrar cada fase / cada cambio de contrato.
 
@@ -25,6 +36,10 @@
 
 - El WhatsApp de la línea es publi. En ClienteA1 no suena ni llega push de fondo por esos chats.
 - El livechat avisa en cada mensaje del cliente (texto o imagen), aunque el bot ya haya contestado. Un cambio de estado sin mensaje nuevo no reemplaza ese aviso. El resto de tenants usa la misma regla de mensaje. La lista de WhatsApp sigue visible, sin alerta.
+
+## Bitácora 2026-10-09 — ClienteA1: post carga sin cajera ni 1000 extra
+
+- El 2° mensaje al acreditar dice "Agenda tu cajero y pasale tu comprobante" y el número. Sin "cajera" y sin +1000 extras. Solo el guion de este cliente. Sin deploy.
 
 ## Bitácora 2026-10-09 — ClienteA1: soporte y post carga al número vinculado
 

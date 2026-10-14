@@ -10,6 +10,7 @@ import { fetchKommoLead, fetchContactPhone, readLeadField, readPhone, contactId,
 import type { ResolvedTenant } from '@/lib/types';
 import { syncChatStepFromKommo } from '@/lib/chat/release';
 import { assertKommoWebhookSecret } from '@/lib/kommoWebhookAuth';
+import { fillSpamCcpp, isSpamCcppStatus } from '@/lib/kommo/fillCcpp';
 
 // CBU robusto: escribe el CBU/Titular del panel en el lead (sin depender del bot).
 // Idempotente; solo escribe si el tenant tiene los campos mapeados.
@@ -149,6 +150,13 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       // fetchKommoLead tira 404/204 y se pierde el matcheo/etiquetado. Reintentamos.
       const lead = await fetchLeadWithRetry(tenant, sig.leadId);
       const inPipeline = !tenant.kommoPipelineId || lead.pipeline_id === tenant.kommoPipelineId;
+
+      // Spam Numero 3: solo al entrar a Base de datos o a la plantilla.
+      // Un mensaje posterior no reescribe a quien ya estaba en el paso.
+      if (isSpamCcppStatus(sig.statusId)) {
+        const ccpp = await fillSpamCcpp(tenant, sig.leadId).catch(() => null);
+        if (ccpp) results.push({ leadId: sig.leadId, ccpp });
+      }
 
       // ===== TOKEN + ATRIBUCIÓN (etiquetas) — SIEMPRE, independiente del pipeline =====
       // El token solo lo tienen los leads que vinieron de NUESTRA landing, así que
