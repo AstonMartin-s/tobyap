@@ -234,7 +234,11 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   const isWaChat = (detail?.channel ?? 'livechat') === 'whatsapp';
   const waAskedAccount = isWaChat && (detail?.messages ?? []).some((m) => m.from === 'user' && ASKS_ACCOUNT_RE.test(m.text ?? ''));
   const manualWaiting = !isWaChat && detail?.step === 'account_pending';
-  const showManualPanel = tenantProvider === 'manual' && !!sel && !!detail && (manualWaiting || waAskedAccount);
+  // ElGanador y otros manuales con bienvenida demo NO pasan por 'account_pending'
+  // (van demo → CBU). El operador igual debe poder ENTREGAR el usuario real luego
+  // de la carga → dejamos el panel disponible en cualquier chat manual ya iniciado.
+  const manualEngaged = !isWaChat && !!detail && !['form', ''].includes(String(detail?.step ?? ''));
+  const showManualPanel = tenantProvider === 'manual' && !!sel && !!detail && (manualWaiting || waAskedAccount || manualEngaged);
   // Sugerencia. ClienteA1: solo el nombre + 777/888/222/123 + g. El resto: últimos 4 del teléfono.
   const manualSuggestedUser = (() => {
     const fromData = String(detail?.data?.suggestedUsername ?? detail?.username ?? '').trim();
@@ -669,7 +673,10 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   useEffect(() => { setOpsOpen(false); setCargoOpen(false); setCargoAmount(''); }, [sel]); // el drawer de fichas arranca cerrado en cada chat
   // Se abre solo cuando corresponde sugerir el alta. Al cambiar de chat, se cierra
   // si ese chat no pidió usuario.
-  useEffect(() => { setManualOpen(showManualPanel); }, [showManualPanel, sel]);
+  // Auto-abre solo cuando lo piden (account_pending / lo escribieron). Si está
+  // disponible por 'manualEngaged' (ej. ElGanador post-carga) queda colapsado y
+  // el operador lo abre con el botón "Entregar usuario".
+  useEffect(() => { setManualOpen(manualWaiting || waAskedAccount); }, [manualWaiting, waAskedAccount, sel]);
   useEffect(() => {
     if (!sel) return;
     const t = setInterval(() => loadDetail(sel), 6000);
