@@ -237,7 +237,9 @@ export function ChatsClient({ canExport = false }: { canExport?: boolean }) {
   // ElGanador y otros manuales con bienvenida demo NO pasan por 'account_pending'
   // (van demo → CBU). El operador igual debe poder ENTREGAR el usuario real luego
   // de la carga → dejamos el panel disponible en cualquier chat manual ya iniciado.
-  const manualEngaged = !isWaChat && !!detail && !['form', ''].includes(String(detail?.step ?? ''));
+  // Disponible desde el inicio del chat (no solo post-carga): apenas hay una
+  // conversación manual abierta, el operador puede ver el usuario sugerido con un click.
+  const manualEngaged = !isWaChat && !!detail;
   const showManualPanel = tenantProvider === 'manual' && !!sel && !!detail && (manualWaiting || waAskedAccount || manualEngaged);
   // Sugerencia. ClienteA1: solo el nombre + 777/888/222/123 + g. El resto: últimos 4 del teléfono.
   const manualSuggestedUser = (() => {
