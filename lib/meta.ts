@@ -3,7 +3,7 @@ import { and, eq, gt, inArray, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { metaEvents, tenants } from '@/db/schema';
 import { decryptOptional } from '@/lib/crypto';
-import { NICHE_EVENTS, type EventSlot } from '@/lib/niche';
+import { capiEventOverride, NICHE_EVENTS, type EventSlot } from '@/lib/niche';
 import type { ResolvedTenant } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
@@ -113,9 +113,21 @@ function buildUserData(u: CapiUserData) {
 // conversation/conversion del vocabulario de nicho (lib/niche.ts).
 export function fullEventName(base: BaseEventName, tenant: ResolvedTenant): string {
   const slot: EventSlot = base === 'Conversacion' ? 'conversation' : 'conversion';
+  const override = tenant.capiEvents?.[slot];
+  if (override) return override;
   const ev = NICHE_EVENTS[tenant.niche]?.[slot];
   if (!ev) return `${base}CRM${tenant.eventSuffix}`;
   return ev.standard ? ev.base : `${ev.base}CRM${tenant.eventSuffix}`;
+}
+
+// Datos de valor del evento de conversación. En un evento nativo (registro)
+// no se manda value: no es una compra y no debe heredar el placeholder.
+export function conversationEventData(
+  tenant: ResolvedTenant,
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  if (tenant.capiEvents?.conversation) return data;
+  return { ...data, ...conversationValue(tenant) };
 }
 
 // ---- Envío ----------------------------------------------------------------

@@ -11,7 +11,7 @@ import {
   type TenantRow,
 } from '@/db/schema';
 import { encrypt, encryptOptional, decryptOptional } from '@/lib/crypto';
-import { parseNiche } from '@/lib/niche';
+import { capiEventOverride, parseNiche } from '@/lib/niche';
 import type { CreateTenantInput, ResolvedTenant } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
@@ -348,7 +348,8 @@ const cache = new Map<string, { tenant: ResolvedTenant; exp: number }>();
 const TTL_MS = 60_000;
 
 function resolve(row: TenantRow): ResolvedTenant {
-  const cf = (row.customFields ?? {}) as Record<string, number>;
+  const raw = (row.customFields ?? {}) as Record<string, unknown>;
+  const cf = raw as Record<string, number>;
   const num = (k: string): number | null => (typeof cf[k] === 'number' ? cf[k] : null);
 
   return {
@@ -391,6 +392,12 @@ function resolve(row: TenantRow): ResolvedTenant {
     fieldUtmContent: num('utm_content'),
     proximityMatchSec: num('proximity_match_sec'),
     conversationValue: num('conversation_value_ars'),
+    capiEvents: raw.capi_native === 1
+      ? {
+          conversation: capiEventOverride(raw, 'conversation'),
+          conversion: capiEventOverride(raw, 'conversion'),
+        }
+      : null,
     // Solapas opcionales: ausente = habilitado; solo 0 lo apaga.
     features: {
       reportes: cf['feat_reportes'] !== 0,

@@ -12,7 +12,7 @@ import { runFlow, flowButtons, EMPTY_FLOW } from '@/lib/chat/flowGraph';
 import { prepareBotBatch } from '@/lib/chat/stagger';
 import { loadChatRuntime } from '@/lib/chat/loadRuntime';
 import { createChatLead, addLeadNote } from '@/lib/chat/kommoMirror';
-import { sendCapiEvent, conversationValue } from '@/lib/meta';
+import { sendCapiEvent, conversationEventData } from '@/lib/meta';
 import { clientIp, rateLimit } from '@/lib/rateLimit';
 import { notifyOperators } from '@/lib/panel/operatorPush';
 import { mergeChatData } from '@/lib/chat/mutations';
@@ -172,7 +172,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
           clientIp: ip && ip !== 'unknown' ? ip : null,
           userAgent: req.headers.get('user-agent'),
         },
-        customData: { campaign_id: attr?.campaignId ?? b.campaign, internal_event: 'ConversacionCRM', ...conversationValue(tenant) },
+        customData: conversationEventData(tenant, { campaign_id: attr?.campaignId ?? b.campaign, internal_event: 'ConversacionCRM' }),
         eventSourceUrl: attr?.eventSourceUrl ?? null,
         leadId: null,
       }).catch(() => {});

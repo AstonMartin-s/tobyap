@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { leads, kommoWebhookLog, clientSettings, attributions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
-import { sendCapiEvent, eventExists, conversationValue } from '@/lib/meta';
+import { sendCapiEvent, eventExists, conversationEventData } from '@/lib/meta';
 import { emitCargo } from '@/lib/cargo/emit';
 import { applyAttributionByCode, claimProximityAttribution, CODE_REGEX } from '@/lib/attribution';
 import { fetchKommoLead, fetchContactPhone, readLeadField, readPhone, contactId, updateLeadFields, type KommoLead } from '@/lib/kommo';
@@ -273,7 +273,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
               eventName: 'Conversacion',
               eventId: convId,
               userData: ud,
-              customData: { campaign_id: campaign, internal_event: 'ConversacionCRM', ...conversationValue(tenant) },
+              customData: conversationEventData(tenant, { campaign_id: campaign, internal_event: 'ConversacionCRM' }),
               eventSourceUrl: convEventSourceUrl,
               leadId: row?.id ?? null,
             }),

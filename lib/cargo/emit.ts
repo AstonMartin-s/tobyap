@@ -301,18 +301,23 @@ export async function emitCargo(tenant: ResolvedTenant, input: EmitCargoInput): 
       console.log(`[emitCargo ${tenant.slug}] skip test campaign`, { eventId: ids.eventId, source: input.source });
       return { ok: true, eventId: ids.eventId, source: input.source, skipped: 'test', ...extra };
     }
+    const nativePurchase = !!tenant.capiEvents?.conversion;
+    const hasAmount = input.value != null && input.value > 0;
     const customData: Record<string, unknown> = {
       campaign_id: ctx.campaign ?? undefined,
       internal_event: 'CargoCRM',
       cargo_source: input.source,
       ...(input.operator ? { cargo_operator: input.operator } : {}),
-      // value/currency del Cargo. Si hay monto real cargado (ARS), lo mandamos
-      // para que Meta pueda optimizar campañas por VALOR de cargo. Si no lo
-      // conocemos, usamos un placeholder pero SIEMPRE en ARS: mezclar monedas
-      // en un mismo evento rompe la optimización por valor.
-      ...(input.value != null
+      // Purchase nativo: solo el monto real que marcó el operador, en ARS.
+      // Sin monto no se manda el placeholder, para no optimizar sobre un 1.
+      // El resto de los tenants mantiene el placeholder en ARS.
+      ...(hasAmount
         ? { value: input.value, currency: input.currency ?? 'ARS' }
-        : { value: CAPI_VALUE.value, currency: 'ARS' }),
+        : nativePurchase
+          ? {}
+          : input.value != null
+            ? { value: input.value, currency: input.currency ?? 'ARS' }
+            : { value: CAPI_VALUE.value, currency: 'ARS' }),
     };
 
     const capi = await sendCapiEvent(tenant, {

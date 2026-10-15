@@ -75,6 +75,9 @@ export interface ResolvedTenant {
   // customFields.conversation_value_ars. Se calcula ~ carga_promedio × tasa_conversión.
   // Si es null/ausente, el evento cae al placeholder CAPI_VALUE (value 1 USD).
   conversationValue: number | null;
+  // Eventos nativos de Meta por ranura, si custom_fields.capi_native = 1.
+  // null = usar el vocabulario del nicho. El nombre va sin sufijo CRM.
+  capiEvents: { conversation: string | null; conversion: string | null } | null;
   // Solapas/funciones OPCIONALES habilitadas por cliente. Se guardan en
   // customFields.feat_* (1 = on, 0 = off). Por defecto TODO habilitado (ausente
   // = on) para no romper clientes existentes. El deploy obligatorio (Chats,

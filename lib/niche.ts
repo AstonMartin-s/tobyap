@@ -59,6 +59,24 @@ export const NICHE_EVENTS: Record<Niche, Record<EventSlot, NicheEventName>> = {
   },
 };
 
+// Override por tenant (custom_fields). No toca NICHE_EVENTS: circo sigue
+// siendo ConversacionCRM / CargoCRM para el resto.
+// capi_native = 1 y capi_event_conversation / capi_event_conversion con el
+// nombre estándar de Meta. Si el nombre falta o no es válido, esa ranura
+// cae al nicho.
+export function capiEventOverride(
+  fields: Record<string, unknown> | null | undefined,
+  slot: EventSlot,
+): string | null {
+  if (!fields || fields.capi_native !== 1) return null;
+  const key = slot === 'conversation' ? 'capi_event_conversation' : 'capi_event_conversion';
+  const raw = fields[key];
+  if (typeof raw !== 'string') return null;
+  const name = raw.trim();
+  if (!/^[A-Za-z][A-Za-z0-9]{0,48}$/.test(name)) return null;
+  return name;
+}
+
 export function isNiche(v: unknown): v is Niche {
   return typeof v === 'string' && (NICHES as readonly string[]).includes(v);
 }

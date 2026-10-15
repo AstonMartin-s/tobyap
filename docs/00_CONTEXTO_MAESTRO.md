@@ -1,5 +1,12 @@
 # TOBYAP — Contexto maestro (bitácora viva)
 
+## Bitácora 2026-10-15 — elganador: eventos nativos de Meta
+
+- MSG-TOB-20261015-CLAUDE-CAPI-NATIVE-1. Override por tenant, sin tocar el mapeo de circo.
+- `custom_fields.capi_native = 1` más `capi_event_conversation` / `capi_event_conversion` salen como evento estándar, sin sufijo CRM.
+- Para elganador, cuando se prenda: CompleteRegistration al iniciar el chat (sin value) y Purchase con el monto real en ARS. Sin monto, Purchase no manda el placeholder de 1.
+- Pixel y token no se cambian en este deploy. Se prenden junto con el flag, después de que el código esté en producción.
+
 ## Bitácora 2026-10-13 — CRM: CCPP en el SalesBot de mooneyatkinson
 
 - Pedido MSG-CRM-20261013-6, solo lectura. No se editó el bot ni se crearon campos.
@@ -10,6 +17,7 @@
 - Prueba manual 2026-10-13: lead 26524664 (Ezequiel Fava, fuera de Spam Numero 3) tenía 1231586 vacío. Se escribió W50 a pedido, para probar la variable del bot. La lista de ese teléfono sigue en B1.
 - Asignación por etiqueta, misma fecha: CCPP 1231586 desde send_list a los leads con Lista 3, Lista4–Lista11, Lista 12, ListaValorMedio1 o ListaValorMedioDormido1. Se saltan ClienteS1 y Piliking (ninguno de este grupo las tenía). 6.785 escritos, 52 ya coincidían, 6 sin teléfono en la lista (campo vacío). No existe Lista 1. Lista 2 no tiene leads. Bot sin publicar.
 - Cierre a CRM: MSG-TOB-20261013-11.
+- Producción: commit 37434b1. MSG-TOB-20261014-1. El CRM publicó el «Si quiero» (MSG-CRM-20261014-1). Sin acción pendiente. Quien ya estaba en 106401859 sigue con el campo vacío si no reentra a la etapa.
 
 > Fuente de verdad operativa junto a `docs/00_PLAN_MEJORAS_2026-08-19.md`.
 > No pegar secretos. Actualizar al cerrar cada fase / cada cambio de contrato.
