@@ -324,11 +324,16 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
     setButtons(nextButtons);
   }
 
+  // Form simplificado (sin checkboxes de confirmación): pide solo nombre + tel.
+  // Pedido de ElGanador para facilitar el ingreso. El teléfono se mantiene (match
+  // de Meta + contacto); solo se sacan las confirmaciones.
+  const simpleForm = slug === 'elganador';
+
   async function start() {
     setFormErr('');
     if (!phone.trim()) return setFormErr('Ingresá tu número de WhatsApp.');
-    if (!ackAuto) return setFormErr('Confirmá que entendiste cómo es la atención.');
-    if (!accept) return setFormErr('Necesitás confirmar que es tu número.');
+    if (!simpleForm && !ackAuto) return setFormErr('Confirmá que entendiste cómo es la atención.');
+    if (!simpleForm && !accept) return setFormErr('Necesitás confirmar que es tu número.');
     setStarting(true);
     try {
       const skipIosSafari = isIos() && !isStandalone();
@@ -874,6 +879,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
             <p style={{ color: '#54656F', fontSize: 14, margin: '4px 0 16px' }}>{skin.gate?.title || (niche === 'tienda' ? 'Dejanos tu número para coordinar tu compra y enviarte el producto' : 'Dejanos tu número para crear tu usuario y darte tu bonificación')}</p>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre o apodo" style={inputStyle} />
             <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="Tu WhatsApp (ej: 11 2345 6789)" style={inputStyle} />
+            {!simpleForm && (<>
             <div style={{ background: '#F0F7F4', border: '1px solid #cfe6dc', borderRadius: 10, padding: '11px 12px', margin: '4px 0 12px' }}>
               <p style={{ fontSize: 13, lineHeight: 1.45, color: '#1b3a30', margin: 0 }}>
                 {skin.gate?.note ? (
@@ -900,6 +906,7 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
               <input type="checkbox" checked={accept} onChange={(e) => setAccept(e.target.checked)} style={{ marginTop: 2 }} />
               <span>{skin.gate?.confirm ? skin.gate.confirm : niche === 'tienda' ? <>Confirmo que este es <b>mi número</b>. Si no lo es, no podré recibir mi compra.</> : <>Confirmo que este es <b>mi número</b>. Si no lo es, no podré recibir mi bonificación.</>}</span>
             </label>
+            </>)}
             {formErr && <div style={{ color: '#C0392B', fontSize: 13, marginBottom: 10 }}>{formErr}</div>}
             <button onClick={start} disabled={starting} style={{ width: '100%', background: C.send, color: '#fff', border: 'none', borderRadius: 24, padding: '13px', fontSize: 16, fontWeight: 600, cursor: 'pointer', opacity: starting ? 0.7 : 1 }}>{starting ? 'Verificando…' : 'Comenzar'}</button>
           </div>
