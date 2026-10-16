@@ -179,7 +179,11 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
     if (C.messageTpl) {
       return C.messageTpl.replace('{fichas}', fichas||'').replace('{bono}', bono||'');
     }
-    ${cfg.chatSlug ? '' : "if (fichas) return 'Hola, quiero mis ' + fichas + ' fichas libres 🎁';"}
+    // Sin número en el copy: el monto real del bono lo comunica el CRM en el
+    // welcome según el tier (ccpp de la lista IVJ). Antes se inyectaba <N> fichas
+    // desde el bono de la landing, que quedaba desalineado al reenviar el link o
+    // si el teléfono no coincidía con el segmento (R1 MSG-CRM-TOB-20261016-1).
+    ${cfg.chatSlug ? '' : "if (fichas) return 'Hola, quiero mi bono de fichas libres 🎁';"}
     return C.defaultMessage;
   }
   function go(d){

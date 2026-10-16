@@ -1,5 +1,39 @@
 # TOBYAP — Contexto maestro (bitácora viva)
 
+## Bitácora 2026-10-16 — Landing redirección: copy sin número de fichas (R1 CRM)
+
+- R1 `MSG-CRM-TOB-20261016-1` (Aston, CRM): el deeplink `wa.me` pre-generaba "Hola, quiero mis <N> fichas libres 🎁" con <N> salido del bono de la landing. Al reenviar el link o si el teléfono no coincidía con el segmento, <N> quedaba desalineado con el bono real que acredita el CRM (ccpp IVJ, piso B1 = 1.000) → conflicto (casos prod: oscar1, filippo, laura1, santiago, maxi22xt con copy "3.000" y bono real 1.000).
+- **Opción A aplicada** (`app/l/_landing.tsx`, `buildText`): el default dinámico ahora arma "Hola, quiero mi bono de fichas libres 🎁" **sin número**. `Codigo Promocion: <CODE>` y `?ccpp=` del query intactos (los setea/usa el CRM). Plantillas propias (`cfg.message` con `{fichas}/{bono}`) no se tocan.
+- Decisión del cliente: lo que se entrega NO lo define el mensaje sino la **trazabilidad** (teléfono + ccpp asignado en Kommo antes del click); sin ccpp → piso 1.000 siempre. La opción B (número desde el ccpp del query) queda **descartada** hasta testear ese circuito.
+- typecheck OK (sin errores en `_landing.tsx`; los TS7006 restantes son de `landings/volve/plugins/horizons-runtime/*`, ajenos).
+
+## Bitácora 2026-10-16 — VOLVÉ: se quita la verificación + ajuste de BM (redeploy)
+
+- Cambio de flujo pedido por el cliente: el paso de verificación (nombre + WhatsApp + selector de país) se trababa y era innecesario (al final contactan por WhatsApp/Telegram igual). **Gate eliminado por completo.** Tras la pregunta "¿Querés conocer cómo podría ayudarte…?" el chat muestra directo dos botones: **Contactar por WhatsApp** (color de marca `#25d366`, `wa.me/5493153466636`) y **Contactar por Telegram** (`#229ed9`, `t.me/VerifiquedBM`).
+- Nuevo `apps/web/src/components/contact-buttons.tsx` reemplaza a `contact-gate.tsx`. Borrados: `contact-gate.tsx`, `constants/countries.ts`, `lib/wa-verify.server.ts`, `lib/leads-db.server.ts`, `routes/api.lead.ts`; se quitó la ruta `api/lead` de `routes.ts`. CSS `.gate*` huérfano eliminado; colores de marca agregados. WACHECK/LEADS_DB_PATH quedan obsoletos (sin uso).
+- Ajuste de copy (Luis, contingencias): las cards de planes listaban "2 BM normales" + "Un BM con N cuentas" + "Un BM para el píxel" → la gente creía que eran 4 BM. Ahora cada plan dice simplemente **2 BM** (Mini/Básica "con 5/7 cuentas publicitarias", Premium "verificados con 10"); el rol de cada BM lo explica Luis en la reunión/WhatsApp. Archivo: `src/data/contingencia.ts`.
+- Fix de build Hostinger: `react-router: command not found` porque `@react-router/dev` y toolchain (vite, postcss, tailwind, autoprefixer, esbuild) estaban en devDependencies y el install productivo no las trae → movidas a `dependencies`.
+- typecheck + lint (0/0) + build verdes. Redeploy a Hostinger (MCP, TUS + Start Node.js build, mismo esquema server.mjs/node22) build `completed`. **Verificado en vivo**: /api/health 200, home con header rotante + footer nuevo, /api/lead 404 (ya no existe), bundle con botones WA/TG + colores + destinos, copy "2 BM" nuevo presente y textos viejos del píxel ausentes.
+
+## Bitácora 2026-10-16 — Landing VOLVÉ: puerta de contacto en el chat (SUPERSEDED, ver entrada de arriba)
+
+- Export Horizons (React Router + Vite SSR) alojado en `landings/volve/`. Sitio aparte, se sube a Hostinger. No entra al deploy de Railway ni toca el chat de producción.
+- El chat ahora termina en una puerta obligatoria antes de los botones de contacto: 1) nombre (se escribe en el chat), 2) WhatsApp real verificado con el mismo gateway que TOBYAP (`WACHECK_URL`/`WACHECK_TOKEN`, Blaster → WuzAPI), 3) recién con el número OK aparecen los botones (WhatsApp y/o Telegram, configurables en `src/constants/contact.ts`).
+- Verificación + guardado en el server del propio sitio (`POST /api/lead`), los secretos no salen al navegador. Sin gateway configurado valida solo formato; ante 503/429/502 no bloquea.
+- Leads en archivo JSONL (`LEADS_DB_PATH`, default `data/leads.jsonl`), una línea por lead: nombre, phone normalizado, onWhatsApp, ip, ua. Ignorado por git.
+- typecheck + build verdes. Smoke local: nombre corto 400, teléfono inválido 422, válido 200 (phone normalizado + línea escrita), GET 405.
+- Ajustes 2026-10-16 (segunda pasada): footer → "Soluciones para el tráfico de tu negocio."; header con frase rotante al lado de "volvé" (Volvé a tener leads / Volvé a una publicidad estable / Volvé a contactar a tus clientes, una a la vez, `HeaderRotator`, SSR-safe, respeta reduced-motion). Destinos: WhatsApp `wa.me/5493153466636`, Telegram `t.me/VerifiquedBM` (nombres provisorios, se ajustan después).
+- WACHECK: mismo gateway que el formulario de entrada del livechat. En Hostinger cargar `WACHECK_URL`/`WACHECK_TOKEN` con esos mismos valores (no se copian acá, son secretos de Railway). Falta setearlos en el server del sitio.
+
+## Bitácora 2026-10-16 — VOLVÉ publicada en Hostinger (Node SSR)
+
+- Deploy en `https://losarmandocereales.site` (plan Business, order 1008727118, username u120514496, website CloudLinux vacío creado por API, datacenter ascenty). DNS ya apuntaba a Hostinger (ALIAS @ → cdn.hstgr.net).
+- Vía: MCP de Hostinger (API). Subida del archivo por TUS a public_html + `Start Node.js build` (app_type react-router, node 22, root `.`, output `build`).
+- Ajustes para que buildee/corra en Hostinger: `react-router.config.ts` buildDirectory `build` (antes `../../dist/apps/web`, el output fuera del root lo rechaza la API). Se empaqueta `apps/web` como raíz del archivo (sin el wrapper monorepo, que rompía el install hoisteado).
+- Hostinger ejecuta el entry file directo y exige `listen()` en <3s; `build/server/index.js` es solo el handler de React Router → daba 503 "did not call listen()". Fix: server propio `apps/web/server.mjs` (Express + `@react-router/express` + compression) que sirve estáticos y llama `listen(process.env.PORT)`. entry_file = `server.mjs`. Deps nuevas: express, @react-router/express, compression.
+- Env en el sitio: NODE_ENV=production, LEADS_DB_PATH=/home/u120514496/volve-data/leads.jsonl. Falta cargar WACHECK_URL/WACHECK_TOKEN (secretos del livechat) para que verifique WA real; sin ellos valida solo formato.
+- Verificado en vivo: /api/health 200, home con header rotante + footer nuevo, /api/lead 200 (válido) y 400 (nombre corto), destinos wa.me/5493153466636 y t.me/VerifiquedBM. elmago.* y el root eran Horizons (no aceptan Node SSR por API); por eso se creó un website CloudLinux nuevo.
+
 ## Bitácora 2026-10-16 — SenderIO en la sidebar del admin
 
 - MSG-SND-20261015-TOB-1. Sección SenderIO al final del menú admin (Overview, Por BM, Plantillas, Funnel & KPIs, Log en vivo, Clientes, Verificador WA).
