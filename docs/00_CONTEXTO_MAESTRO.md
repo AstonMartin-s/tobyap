@@ -1,5 +1,12 @@
 # TOBYAP — Contexto maestro (bitácora viva)
 
+## Bitácora 2026-10-16 — SenderIO en la sidebar del admin
+
+- MSG-SND-20261015-TOB-1. Sección SenderIO al final del menú admin (Overview, Por BM, Plantillas, Funnel & KPIs, Log en vivo, Clientes, Verificador WA).
+- El iframe apunta a `https://senderio-production.up.railway.app/embed/<vista>`. Sin credenciales en el navegador. El selector de cliente de Tracker no entra.
+- Origen del panel: `https://panel.trackerapp.site`. También sirve `https://tobyap-production.up.railway.app`.
+- MSG-SND-20261016-TOB-1: embed en producción (cd3e025). frame-ancestors de panel.trackerapp.site y tobyap-production. El iframe manda el origen (referrerPolicy origin), no no-referrer. Sidebar desplegada a continuación.
+
 ## Bitácora 2026-10-15 — elganador: eventos nativos de Meta
 
 - MSG-TOB-20261015-CLAUDE-CAPI-NATIVE-1. Override por tenant, sin tocar el mapeo de circo.
