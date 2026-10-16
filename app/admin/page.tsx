@@ -34,8 +34,10 @@ export default async function AdminPage({
   const selected = clientList.find((c) => c.slug === searchParams.tenant);
 
   const [cards, daily, wallets, walletTotal, walletExtras] = await Promise.all([
-    getDayCards(today, { channel: 'meta' }),
-    getDailyReport({ start, end, tenantId: selected?.id, channel: 'meta' }),
+    // Sin channel => Meta + Influencer combinados (así los clientes 100% INFLU,
+    // como elganador, también aparecen con su actividad).
+    getDayCards(today, {}),
+    getDailyReport({ start, end, tenantId: selected?.id }),
     listWalletRows(),
     getWalletTotal(),
     getWalletExtras(),
@@ -51,7 +53,7 @@ export default async function AdminPage({
         <div className="page-head">
           <div className="page-head__text">
             <h1>Panel de administración</h1>
-            <p>Estadísticas por cliente · solo Meta (campañas INFLU quedan en el panel del cliente).</p>
+            <p>Estadísticas por cliente · Meta + Influencer (todas las campañas).</p>
           </div>
         </div>
 
@@ -59,7 +61,7 @@ export default async function AdminPage({
         {/* ---- Reporte del día (tarjetas) ---- */}
         <div className="card">
           <div className="card__title">
-            Reporte del día <span className="card__sub">{today} · {cards.length} clientes · con actividad {activos.length} · solo Meta</span>
+            Reporte del día <span className="card__sub">{today} · {cards.length} clientes · con actividad {activos.length} · Meta + INFLU</span>
           </div>
           {activos.length === 0 ? (
             <div className="empty">Todavía no hay actividad hoy.</div>
@@ -103,7 +105,7 @@ export default async function AdminPage({
         {/* ---- Reportes diarios (tabla editable) ---- */}
         <div className="card">
           <div className="card__title">
-            Reportes diarios de ads <span className="card__sub">gasto Meta · campañas INFLU no se suman acá</span>
+            Reportes diarios de ads <span className="card__sub">chats/cargas Meta + INFLU · gasto solo Meta</span>
           </div>
           <form method="get" className="row" style={{ alignItems: 'flex-end', marginBottom: '1.1rem', flexWrap: 'wrap' }}>
             <div className="field" style={{ margin: 0, minWidth: 200 }}>

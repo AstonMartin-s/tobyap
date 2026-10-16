@@ -5,7 +5,8 @@
 - MSG-SND-20261015-TOB-1. Sección SenderIO al final del menú admin (Overview, Por BM, Plantillas, Funnel & KPIs, Log en vivo, Clientes, Verificador WA).
 - El iframe apunta a `https://senderio-production.up.railway.app/embed/<vista>`. Sin credenciales en el navegador. El selector de cliente de Tracker no entra.
 - Origen del panel: `https://panel.trackerapp.site`. También sirve `https://tobyap-production.up.railway.app`.
-- MSG-SND-20261016-TOB-1: embed en producción (cd3e025). frame-ancestors de panel.trackerapp.site y tobyap-production. El iframe manda el origen (referrerPolicy origin), no no-referrer. Sidebar desplegada a continuación.
+- MSG-SND-20261016-TOB-1: embed en producción (cd3e025). frame-ancestors de panel.trackerapp.site y tobyap-production. El iframe manda el origen (referrerPolicy origin), no no-referrer. Sidebar en producción: commit d05366a, Railway 1fd8d27b SUCCESS.
+- MSG-SND-20261016-TOB-2: costura cerrada. Marco confirmado en /admin/senderio/funnel. El iframe no trae la sidebar de Sender; el selector Kommo queda adentro. El encabezado (ícono, SenderIO, Orquestador de goteo) lo resolvió SND en 64ebab7, Railway 92c19871. Sin cambios de orígenes ni de rutas. Sin acción de TOB.
 
 ## Bitácora 2026-10-15 — elganador: eventos nativos de Meta
 
