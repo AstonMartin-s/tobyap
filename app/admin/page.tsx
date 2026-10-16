@@ -33,15 +33,24 @@ export default async function AdminPage({
   const clientList = clientListAll.filter((c) => !REPORT_EXCLUDE_TENANTS.includes(c.slug));
   const selected = clientList.find((c) => c.slug === searchParams.tenant);
 
-  const [cards, daily, wallets, walletTotal, walletExtras] = await Promise.all([
-    // Sin channel => Meta + Influencer combinados (así los clientes 100% INFLU,
-    // como elganador, también aparecen con su actividad).
-    getDayCards(today, {}),
-    getDailyReport({ start, end, tenantId: selected?.id }),
+  // Clientes 100% influencer que SÍ deben mostrar INFLU en el admin. El resto
+  // queda solo Meta (no se mezcla el tráfico de influencer en sus métricas).
+  const INFLU_IN_ADMIN = ['elganador'];
+  const inclInflu = (slug?: string) => !!slug && INFLU_IN_ADMIN.includes(slug);
+
+  const [cardsMeta, cardsAll, daily, wallets, walletTotal, walletExtras] = await Promise.all([
+    getDayCards(today, { channel: 'meta' }),
+    getDayCards(today, {}), // Meta + Influencer
+    getDailyReport({ start, end, tenantId: selected?.id, channel: inclInflu(selected?.slug) ? undefined : 'meta' }),
     listWalletRows(),
     getWalletTotal(),
     getWalletExtras(),
   ]);
+
+  // Por cliente: elganador usa la tarjeta con INFLU; el resto, solo Meta.
+  const allById = new Map(cardsAll.map((c) => [c.tenantId, c]));
+  const cards = cardsMeta.map((c) => (inclInflu(c.slug) ? allById.get(c.tenantId) ?? c : c));
+  cards.sort((a, b) => (b.chats + b.cargas) - (a.chats + a.cargas));
 
   const activos = cards.filter((c) => c.chats + c.cargas > 0);
   const inactivos = cards.filter((c) => c.chats + c.cargas === 0);
@@ -53,7 +62,7 @@ export default async function AdminPage({
         <div className="page-head">
           <div className="page-head__text">
             <h1>Panel de administración</h1>
-            <p>Estadísticas por cliente · Meta + Influencer (todas las campañas).</p>
+            <p>Estadísticas por cliente · solo Meta (ElGanador incluye sus campañas INFLU).</p>
           </div>
         </div>
 
@@ -61,7 +70,7 @@ export default async function AdminPage({
         {/* ---- Reporte del día (tarjetas) ---- */}
         <div className="card">
           <div className="card__title">
-            Reporte del día <span className="card__sub">{today} · {cards.length} clientes · con actividad {activos.length} · Meta + INFLU</span>
+            Reporte del día <span className="card__sub">{today} · {cards.length} clientes · con actividad {activos.length} · solo Meta (+INFLU en ElGanador)</span>
           </div>
           {activos.length === 0 ? (
             <div className="empty">Todavía no hay actividad hoy.</div>
@@ -105,7 +114,7 @@ export default async function AdminPage({
         {/* ---- Reportes diarios (tabla editable) ---- */}
         <div className="card">
           <div className="card__title">
-            Reportes diarios de ads <span className="card__sub">chats/cargas Meta + INFLU · gasto solo Meta</span>
+            Reportes diarios de ads <span className="card__sub">gasto Meta · INFLU solo se suma en ElGanador</span>
           </div>
           <form method="get" className="row" style={{ alignItems: 'flex-end', marginBottom: '1.1rem', flexWrap: 'wrap' }}>
             <div className="field" style={{ margin: 0, minWidth: 200 }}>
