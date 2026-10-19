@@ -44,6 +44,9 @@ interface LeadSignal {
   leadId: number;
   statusId?: number;
   code?: string;
+  // Quién movió la etapa. En el webhook es modified_user_id (el created_by del
+  // evento). 0 = bot o pipeline digital. Ausente = no sabemos, no es un operador.
+  modifiedUserId?: number;
 }
 
 function parseWebhook(form: URLSearchParams, raw: string): Map<number, LeadSignal> {
@@ -56,8 +59,11 @@ function parseWebhook(form: URLSearchParams, raw: string): Map<number, LeadSigna
 
   for (let i = 0; get(`leads[add][${i}][id]`); i++) upsert(Number(get(`leads[add][${i}][id]`)), {});
   for (let i = 0; get(`leads[status][${i}][id]`); i++) {
+    const actorRaw = get(`leads[status][${i}][modified_user_id]`) ?? get(`leads[status][${i}][created_by]`);
+    const actor = actorRaw != null && actorRaw !== '' ? Number(actorRaw) : undefined;
     upsert(Number(get(`leads[status][${i}][id]`)), {
       statusId: Number(get(`leads[status][${i}][status_id]`)),
+      ...(actor != null && Number.isFinite(actor) ? { modifiedUserId: actor } : {}),
     });
   }
   // Mensajes entrantes: el lead puede venir en entity_id / element_id; el token, en
@@ -301,7 +307,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       // KOMMO MANDA: reflejamos en el panel cualquier etapa de resultado que el
       // empleado haya movido en Kommo (Cargo$ / No Cargo / Revisar imagen).
       const statusNow = sig.statusId ?? lead.status_id;
-      syncChatStepFromKommo(tenant, sig.leadId, statusNow).catch(() => {});
+      syncChatStepFromKommo(tenant, sig.leadId, statusNow, {
+        fromStatusEvent: sig.statusId != null,
+        actorId: sig.modifiedUserId ?? null,
+      }).catch(() => {});
     } catch (e) {
       console.error(`[kommo-webhook ${tenant.slug}] lead ${sig.leadId}:`, e);
       results.push({ leadId: sig.leadId, error: String(e) });

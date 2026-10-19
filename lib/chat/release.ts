@@ -38,7 +38,15 @@ export function kommoStatusFromPanelStep(tenant: ResolvedTenant, step: string): 
 // Sincroniza el estado del chat del panel a partir de la etapa de Kommo (lo llama
 // el webhook). No manda mensajes al cliente (el "acreditado" lo maneja
 // releaseChatOnCargo aparte). Idempotente.
-export async function syncChatStepFromKommo(tenant: ResolvedTenant, kommoLeadId: number, statusId?: number | null): Promise<void> {
+// fromStatusEvent: el webhook trae un cambio de etapa. Si es false, el lead ya
+// estaba en esa etapa y este aviso es un mensaje u otro evento.
+// actorId: modified_user_id del webhook (el created_by del evento). > 0 operador.
+export async function syncChatStepFromKommo(
+  tenant: ResolvedTenant,
+  kommoLeadId: number,
+  statusId?: number | null,
+  opts?: { fromStatusEvent?: boolean; actorId?: number | null },
+): Promise<void> {
   const step = panelStepFromKommoStatus(tenant, statusId);
   if (!step) return;
   try {
@@ -47,6 +55,12 @@ export async function syncChatStepFromKommo(tenant: ResolvedTenant, kommoLeadId:
       .from(chatSessions)
       .where(and(eq(chatSessions.tenantId, tenant.id), eq(chatSessions.kommoLeadId, kommoLeadId)));
     if (!s || s.step === step) return;
+    if (step === 'no_cargo') {
+      // El lead sigue en No Cargo: un mensaje posterior no vuelve a cerrar el chat.
+      if (!opts?.fromStatusEvent) return;
+      // 0 = bot / pipeline digital. Ausente = no es un operador. Solo un id > 0 cierra.
+      if (!((opts.actorId ?? 0) > 0)) return;
+    }
     await db.update(chatSessions).set({ step, updatedAt: new Date() }).where(eq(chatSessions.id, s.id));
   } catch {
     /* best-effort */

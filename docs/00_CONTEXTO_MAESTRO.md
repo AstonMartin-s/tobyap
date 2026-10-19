@@ -1,5 +1,23 @@
 # TOBYAP — Contexto maestro (bitácora viva)
 
+## Bitácora 2026-10-19 — King: el bot de Kommo no cierra el chat
+
+- El bot de King mueve el lead a No Cargo solo, cerca de 1 h 15 m después de entrar (Revisar → Atención manual → No Cargo). 81/81 eventos con `created_by` 0. El tracker quedaba en `no_cargo` y no entregaba el CBU.
+- El webhook no trae `created_by`. El actor viene en `leads[status][n][modified_user_id]`. 0 es el bot.
+- `syncChatStepFromKommo` pasa a `no_cargo` solo si el aviso es un cambio de etapa y `modified_user_id` > 0. El bot no cierra, ni antes ni después del CBU. Un operador en Kommo sí. Un mensaje posterior no vuelve a cerrar porque el lead sigue en esa etapa. Cargo$, Revisar imagen y el botón "No cargó" del panel no cambian.
+
+## Bitácora 2026-10-16 — VOLVÉ: recorte de flujo + cierre único
+
+- Se saca "Piezas finales / Piezas de texto" del footer (era copy interno, no del visitante). Borrados `copy-kit.tsx` y `data/final-copy.ts`.
+- Cierre unificado en las tres ramas: "Seguimos por chat privado y vemos tu caso." + botones "Continuar por WhatsApp" / "Continuar por Telegram". Mensaje precargado único: "Hola, vengo de la web de Volvé, necesito, quiero conversar." (`constants/contact.ts`).
+- Rama B (estructuras/pauta) recortada: 2 preguntas + contacto. Se sacan cards Mini/Básica/Premium, "qué significa", entrega, uso, reposición, adicional WA y el texto de Premium. Eso queda como entregable en el chat, no en la web. Borrado `data/contingencia.ts`.
+
+## Bitácora 2026-10-16 — mooney: plantillas {fichas} sacadas del wa.me
+
+- Las landings `reactivacion` y `go1` (tenant `mooneyatkinson`) seguían armando "quiero mis 3.000 fichas" porque su `config.message` era plantilla con `{fichas}` y eso pisa el default sin número.
+- Actualizado en prod (solo esas dos filas): mensaje sin monto y sin `{fichas}`. `regalo1` no se tocó (ya no tenía número). Código de promo y ccpp intactos.
+- Aviso a TOBYAP: MSG-CRM-TOB-20261016-3. No reponer `{fichas}` en esas landings.
+
 ## Bitácora 2026-10-16 — Landing redirección: copy sin número de fichas (R1 CRM)
 
 - R1 `MSG-CRM-TOB-20261016-1` (Aston, CRM): el deeplink `wa.me` pre-generaba "Hola, quiero mis <N> fichas libres 🎁" con <N> salido del bono de la landing. Al reenviar el link o si el teléfono no coincidía con el segmento, <N> quedaba desalineado con el bono real que acredita el CRM (ccpp IVJ, piso B1 = 1.000) → conflicto (casos prod: oscar1, filippo, laura1, santiago, maxi22xt con copy "3.000" y bono real 1.000).
