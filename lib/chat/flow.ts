@@ -491,12 +491,15 @@ export async function cbuStep(tenant: ResolvedTenant, cfg: ChatRuntimeConfig = D
 // Al subir la foto NO entra directo a revisión: primero el usuario debe instalar
 // la app y activar notificaciones (paso a paso) para "terminar de enviar" el
 // comprobante. Sin eso, no se envía y no puede reclamar el bono.
-export function onComprobante(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME, opts?: { skipNotif?: boolean }): BotMsg[] {
+export function onComprobante(cfg: ChatRuntimeConfig = DEFAULT_RUNTIME, opts?: { skipNotif?: boolean; omitInstallMsg?: boolean }): BotMsg[] {
+  const first: BotMsg = { from: 'bot', delayMs: 900, at: now(), text: renderTemplate('comprobante_upload_1', cfg) };
+  // El Ganador: no mostrar "Instalá la app y activá las notificaciones".
+  if (opts?.omitInstallMsg) return [first];
   const second = opts?.skipNotif
     ? '📲 Instalá la app — así te acreditamos más rápido 🎁'
     : renderTemplate('comprobante_upload_2', cfg);
   return [
-    { from: 'bot', delayMs: 900, at: now(), text: renderTemplate('comprobante_upload_1', cfg) },
+    first,
     { from: 'bot', delayMs: 1400, at: now(), text: second },
   ];
 }

@@ -115,7 +115,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     botMsgs = prepareBotBatch(comprobanteReviewTienda());
   } else if (firstComprobante && !skipApp) {
     step = 'app_onboarding'; // primero instala app (+ notifs si todavía no las aceptó)
-    botMsgs = prepareBotBatch(onComprobante(runtime, { skipNotif: pushOn }));
+    botMsgs = prepareBotBatch(onComprobante(runtime, {
+      skipNotif: pushOn,
+      omitInstallMsg: tenant.slug === 'elganador',
+    }));
   } else {
     step = 'validando';
     botMsgs = prepareBotBatch(comprobanteReviewMessages(runtime));
