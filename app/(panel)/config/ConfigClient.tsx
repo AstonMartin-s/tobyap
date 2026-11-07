@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { CajerosSection } from './CajerosSection';
 
 type Settings = Record<string, string | null>;
 interface NumberRow { id: string; name: string | null; phone: string | null; status: boolean | null; type: string | null }
@@ -34,6 +35,8 @@ export function ConfigClient() {
         </div>
       </div>
       <SettingsSection />
+      {/* Cajeros con CBU/WhatsApp propios y rotación por horario (circo). */}
+      {!isTienda && <CajerosSection />}
       <MetaSection />
       {/* Circo: liberador de fichas + webhook de afiliados. No aplica a tienda. */}
       {!isTienda && <LiberadorSection />}

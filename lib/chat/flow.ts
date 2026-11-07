@@ -7,6 +7,7 @@ import { createPlayerWithRetry, buildPlayerUsername, randomPlayerPassword } from
 import { createUser as kingCreateUser, KingApiError } from '@/lib/king-api';
 import { createPlayer as kingcashCreatePlayer, kingcashPlayerLoginUrl, KingcashApiError } from '@/lib/kingcash-api';
 import { pickCajero } from '@/lib/rotation';
+import { getCajeros, getCajerosTz, pickActiveCajero } from '@/lib/chat/cajeros';
 import type { ResolvedTenant } from '@/lib/types';
 import {
   DEFAULT_RUNTIME,
@@ -75,6 +76,13 @@ function portalNameFrom(name?: string | null, phone?: string): string {
 // mano desde el panel.
 async function assignCajeroData(tenantId: string): Promise<Record<string, unknown>> {
   try {
+    // Cajeros con horario (Imperio VIP): el WhatsApp sigue al cajero activo.
+    const [s] = await db.select().from(clientSettings).where(eq(clientSettings.tenantId, tenantId));
+    const cajeros = getCajeros(s?.chatConfig);
+    if (cajeros.length) {
+      const a = pickActiveCajero(cajeros, getCajerosTz(s?.chatConfig));
+      if (a && a.wa) return { assignedWa: a.wa, assignedWaName: a.label || null, cajeroId: a.id };
+    }
     const c = await pickCajero(tenantId);
     if (!c) return {};
     return { assignedWa: c.phone, assignedWaName: c.name ?? null };
@@ -463,8 +471,11 @@ async function accountStepKingApi(
 // ── Paso 3: CBU (número separado + copiar) ─────────────────────────────────
 export async function cbuStep(tenant: ResolvedTenant, cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): Promise<{ messages: BotMsg[]; data: Record<string, unknown>; step: string }> {
   const [s] = await db.select().from(clientSettings).where(eq(clientSettings.tenantId, tenant.id));
-  const cbu = s?.accountCbu ?? '';
-  const titular = s?.accountName ?? '';
+  // Cajeros con horario: mostrar CBU/titular del cajero activo (si hay). Si no, el CBU único.
+  const cajeros = getCajeros(s?.chatConfig);
+  const activeCajero = cajeros.length ? pickActiveCajero(cajeros, getCajerosTz(s?.chatConfig)) : null;
+  const cbu = activeCajero ? activeCajero.cbu : (s?.accountCbu ?? '');
+  const titular = activeCajero ? activeCajero.titular : (s?.accountName ?? '');
   const messages: BotMsg[] = [
     { from: 'bot', delayMs: 750, at: now(), text: renderTemplate('cbu_intro', cfg, { titular }) },
   ];
@@ -484,7 +495,15 @@ export async function cbuStep(tenant: ResolvedTenant, cfg: ChatRuntimeConfig = D
       });
     }
   }
-  return { messages, data: { cbu, titular }, step: 'comprobante' };
+  return {
+    messages,
+    data: {
+      cbu,
+      titular,
+      ...(activeCajero?.wa ? { assignedWa: activeCajero.wa, assignedWaName: activeCajero.label, cajeroId: activeCajero.id } : {}),
+    },
+    step: 'comprobante',
+  };
 }
 
 // ── Paso 4: comprobante recibido → GATE de app obligatorio ─────────────────
