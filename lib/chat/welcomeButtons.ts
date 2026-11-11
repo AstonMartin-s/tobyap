@@ -10,7 +10,7 @@ export const WANT_AGENT_PLAIN_BTN: WelcomeBtn = { id: 'want_agent', label: 'Habl
 export const HAVE_USER_BTN: WelcomeBtn = { id: 'have_user', label: 'Ya tengo usuario' };
 export const WANT_CBU_BTN: WelcomeBtn = { id: 'want_cbu', label: 'Quiero el CBU 💳' };
 
-export const AGENT_BUTTON_SLUGS = ['king', 'paradise', 'elganador', 'luck', 'piliking'];
+export const AGENT_BUTTON_SLUGS = ['king', 'paradise', 'elganador', 'luck', 'piliking', 'imperiovip'];
 
 // Clientes que NO muestran el botón "Ya tengo usuario" en la bienvenida.
 // Los recurrentes igual pueden escribir "ya tengo usuario" por texto (HAVE_USER_RE).
