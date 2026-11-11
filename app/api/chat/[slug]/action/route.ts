@@ -231,7 +231,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   }
 
   if (b.action === 'want_cbu') {
-    const r = await cbuStep(tenant, runtime);
+    const r = await cbuStep(tenant, runtime, (s.data ?? {}) as Record<string, unknown>);
     const botMsgs = prepareBotBatch(r.messages);
     const history = [...(s.messages ?? []), ...botMsgs];
     // Persistimos cbu/titular y marcamos atención: ElGanador entra por este botón.

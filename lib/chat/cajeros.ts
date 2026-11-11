@@ -95,3 +95,21 @@ export function pickActiveCajero(
   }
   return cajeros.find((c) => c.fallback) ?? cajeros[0];
 }
+
+/** Sticky por sesión: si el cliente YA entró bajo un cajero (`prevCajeroId`), se
+ *  lo mantiene en ese cajero (leyendo sus datos actuales del config, por si se
+ *  editó el CBU/WhatsApp). Solo en la PRIMERA asignación se elige por horario.
+ *  Si el cajero fijado ya no existe, cae a la selección por horario. */
+export function pickStickyCajero(
+  cajeros: CajeroConf[],
+  tz: string = DEFAULT_CAJEROS_TZ,
+  prevCajeroId?: string | null,
+  nowMs?: number,
+): CajeroConf | null {
+  if (!cajeros.length) return null;
+  if (prevCajeroId) {
+    const stuck = cajeros.find((c) => c.id === prevCajeroId);
+    if (stuck) return stuck;
+  }
+  return pickActiveCajero(cajeros, tz, nowMs);
+}

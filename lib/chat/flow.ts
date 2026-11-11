@@ -7,7 +7,7 @@ import { createPlayerWithRetry, buildPlayerUsername, randomPlayerPassword } from
 import { createUser as kingCreateUser, KingApiError } from '@/lib/king-api';
 import { createPlayer as kingcashCreatePlayer, kingcashPlayerLoginUrl, KingcashApiError } from '@/lib/kingcash-api';
 import { pickCajero } from '@/lib/rotation';
-import { getCajeros, getCajerosTz, pickActiveCajero } from '@/lib/chat/cajeros';
+import { getCajeros, getCajerosTz, pickStickyCajero } from '@/lib/chat/cajeros';
 import type { ResolvedTenant } from '@/lib/types';
 import {
   DEFAULT_RUNTIME,
@@ -74,13 +74,15 @@ function portalNameFrom(name?: string | null, phone?: string): string {
 // no tiene pool de cajeros cargado, devuelve {} y el flujo sigue como siempre
 // (link de soporte con rotación de landing). El operador puede reasignarlo a
 // mano desde el panel.
-async function assignCajeroData(tenantId: string): Promise<Record<string, unknown>> {
+async function assignCajeroData(tenantId: string, prevCajeroId?: string | null): Promise<Record<string, unknown>> {
   try {
-    // Cajeros con horario (Imperio VIP): el WhatsApp sigue al cajero activo.
+    // Cajeros con horario (Imperio VIP): STICKY por sesión. Si el cliente ya
+    // entró bajo un cajero, se mantiene ese (no rota); solo la 1ª vez se elige
+    // por horario.
     const [s] = await db.select().from(clientSettings).where(eq(clientSettings.tenantId, tenantId));
     const cajeros = getCajeros(s?.chatConfig);
     if (cajeros.length) {
-      const a = pickActiveCajero(cajeros, getCajerosTz(s?.chatConfig));
+      const a = pickStickyCajero(cajeros, getCajerosTz(s?.chatConfig), prevCajeroId);
       if (a && a.wa) return { assignedWa: a.wa, assignedWaName: a.label || null, cajeroId: a.id };
     }
     const c = await pickCajero(tenantId);
@@ -241,8 +243,8 @@ export async function accountStep(
 
   const prev = session.existing ?? {};
   const cajero = prev.assignedWa
-    ? { assignedWa: prev.assignedWa, assignedWaName: prev.assignedWaName ?? null }
-    : await assignCajeroData(tenant.id);
+    ? { assignedWa: prev.assignedWa, assignedWaName: prev.assignedWaName ?? null, ...(prev.cajeroId ? { cajeroId: prev.cajeroId } : {}) }
+    : await assignCajeroData(tenant.id, typeof prev.cajeroId === 'string' ? prev.cajeroId : null);
   return {
     messages,
     buttons: [{ id: 'want_cbu', label: 'Quiero el CBU 💳' }],
@@ -307,7 +309,7 @@ async function accountStepManual(
     : buildManualUsername(session.name, session.phone));
   const fixedPass = cfg.fixedSuggestedPassword?.trim() || '';
   const suggestedPassword = fixedPass || keepPass || randomPlayerPassword();
-  const cajero = await assignCajeroData(tenant.id);
+  const cajero = await assignCajeroData(tenant.id, typeof prev.cajeroId === 'string' ? prev.cajeroId : null);
   return {
     messages: [
       { from: 'bot', delayMs: 700, at: now(), text: renderTemplate('account_creating_manual', cfg) },
@@ -438,8 +440,8 @@ async function accountStepKingApi(
       const creds = `\n\n👤 Usuario: *${acc.username}*\n🔑 Contraseña: *${acc.password}*\n\n🔗 Entrá acá:\n${cfg.links.portal_login}`;
       const prev = session.existing ?? {};
       const cajero = prev.assignedWa
-        ? { assignedWa: prev.assignedWa, assignedWaName: prev.assignedWaName ?? null }
-        : await assignCajeroData(tenant.id);
+        ? { assignedWa: prev.assignedWa, assignedWaName: prev.assignedWaName ?? null, ...(prev.cajeroId ? { cajeroId: prev.cajeroId } : {}) }
+        : await assignCajeroData(tenant.id, typeof prev.cajeroId === 'string' ? prev.cajeroId : null);
       return {
         messages: [
           { from: 'bot', delayMs: 600, at: now(), text: renderTemplate('account_creating', cfg) },
@@ -470,11 +472,13 @@ async function accountStepKingApi(
 }
 
 // ── Paso 3: CBU (número separado + copiar) ─────────────────────────────────
-export async function cbuStep(tenant: ResolvedTenant, cfg: ChatRuntimeConfig = DEFAULT_RUNTIME): Promise<{ messages: BotMsg[]; data: Record<string, unknown>; step: string }> {
+export async function cbuStep(tenant: ResolvedTenant, cfg: ChatRuntimeConfig = DEFAULT_RUNTIME, prevData?: Record<string, unknown>): Promise<{ messages: BotMsg[]; data: Record<string, unknown>; step: string }> {
   const [s] = await db.select().from(clientSettings).where(eq(clientSettings.tenantId, tenant.id));
-  // Cajeros con horario: mostrar CBU/titular del cajero activo (si hay). Si no, el CBU único.
+  // Cajeros con horario: STICKY. Si el cliente ya entró bajo un cajero, mostramos
+  // el CBU/titular/WhatsApp de ESE cajero (no rota); solo la 1ª vez se elige por horario.
   const cajeros = getCajeros(s?.chatConfig);
-  const activeCajero = cajeros.length ? pickActiveCajero(cajeros, getCajerosTz(s?.chatConfig)) : null;
+  const prevCajeroId = typeof prevData?.cajeroId === 'string' ? prevData.cajeroId : null;
+  const activeCajero = cajeros.length ? pickStickyCajero(cajeros, getCajerosTz(s?.chatConfig), prevCajeroId) : null;
   const cbu = activeCajero ? activeCajero.cbu : (s?.accountCbu ?? '');
   const titular = activeCajero ? activeCajero.titular : (s?.accountName ?? '');
   const messages: BotMsg[] = [
