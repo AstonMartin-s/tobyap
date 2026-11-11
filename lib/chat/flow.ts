@@ -154,20 +154,24 @@ export function sessionHasAccount(data: Record<string, unknown> | null | undefin
 export function sessionCanOpenSupport(
   data: Record<string, unknown> | null | undefined,
   step?: string | null,
+  unlockOnAccount = false,
 ): boolean {
   if (step === 'done') return true;
   if (data?.hasExistingUser === true) return true;
+  // Modelo cajero (ej. imperiovip): con credenciales entregadas (username) ya se
+  // habilita el WhatsApp, sin esperar la carga.
+  if (unlockOnAccount && sessionHasAccount(data)) return true;
   return false;
 }
 
-export function supportClientFlags(data: Record<string, unknown> | null | undefined, step?: string | null) {
+export function supportClientFlags(data: Record<string, unknown> | null | undefined, step?: string | null, unlockOnAccount = false) {
   const d = data ?? {};
   const username = typeof d.username === 'string' && d.username.trim() ? d.username.trim() : null;
   const assignedWa = typeof d.assignedWa === 'string' && d.assignedWa.trim() ? String(d.assignedWa) : null;
   return {
     username,
     assignedWa,
-    waUnlocked: sessionCanOpenSupport(d, step),
+    waUnlocked: sessionCanOpenSupport(d, step, unlockOnAccount),
   };
 }
 
@@ -636,7 +640,7 @@ export function onFreeText(step: string, text?: string, cfg: ChatRuntimeConfig =
   // Comprobante en revisión: el operario manda. Si YA tiene usuario y pide
   // ayuda/estafa, lo derivamos a WhatsApp (no lo dejamos mudo: Karen/KingCBA).
   if (step === 'validando') {
-    if (text && HELP_RE.test(text) && sessionCanOpenSupport(data, step)) return supportReply(cfg, data);
+    if (text && HELP_RE.test(text) && sessionCanOpenSupport(data, step, !!cfg.waUnlockOnAccount)) return supportReply(cfg, data);
     return [];
   }
 
@@ -664,11 +668,11 @@ export function onFreeText(step: string, text?: string, cfg: ChatRuntimeConfig =
   }
   // WhatsApp SOLO post-carga o "Ya tengo usuario". Antes: se queda en el chat.
   if (text && HELP_RE.test(text)) {
-    return sessionCanOpenSupport(data, step) ? supportReply(cfg, data) : reassureInChat();
+    return sessionCanOpenSupport(data, step, !!cfg.waUnlockOnAccount) ? supportReply(cfg, data) : reassureInChat();
   }
   if (step === 'welcome') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Tocá un botón de abajo para seguir 👇' }];
   if (step === 'account_pending') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Todavía estamos creando tu usuario, dame un momento 🙌' }];
   if (step === 'credenciales') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Cuando quieras cargar, tocá *Quiero el CBU 💳* 👇' }];
   if (step === 'comprobante') return [{ from: 'bot', delayMs: 700, at: now(), text: 'Cuando tengas el comprobante de la transferencia, mandámelo por acá 📸' }];
-  return sessionCanOpenSupport(data, step) ? supportReply(cfg, data) : reassureInChat();
+  return sessionCanOpenSupport(data, step, !!cfg.waUnlockOnAccount) ? supportReply(cfg, data) : reassureInChat();
 }

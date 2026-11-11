@@ -172,7 +172,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       updateLeadName(tenant, s.kommoLeadId, String(r.data.username)).catch(() => {});
       addLeadNote(tenant, s.kommoLeadId, `👤 Usuario Pagoda ${r.data.existing ? '(existente, recordado)' : 'creado'}: ${r.data.username}`);
     }
-    return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length, ...supportClientFlags(nextData, r.step) });
+    return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length, ...supportClientFlags(nextData, r.step, runtime.waUnlockOnAccount) });
   }
 
   // Ya tiene usuario: no crea otra cuenta, abre el hop de WhatsApp (header + botón).
@@ -185,7 +185,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     void notifyClientOutgoing(s.id, botMsgs).catch(() => {});
     await notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
     if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, '🔁 El cliente dijo que YA TIENE usuario — derivado a WhatsApp.');
-    return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length, ...supportClientFlags(r.data, r.step) });
+    return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length, ...supportClientFlags(r.data, r.step, runtime.waUnlockOnAccount) });
   }
 
   // "Hablar con un agente" (King/Paradise): crea IGUAL la cuenta por emergencia
@@ -227,7 +227,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     }
     const total = (s.messages?.length ?? 0) + botMsgs.length + 1;
     await notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
-    return NextResponse.json({ ok: true, messages: [...botMsgs, handoff], buttons: r.buttons, step: r.step, total, ...supportClientFlags({ ...r.data, requestedAgent: true }, r.step) });
+    return NextResponse.json({ ok: true, messages: [...botMsgs, handoff], buttons: r.buttons, step: r.step, total, ...supportClientFlags({ ...r.data, requestedAgent: true }, r.step, runtime.waUnlockOnAccount) });
   }
 
   if (b.action === 'want_cbu') {

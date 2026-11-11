@@ -92,7 +92,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       updateLeadName(tenant, s.kommoLeadId, String(r.data.username)).catch(() => {});
       addLeadNote(tenant, s.kommoLeadId, `👤 Usuario Pagoda ${r.data.existing ? '(existente, recordado)' : 'creado'} (por texto): ${r.data.username}`);
     }
-    return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length, ...supportClientFlags({ ...existing, ...r.data }, r.step) });
+    return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length, ...supportClientFlags({ ...existing, ...r.data }, r.step, runtime.waUnlockOnAccount) });
   }
 
   if ((s.step ?? 'welcome') === 'welcome' && HAVE_USER_RE.test(b.text)) {
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     const history = [...(s.messages ?? []), userMsg, ...botMsgs];
     await notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
     if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, '🔁 El cliente escribió que YA TIENE usuario — derivado a WhatsApp.');
-    return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length, ...supportClientFlags(r.data, r.step) });
+    return NextResponse.json({ ok: true, messages: botMsgs, buttons: r.buttons, step: r.step, total: history.length, ...supportClientFlags(r.data, r.step, runtime.waUnlockOnAccount) });
   }
 
   let replies = onFreeText(s.step ?? 'comprobante', b.text, runtime, (s.data ?? {}) as Record<string, unknown>);
@@ -131,11 +131,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (s.kommoLeadId) addLeadNote(tenant, s.kommoLeadId, `👤 Lead: ${b.text}`);
 
   // Manual: cada inbound avisa al operador. Soporte post-carga usa copy propio.
-  if (HELP_RE.test(b.text) && sessionCanOpenSupport((s.data ?? {}) as Record<string, unknown>, s.step)) {
+  if (HELP_RE.test(b.text) && sessionCanOpenSupport((s.data ?? {}) as Record<string, unknown>, s.step, runtime.waUnlockOnAccount)) {
     await notifyOperators(tenant, 'support', { sessionKey: s.sessionKey, name: s.name });
   } else {
     await notifyOperators(tenant, 'message', { sessionKey: s.sessionKey, name: s.name, text: b.text });
   }
 
-  return NextResponse.json({ ok: true, messages: botMsgs, total: history.length });
+  return NextResponse.json({ ok: true, messages: botMsgs, total: history.length, step: s.step, ...supportClientFlags((s.data ?? {}) as Record<string, unknown>, s.step, runtime.waUnlockOnAccount) });
 }

@@ -5,6 +5,7 @@ import { chatSessions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { acreditarChat } from '@/lib/chat/release';
 import { fetchKommoLead } from '@/lib/kommo';
+import { waUnlocksOnAccount } from '@/lib/chat/welcomeButtons';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,6 +70,8 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const fresh = messages.slice(Math.max(0, since));
   const assignedWa = s.assignedWa ?? null;
   const username = s.username && String(s.username).trim() ? String(s.username).trim() : null;
-  const waUnlocked = s.hasExistingUser === 'true' || step === 'done';
+  // Modelo cajero (ej. imperiovip): con credenciales entregadas (username) ya se
+  // habilita el WhatsApp, sin esperar la carga.
+  const waUnlocked = s.hasExistingUser === 'true' || step === 'done' || (waUnlocksOnAccount(tenant.slug) && !!username);
   return NextResponse.json({ ok: true, step, total: messages.length, messages: fresh, assignedWa, username, waUnlocked, ...(debug ? { dbg } : {}) });
 }

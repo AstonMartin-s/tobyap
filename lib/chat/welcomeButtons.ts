@@ -12,6 +12,15 @@ export const WANT_CBU_BTN: WelcomeBtn = { id: 'want_cbu', label: 'Quiero el CBU 
 
 export const AGENT_BUTTON_SLUGS = ['king', 'paradise', 'elganador', 'luck', 'piliking', 'imperiovip'];
 
+// Tenants donde el botón de WhatsApp se habilita apenas se ENTREGAN las
+// credenciales (hay username), sin esperar la carga. Modelo cajero: el cliente
+// coordina la carga con el cajero por WhatsApp. (bblack/partner NO: ahí el user
+// se crea antes del comprobante y derivar temprano trae gente sin convertir.)
+export const WA_UNLOCK_ON_ACCOUNT_SLUGS = ['imperiovip'];
+export function waUnlocksOnAccount(slug?: string | null): boolean {
+  return !!slug && WA_UNLOCK_ON_ACCOUNT_SLUGS.includes(slug);
+}
+
 // Clientes que NO muestran el botón "Ya tengo usuario" en la bienvenida.
 // Los recurrentes igual pueden escribir "ya tengo usuario" por texto (HAVE_USER_RE).
 export const NO_HAVE_USER_SLUGS: string[] = [];
