@@ -35,6 +35,8 @@ export interface ChatRuntimeConfig {
   cbuOfferOnlyBonus?: boolean;
   /** Si está, el alta manual siempre sugiere esta clave (sin random tipo aaa777). */
   fixedSuggestedPassword?: string;
+  /** Si está, el botón de WhatsApp al cajero abre SIN texto prellenado (limpio). */
+  cajeroWaNoText?: boolean;
 }
 
 export const DEFAULT_PORTAL_URL = 'https://greenbet.uno/login';
@@ -241,6 +243,7 @@ function parseLinks(raw: unknown, legacyPortal?: unknown, legacySupport?: unknow
 export function applyTenantRuntimeOverrides(cfg: ChatRuntimeConfig, tenantSlug?: string): ChatRuntimeConfig {
   let next = cfg;
   if (tenantSlug === 'king') next = { ...next, postAccreditCajera: false };
+  if (tenantSlug === 'imperiovip') next = { ...next, cajeroWaNoText: true };
   if (tenantSlug === 'elganador') {
     next = {
       ...next,

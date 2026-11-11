@@ -608,8 +608,12 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   // Cajero sticky: si el usuario tiene uno asignado, el botón del header abre ESE
   // número (con mensaje predeterminado), no la URL/rotación del cliente.
   const CAJERO_MSG = '¡Holaa! 🙌 Me derivaron a esta línea y quiero aprovechar mi promo 🎁✨';
+  // imperiovip: el botón abre WhatsApp limpio, sin texto prellenado.
+  const cajeroWaNoText = slug === 'imperiovip';
   const effectiveWaUrl = assignedWa
-    ? `https://wa.me/${assignedWa.replace(/\D/g, '')}?text=${encodeURIComponent(CAJERO_MSG)}`
+    ? (cajeroWaNoText
+        ? `https://wa.me/${assignedWa.replace(/\D/g, '')}`
+        : `https://wa.me/${assignedWa.replace(/\D/g, '')}?text=${encodeURIComponent(CAJERO_MSG)}`)
     : waBtn.url;
 
   // waBtn.direct (opt-in por tenant): el botón abre WhatsApp directo, sin el gate

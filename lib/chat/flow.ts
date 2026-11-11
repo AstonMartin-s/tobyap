@@ -94,10 +94,11 @@ async function assignCajeroData(tenantId: string): Promise<Record<string, unknow
 // Mensaje que se prellena al abrir el WhatsApp del cajero asignado.
 export const CAJERO_WA_MSG = '¡Holaa! 🙌 Me derivaron a esta línea y quiero aprovechar mi promo 🎁✨';
 
-/** Link wa.me directo al cajero asignado (sticky), con mensaje predeterminado. */
-export function stickyWaUrl(phone: string, msg = CAJERO_WA_MSG): string {
+/** Link wa.me directo al cajero asignado (sticky). Con `msg` vacío → abre limpio
+ *  (sin ?text prellenado). */
+export function stickyWaUrl(phone: string, msg: string = CAJERO_WA_MSG): string {
   const digits = String(phone).replace(/\D/g, '');
-  return `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`;
+  return msg ? `https://wa.me/${digits}?text=${encodeURIComponent(msg)}` : `https://wa.me/${digits}`;
 }
 
 /** Si la sesión tiene cajero asignado, override del slot {support} con el link
@@ -117,7 +118,7 @@ const SUPPORT_BTN_TEXT = '🙋 Tocá el botón de acá abajo y hablás directo c
  *  cajero (tenants sin pool) → template normal con link de soporte. */
 function buildSupportMsg(cfg: ChatRuntimeConfig, data: Record<string, unknown>, delayMs: number): BotMsg {
   const wa = data.assignedWa ? String(data.assignedWa).replace(/\D/g, '') : '';
-  if (wa) return { from: 'bot', delayMs, at: now(), text: SUPPORT_BTN_TEXT, wa: stickyWaUrl(wa) };
+  if (wa) return { from: 'bot', delayMs, at: now(), text: SUPPORT_BTN_TEXT, wa: stickyWaUrl(wa, cfg.cajeroWaNoText ? '' : undefined) };
   // Sin cajero sticky: si el soporte es una URL (landing walink/redvip o wa.me),
   // mostramos texto limpio + botón "Abrir WhatsApp" en vez del link crudo en el
   // cuerpo (mismo formato que los tenants con cajero, ej. a3).
@@ -134,7 +135,7 @@ function buildCajeraMsg(cfg: ChatRuntimeConfig, data: Record<string, unknown>, d
   const wa = data.assignedWa ? String(data.assignedWa).replace(/\D/g, '') : '';
   const url = (cfg.links.support || '').trim();
   const text = renderTemplate('accredited_cajera', cfg, wa ? { support: wa } : {});
-  if (wa) return { from: 'bot', delayMs, at: now(), text, wa: stickyWaUrl(wa) };
+  if (wa) return { from: 'bot', delayMs, at: now(), text, wa: stickyWaUrl(wa, cfg.cajeroWaNoText ? '' : undefined) };
   if (/^https?:\/\//i.test(url)) return { from: 'bot', delayMs, at: now(), text, wa: url };
   return { from: 'bot', delayMs, at: now(), text };
 }
