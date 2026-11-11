@@ -328,11 +328,14 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
   // Pedido de ElGanador para facilitar el ingreso. El teléfono se mantiene (match
   // de Meta + contacto); solo se sacan las confirmaciones.
   const simpleForm = slug === 'elganador';
+  // Un solo tick: mantiene el cartel de "atención automática" pero sin la tilde
+  // "Entendido" extra — queda solo la confirmación de número (ej. imperiovip).
+  const singleTick = slug === 'imperiovip';
 
   async function start() {
     setFormErr('');
     if (!phone.trim()) return setFormErr('Ingresá tu número de WhatsApp.');
-    if (!simpleForm && !ackAuto) return setFormErr('Confirmá que entendiste cómo es la atención.');
+    if (!simpleForm && !singleTick && !ackAuto) return setFormErr('Confirmá que entendiste cómo es la atención.');
     if (!simpleForm && !accept) return setFormErr('Necesitás confirmar que es tu número.');
     setStarting(true);
     try {
@@ -890,10 +893,12 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
                   <>🤖 La atención para crear tu usuario es <b>automática</b>, pero quedate tranquilo: <b> hay personas detrás</b> pendientes por si necesitás algo. Cuando quieras, pedí por <b>Soporte</b> y te atendemos 🙌</>
                 )}
               </p>
+              {!singleTick && (
               <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, color: '#111827', marginTop: 10, cursor: 'pointer' }}>
                 <input type="checkbox" checked={ackAuto} onChange={(e) => setAckAuto(e.target.checked)} style={{ marginTop: 2 }} />
                 <span>Entendido 👍</span>
               </label>
+              )}
               {wantsEarlyPush(slug) && (
                 <p style={{ fontSize: 12, lineHeight: 1.4, color: '#1b3a30', margin: '8px 0 0' }}>
                   {iosNeedsPwa
