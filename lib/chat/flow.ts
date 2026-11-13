@@ -34,7 +34,10 @@ import {
 } from '@/lib/chat/welcomeButtons';
 
 export type Btn = WelcomeBtn;
-export interface BotMsg { from: 'bot'; text?: string; copy?: string; image?: string; wa?: string; waLabel?: string; delayMs?: number; at: number }
+/** Tarjeta de credenciales (modelo cajero): usuario/contraseña con botones de
+ *  copiar + botón "Ingresar a la plataforma" que abre en pestaña nueva. */
+export interface CredsCard { username: string; password: string; playUrl: string; playLabel?: string }
+export interface BotMsg { from: 'bot'; text?: string; copy?: string; image?: string; wa?: string; waLabel?: string; creds?: CredsCard; delayMs?: number; at: number }
 
 export {
   AGENT_BUTTON_SLUGS,

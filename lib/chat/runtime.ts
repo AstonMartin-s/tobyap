@@ -40,6 +40,10 @@ export interface ChatRuntimeConfig {
   /** Si está, el WhatsApp se habilita al entregar credenciales (hay username),
    *  sin esperar la carga. Modelo cajero (ej. imperiovip). */
   waUnlockOnAccount?: boolean;
+  /** Si está, la entrega de credenciales se muestra como TARJETA (botones de
+   *  copiar usuario/contraseña + botón "Ingresar a la plataforma" en pestaña
+   *  nueva) en vez de texto plano con el link. Modelo cajero (ej. imperiovip). */
+  credsCard?: boolean;
 }
 
 export const DEFAULT_PORTAL_URL = 'https://greenbet.uno/login';
@@ -246,7 +250,7 @@ function parseLinks(raw: unknown, legacyPortal?: unknown, legacySupport?: unknow
 export function applyTenantRuntimeOverrides(cfg: ChatRuntimeConfig, tenantSlug?: string): ChatRuntimeConfig {
   let next = cfg;
   if (tenantSlug === 'king') next = { ...next, postAccreditCajera: false };
-  if (tenantSlug === 'imperiovip') next = { ...next, cajeroWaNoText: true, waUnlockOnAccount: true };
+  if (tenantSlug === 'imperiovip') next = { ...next, cajeroWaNoText: true, waUnlockOnAccount: true, credsCard: true };
   if (tenantSlug === 'elganador') {
     next = {
       ...next,

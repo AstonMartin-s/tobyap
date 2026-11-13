@@ -370,14 +370,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'usuario y contraseña requeridos' }, { status: 400 });
     }
     const runtime = await loadChatRuntime(session.tenantId, session.slug, s.phone, session.slug);
-    const creds = `\n\n👤 Usuario: *${username}*\n🔑 Contraseña: *${password}*\n\n🔗 Entrá acá:\n${runtime.links.portal_login}`;
-    const botMsgs = prepareBotBatch(
-      [
-        { from: 'bot', delayMs: 400, at: Date.now(), text: renderTemplate('account_done', runtime, { creds_block: creds }) },
-        { from: 'bot', delayMs: 1200, at: Date.now(), text: renderTemplate('account_agent_followup', runtime) },
-      ],
-      { op: true },
-    );
+    // Modelo cajero (ej. imperiovip): tarjeta con botones de copiar usuario/
+    // contraseña + botón "Ingresar a la plataforma" (pestaña nueva). El resto de
+    // tenants sigue con el bloque de texto + link.
+    const botMsgs = runtime.credsCard
+      ? prepareBotBatch(
+          [
+            { from: 'bot', delayMs: 400, at: Date.now(), text: '¡Listo! 🎉 Creamos tu usuario. Tocá para copiar 👇', creds: { username, password, playUrl: runtime.links.portal_login, playLabel: 'Ingresar a la plataforma' } },
+            { from: 'bot', delayMs: 1200, at: Date.now(), text: renderTemplate('account_agent_followup', runtime) },
+          ],
+          { op: true },
+        )
+      : prepareBotBatch(
+          [
+            { from: 'bot', delayMs: 400, at: Date.now(), text: renderTemplate('account_done', runtime, { creds_block: `\n\n👤 Usuario: *${username}*\n🔑 Contraseña: *${password}*\n\n🔗 Entrá acá:\n${runtime.links.portal_login}` }) },
+            { from: 'bot', delayMs: 1200, at: Date.now(), text: renderTemplate('account_agent_followup', runtime) },
+          ],
+          { op: true },
+        );
     // No pisar el paso si el cliente YA avanzó (ElGanador: demo → CBU → carga →
     // recién ahí Luis entrega el usuario). Solo empujamos a 'credenciales' si
     // todavía está en la bienvenida o esperando el alta.

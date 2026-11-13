@@ -4,7 +4,8 @@ import { wantsEarlyPush, type PushStatus } from '@/lib/chat/earlyPush';
 import { skipsAppStep, welcomeButtonsFor } from '@/lib/chat/welcomeButtons';
 import { ImageZoom } from '@/app/_components/ImageZoom';
 
-type Msg = { from: 'bot' | 'user'; text?: string; image?: string; mime?: string; name?: string; copy?: string; wa?: string; waLabel?: string; delayMs?: number };
+type Creds = { username: string; password: string; playUrl: string; playLabel?: string };
+type Msg = { from: 'bot' | 'user'; text?: string; image?: string; mime?: string; name?: string; copy?: string; wa?: string; waLabel?: string; creds?: Creds; delayMs?: number };
 type Btn = { id: string; label: string };
 
 const C = { header: '#008069', bg: '#ECE5DD', botBubble: '#FFFFFF', userBubble: '#D9FDD3', send: '#008069', ink: '#111B21', sub: '#667781' };
@@ -784,6 +785,31 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
                   </span>
                 </>
                 )
+              ) : m.creds ? (
+                <div>
+                  {m.text && <div style={{ marginBottom: 10 }}>{renderText(m.text)}</div>}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ background: '#F6F8FA', borderRadius: 10, padding: '8px 10px' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, textTransform: 'uppercase', letterSpacing: 0.4 }}>Usuario</div>
+                      <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: 0.3, fontFamily: 'ui-monospace, Menlo, monospace', wordBreak: 'break-all' }}>{m.creds.username}</div>
+                      <button onClick={() => copyCbu(m.creds!.username)} style={{ marginTop: 6, background: copied === m.creds.username ? '#25D366' : '#EAF7EF', color: copied === m.creds.username ? '#fff' : C.send, border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%' }}>
+                        {copied === m.creds.username ? 'Copiado ✓' : 'Copiar usuario'}
+                      </button>
+                    </div>
+                    <div style={{ background: '#F6F8FA', borderRadius: 10, padding: '8px 10px' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, textTransform: 'uppercase', letterSpacing: 0.4 }}>Contraseña</div>
+                      <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: 0.3, fontFamily: 'ui-monospace, Menlo, monospace', wordBreak: 'break-all' }}>{m.creds.password}</div>
+                      <button onClick={() => copyCbu(m.creds!.password)} style={{ marginTop: 6, background: copied === m.creds.password ? '#25D366' : '#EAF7EF', color: copied === m.creds.password ? '#fff' : C.send, border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%' }}>
+                        {copied === m.creds.password ? 'Copiado ✓' : 'Copiar contraseña'}
+                      </button>
+                    </div>
+                    <a href={m.creds.playUrl} target="_blank" rel="noreferrer"
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: C.send, color: '#fff', borderRadius: 10, padding: '11px 14px', fontSize: 15, fontWeight: 700, textDecoration: 'none', width: '100%', textAlign: 'center' }}>
+                      <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg>
+                      {m.creds.playLabel || 'Ingresar a la plataforma'}
+                    </a>
+                  </div>
+                </div>
               ) : (
                 m.copy ? (
                   <div>

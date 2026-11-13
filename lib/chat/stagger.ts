@@ -1,4 +1,4 @@
-import type { BotMsg } from '@/lib/chat/flow';
+import type { BotMsg, CredsCard } from '@/lib/chat/flow';
 
 /** Escalona `at` según delayMs para que bloques de bot no parezcan un solo disparo. */
 export function staggerBotMessages(messages: BotMsg[]): BotMsg[] {
@@ -17,6 +17,7 @@ export type StoredBotMsg = {
   copy?: string;
   wa?: string;
   waLabel?: string;
+  creds?: CredsCard;
   at: number;
   delayMs?: number;
   op?: boolean;
@@ -30,6 +31,7 @@ export function toStoredBot(m: BotMsg, extra?: Partial<StoredBotMsg>): StoredBot
     copy: m.copy,
     ...(m.wa ? { wa: m.wa } : {}),
     ...(m.waLabel ? { waLabel: m.waLabel } : {}),
+    ...(m.creds ? { creds: m.creds } : {}),
     at: m.at,
     delayMs: m.delayMs,
     ...extra,
