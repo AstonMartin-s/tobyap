@@ -787,7 +787,9 @@ export default function ChatWidget({ slug, token, campaign, ccpp, brand, primary
                 )
               ) : m.creds ? (
                 <div>
-                  {m.text && <div style={{ marginBottom: 10 }}>{renderText(m.text)}</div>}
+                  {/* El texto del mensaje lleva usuario/contraseña para el operador
+                      (panel). El cliente ve solo la tarjeta con botones de copiar. */}
+                  <div style={{ marginBottom: 10 }}>¡Listo! 🎉 Creamos tu usuario. Tocá para copiar 👇</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div style={{ background: '#F6F8FA', borderRadius: 10, padding: '8px 10px' }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, textTransform: 'uppercase', letterSpacing: 0.4 }}>Usuario</div>

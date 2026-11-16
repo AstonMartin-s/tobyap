@@ -376,7 +376,10 @@ export async function POST(req: NextRequest) {
     const botMsgs = runtime.credsCard
       ? prepareBotBatch(
           [
-            { from: 'bot', delayMs: 400, at: Date.now(), text: '¡Listo! 🎉 Creamos tu usuario. Tocá para copiar 👇', creds: { username, password, playUrl: runtime.links.portal_login, playLabel: 'Ingresar a la plataforma' } },
+            // El texto lleva usuario/contraseña para que el OPERADOR los vea en el
+            // panel y en el histórico. El widget del cliente ignora este texto y
+            // muestra la tarjeta (campo `creds`) con botones de copiar.
+            { from: 'bot', delayMs: 400, at: Date.now(), text: `¡Listo! 🎉 Creamos tu usuario 👇\n\n👤 Usuario: *${username}*\n🔑 Contraseña: *${password}*`, creds: { username, password, playUrl: runtime.links.portal_login, playLabel: 'Ingresar a la plataforma' } },
             { from: 'bot', delayMs: 1200, at: Date.now(), text: renderTemplate('account_agent_followup', runtime) },
           ],
           { op: true },
