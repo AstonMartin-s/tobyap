@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { and, eq, sql } from 'drizzle-orm';
@@ -7,9 +8,48 @@ import { clientSettings, landings, tenants } from '@/db/schema';
 import { getTenantBySlugAnyStatus } from '@/lib/tenants';
 import { pickNumberByCategory } from '@/lib/rotation';
 import { usesAdsSameOrigin } from '@/lib/chat/adsIsolation';
-import { LandingView, type LandingConfig } from './l/_landing';
+import { LandingView, landingMetadata, type LandingConfig } from './l/_landing';
 
 export const dynamic = 'force-dynamic';
+
+// Preview (Open Graph / WhatsApp) cuando la RAÍZ sirve la landing de un dominio
+// propio (ej volveapp.online). Sin esto cae al metadata default del panel
+// (TrackerIO). Usa previewTitle/previewDescription de la landing si existen.
+export async function generateMetadata(): Promise<Metadata> {
+  const row = await landingRowForHost();
+  if (!row) return {};
+  const { tenant, landing, base } = row;
+  const c = (landing.config ?? {}) as Record<string, string | null>;
+  return landingMetadata({
+    brand: c.brandName ? String(c.brandName) : tenant.name,
+    logoAbs: c.logoUrl ? base + String(c.logoUrl) : null,
+    url: base + '/',
+    neutral: String(c.neutralPreview) === 'true',
+    previewTitle: c.previewTitle ? String(c.previewTitle) : null,
+    previewDescription: c.previewDescription ? String(c.previewDescription) : null,
+  });
+}
+
+// Resuelve tenant + primera landing activa para el host actual (dominio propio).
+async function landingRowForHost() {
+  const h = headers();
+  const host = (h.get('host') ?? '').toLowerCase().replace(/^www\./, '').split(':')[0];
+  if (!host) return null;
+  const base = `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('host')}`;
+  const [match] = await db
+    .select({ tenantId: clientSettings.tenantId })
+    .from(clientSettings)
+    .where(sql`lower(regexp_replace(coalesce(${clientSettings.chatConfig} ->> 'landingDomain', ''), '^https?://', '')) = ${host}`)
+    .limit(1);
+  if (!match) return null;
+  const [slugRow] = await db.select({ slug: tenants.slug }).from(tenants).where(eq(tenants.id, match.tenantId)).limit(1);
+  if (!slugRow) return null;
+  const tenant = await getTenantBySlugAnyStatus(slugRow.slug);
+  if (!tenant) return null;
+  const [landing] = await db.select().from(landings).where(and(eq(landings.tenantId, tenant.id), eq(landings.active, true))).limit(1);
+  if (!landing) return null;
+  return { tenant, landing, base };
+}
 
 // Dominio propio de cliente (ej volveapp.online) apuntado al mismo app: si el
 // host de la request coincide con el landingDomain de un tenant, la RAÍZ sirve su
