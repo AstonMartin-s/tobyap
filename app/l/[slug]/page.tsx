@@ -116,6 +116,7 @@ export default async function Landing({
     telegramStartPrefix: t.slug === 'candywin' && c.telegramStartPrefix ? String(c.telegramStartPrefix) : null,
     noCode: c.noCode === true,
     neutralAds: isolated,
+    leadEvent: c.leadEvent != null && String(c.leadEvent).trim() !== '' ? String(c.leadEvent) : null,
   };
 
   return <LandingView {...cfg} />;

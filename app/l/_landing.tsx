@@ -72,6 +72,9 @@ export interface LandingConfig {
   noCode?: boolean; // no incluir "Codigo Promocion:" en el mensaje (CRM sin webhook, no matchea)
   /** Pauta aislada (juegayahorra): copy/OG neutros, sin marca/foto. */
   neutralAds?: boolean;
+  /** Si está (ej "Lead"), dispara ese evento estándar del Pixel al derivar. Para
+   *  clientes SIN CRM (ej. Volve) que empujan "Cliente potencial" por el pixel. */
+  leadEvent?: string | null;
 }
 
 // Piloto Meta solo paradise (chat): copy de página, no de redirect.
@@ -133,6 +136,7 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
     telegramBot: cfg.telegramBot ?? null,
     telegramStartPrefix: (cfg.telegramStartPrefix ?? '').replace(/[^A-Za-z0-9_]/g, ''),
     noCode: cfg.noCode ?? false,
+    leadEvent: (cfg.leadEvent ?? '').replace(/[^A-Za-z0-9_]/g, '') || null,
     redirectDelayMs: delay,
     // Si el mensaje configurado trae {fichas} o {bono}, se usa como plantilla.
     messageTpl: cfg.message && cfg.message.indexOf('{') !== -1 ? cfg.message : null,
@@ -188,6 +192,9 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
   }
   function go(d){
     var code = d && d.code;
+    // Evento estándar del Pixel al derivar (ej "Lead" / Cliente potencial). Para
+    // clientes sin CRM que optimizan la campaña por este evento del navegador.
+    if(C.leadEvent && window.fbq){try{fbq('track',C.leadEvent);}catch(e){}}
     // Destino TELEGRAM (afiliados): redirige al bot con el code como sub-id
     // (?start=<code>). El bot es caja negra; la conversión vuelve por webhook.
     if(C.telegramBot){

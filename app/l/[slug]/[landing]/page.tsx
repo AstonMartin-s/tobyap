@@ -117,6 +117,7 @@ export default async function NamedLanding({
     telegramStartPrefix: c.telegramStartPrefix != null && String(c.telegramStartPrefix).trim() !== '' ? String(c.telegramStartPrefix) : null,
     noCode: c.noCode === true || lp.type === 'soporte',
     neutralAds: isolated,
+    leadEvent: c.leadEvent != null && String(c.leadEvent).trim() !== '' ? String(c.leadEvent) : null,
   };
 
   // Soporte sin número ni redirectUrl (KingCBA): cae a Config → walink o
