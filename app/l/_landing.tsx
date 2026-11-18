@@ -192,9 +192,9 @@ fbq('init','${cfg.pixelId}');fbq('track','PageView');`
   }
   function go(d){
     var code = d && d.code;
-    // Evento estándar del Pixel al derivar (ej "Lead" / Cliente potencial). Para
-    // clientes sin CRM que optimizan la campaña por este evento del navegador.
-    if(C.leadEvent && window.fbq){try{fbq('track',C.leadEvent);}catch(e){}}
+    // Evento estándar del Pixel al derivar (ej "Lead" / Cliente potencial). Si el
+    // server ya mandó el mismo evento por CAPI, usa su eventID para deduplicar.
+    if(C.leadEvent && window.fbq){try{var lid=d&&d.leadEventId;fbq('track',C.leadEvent,{},lid?{eventID:lid}:undefined);}catch(e){}}
     // Destino TELEGRAM (afiliados): redirige al bot con el code como sub-id
     // (?start=<code>). El bot es caja negra; la conversión vuelve por webhook.
     if(C.telegramBot){

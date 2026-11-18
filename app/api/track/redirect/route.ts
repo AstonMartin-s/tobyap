@@ -5,6 +5,7 @@ import { metaEvents, attributions } from '@/db/schema';
 import { getTenantBySlug } from '@/lib/tenants';
 import { generateCode, resolveBono } from '@/lib/attribution';
 import { clientIp, rateLimit } from '@/lib/rateLimit';
+import { sendCapiEvent, conversationEventData } from '@/lib/meta';
 
 // ---------------------------------------------------------------------------
 // POST /api/track/redirect
@@ -86,9 +87,36 @@ export async function POST(req: NextRequest) {
     sentAt: new Date(),
   });
 
+  // 1b) Conversión CAPI en la derivación (clientes SIN CRM, ej Volve): empujamos
+  // el evento de conversación (ej "Lead" / Cliente potencial) server-side con la
+  // señal que trae la landing (fbp/fbc/fbclid + ip/ua). El eventId se devuelve
+  // para que el navegador dispare el MISMO evento con ese eventID y Meta deduplique.
+  let leadEventId: string | null = null;
+  if (tenant.customFields?.lead_on_redirect === 1 && tenant.metaCapiToken && tenant.capiEvents?.conversation) {
+    leadEventId = `lead:${crypto.randomUUID()}`;
+    try {
+      await sendCapiEvent(tenant, {
+        eventName: 'Conversacion',
+        eventId: leadEventId,
+        userData: {
+          fbp: b.fbp ?? null,
+          fbc: b.fbc ?? null,
+          fbclid: b.fbclid ?? null,
+          clientIp: ip,
+          userAgent,
+        },
+        customData: conversationEventData(tenant, {}),
+        actionSource: 'website',
+        eventSourceUrl: b.eventSourceUrl ?? null,
+      });
+    } catch {
+      // No romper la derivación si Meta falla; el pixel del navegador cubre igual.
+    }
+  }
+
   // 2) Token de atribución — omitir si la landing pidió noCode (soporte/walink sin CRM).
   if (skipCode) {
-    return NextResponse.json({ ok: true, noCode: true, bono, campaignId }, { headers: CORS });
+    return NextResponse.json({ ok: true, noCode: true, bono, campaignId, leadEventId }, { headers: CORS });
   }
 
   // Afiliados Telegram → prefijo TG (la landing lo marca); resto → PB.
@@ -117,5 +145,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, code, bono, campaignId }, { headers: CORS });
+  return NextResponse.json({ ok: true, code, bono, campaignId, leadEventId }, { headers: CORS });
 }
